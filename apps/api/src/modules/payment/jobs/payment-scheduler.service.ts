@@ -7,6 +7,10 @@ import {
   type CronStepRunner,
 } from "../../../monitoring/cron-step-runner";
 import { QUEUE_NAMES } from "../../../workers/constants";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 import { PaymentService } from "../payment.service";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { EventService } from "../../events/event.service";
@@ -131,7 +135,7 @@ export class PaymentSchedulerService implements OnModuleInit {
       matched: match.matched,
     });
     return {
-      summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
+      summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · UYARI: ${match.mismatched + match.missingInPaytr} fark` : ""}`,
       stats: {
         fetched: result.fetched,
         upserted: result.upserted,
@@ -175,7 +179,7 @@ export class PaymentSchedulerService implements OnModuleInit {
       upserted: result.settlements,
     });
     return {
-      summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · ⚠ ${verify.mismatches} fark` : ""}`,
+      summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · UYARI: ${verify.mismatches} fark` : ""}`,
       stats: {
         settlements: result.settlements,
         itemsFetchedFor: result.itemsFetchedFor,
@@ -279,17 +283,15 @@ export class PaymentSchedulerService implements OnModuleInit {
     });
 
     // Recover only durable safe states. Ambiguous provider submissions are
-    // quarantined for manual reconciliation and are never resubmitted.
+    // quarantined for manual reconciliation and are never resubmitted. The
+    // service raises the manual review alarm itself, one line per attempt
+    // and at most once a day each; a counts line here would repeat it on
+    // every run.
     await this.runStep("reconcileStuckRefundMarkers", async () => {
       const stuck = await this.paymentService.reconcileStuckRefundMarkers();
       if (stuck.recovered > 0) {
         this.logger.warn(
           `Stuck refund markers finalized: ${stuck.recovered} of ${stuck.checked}`,
-        );
-      }
-      if (stuck.manualReview > 0) {
-        this.logger.error(
-          `${stuck.manualReview} refund attempt(s) require manual provider reconciliation`,
         );
       }
     });
@@ -356,9 +358,9 @@ export class PaymentSchedulerService implements OnModuleInit {
               receiverId: trade.receiverId,
               reason: cancelReason,
             });
-          } catch (err: any) {
+          } catch (err: unknown) {
             this.logger.error(
-              `Failed to notify trade ${trade.tradeId}: ${err.message}`,
+              `Failed to notify trade ${trade.tradeId}: ${errorMessage(err)}`,
             );
           }
         }
@@ -457,12 +459,12 @@ export class PaymentSchedulerService implements OnModuleInit {
           cancelled: result.cancelled,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Error in expired preparing orders job: ${error.message}`,
-        error.stack,
+        `Error in expired preparing orders job: ${errorMessage(error)}`,
+        errorStack(error),
       );
-      log(`HATA: ${error.message}`);
+      log(`HATA: ${errorMessage(error)}`);
       // Yut MA: Bull job'ı "failed" olsun ki retry + Sentry Cron alarmı çalışsın.
       throw error;
     }

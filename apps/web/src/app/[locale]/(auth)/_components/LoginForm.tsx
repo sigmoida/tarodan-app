@@ -18,7 +18,7 @@ import {
 } from "../_lib/auth";
 import { useLoginFlow } from "../_hooks/useLoginFlow";
 
-/** "veya" ayıracı (Google butonu ile e-posta girişi arasında). */
+/** The "or" divider between the social buttons and the e-mail sign-in. */
 function OrDivider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3">
@@ -29,7 +29,7 @@ function OrDivider({ label }: { label: string }) {
   );
 }
 
-/** Çözülmüş e-postayı gösterir + "farklı e-posta" ile 1. adıma döner. */
+/** Shows the resolved e-mail; "use a different e-mail" returns to step 1. */
 function ResolvedEmail({
   email,
   onChange,
@@ -98,7 +98,7 @@ export function LoginForm() {
         </>
       }
     >
-      {/* 1. adım — e-posta + sosyal giriş */}
+      {/* Step 1: e-mail plus social sign-in */}
       {flow.step === "identify" && (
         <div className="space-y-4">
           <GoogleSignInButton onSuccess={flow.redirectAfterGoogle} />
@@ -135,7 +135,7 @@ export function LoginForm() {
         </div>
       )}
 
-      {/* 2. adım — parola (kayıtlı + parolalı hesap) */}
+      {/* Step 2: password (a registered account with a password) */}
       {flow.step === "password" && (
         <div className="space-y-4">
           <ResolvedEmail
@@ -213,18 +213,19 @@ export function LoginForm() {
         </div>
       )}
 
-      {/* 2. adım (alternatif) — Google-only hesap */}
-      {flow.step === "googleOnly" && (
+      {/* Step 2 (alternative): an account without a password. The copy says
+          nothing about how the account was created (the client does not know
+          it), so both providers are offered (sign-in methods plan, D5). */}
+      {flow.step === "noPassword" && (
         <div className="space-y-4">
           <ResolvedEmail
             email={flow.email}
             onChange={flow.back}
             changeLabel={t("auth.useDifferentEmail")}
           />
-          <p className="text-sm text-body">{t("auth.googleOnlyAccount")}</p>
-          {/* Bu dal "hesap Google ile oluşturulmuş, şifresi yok" durumuna özel
-              bir yönlendirme — Apple burada anlamsız olur, bilinçli olarak yok. */}
+          <p className="text-sm text-body">{t("auth.noPasswordAccount")}</p>
           <GoogleSignInButton onSuccess={flow.redirectAfterGoogle} />
+          <AppleSignInButton onSuccess={flow.redirectAfterGoogle} />
           <Button
             type="button"
             variant="outline"

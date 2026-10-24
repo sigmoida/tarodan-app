@@ -224,6 +224,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
       {} as any, // tradeRefunds — bu spec yalnız SİPARİŞ iadesini sürüyor
+      {} as any, // boostTimeline (not a boost order)
       undefined, // outbox
       opts.ledger as any, // Faz 6.2 ledger (@Optional)
     );

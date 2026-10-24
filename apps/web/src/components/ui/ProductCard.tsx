@@ -2,8 +2,11 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
-import { EyeIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import {
+  EyeIcon,
+  ArrowsRightLeftIcon,
+  RocketLaunchIcon,
+} from "@heroicons/react/24/outline";
 import {
   StarIcon as StarIconSolid,
   HeartIcon as HeartSolidIcon,
@@ -13,10 +16,14 @@ import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
 import ProductCardBadges from "@/components/ui/ProductCardBadges";
 import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
+import ProductCardPriceRow from "@/components/ui/ProductCardAction";
+import ProductCardTitleLink from "@/components/ui/ProductCardTitleLink";
 import {
   describeProductBadges,
+  productBadgeLabels,
   selectProductCardBadges,
 } from "@/lib/productCardBadges";
+import { toProductCardListing } from "@/lib/productCardListing";
 import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
@@ -28,38 +35,41 @@ import {
 import type { Product, ProductImage } from "@/types/product";
 import { formatTL } from "@/lib/format";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
+import { PRODUCT_PLACEHOLDER } from "@/lib/productPlaceholder";
+import { listingPath } from "@tarodan/types";
 
 /**
  * The single product/listing card for the whole marketplace (grid + list). It is
  * **fluid**: it fills whatever grid cell it's dropped into, so the same card works
  * at 4-across or 6-across — the column count is each route's grid, never a card
- * prop. Self-deriving: give it a raw `product` and it computes price / sale /
+ * prop. Its width must come from outside (a grid cell or a sized wrapper): the
+ * grid card is a size container (`@container`) and never grows to fit its
+ * content. Self-deriving: give it a raw `product` and it computes price / sale /
  * stock / image itself via the shared helpers — callers never precompute.
  *
  * Kept to a minimal API. Title, price and image ALWAYS render. `showMeta` (default
  * true) is the one toggle for the secondary info (brand · scale · year, rating,
  * views/likes, condition) — pass `false` for lean rails, dense grids or
  * reduced-shape items. `overlay` / `footer` are click-isolated slots for actions
- * (remove, add-to-cart, SOLD badges) rendered OUTSIDE the card's `<Link>`.
+ * (remove, add-to-cart, SOLD badges).
  *
- * Listing cards carry the favorite heart at the image's top-right
- * (`ProductCardFavorite`, also outside the `<Link>`); it is skipped for
- * non-navigating cards, where the caller opts out with `showFavorite={false}`,
- * and on grid cards that fill the top-right slot with their own `overlay`.
- * The grid image's top-left holds the badge stack (max 2: %discount → sponsored
- * → trade → campaign, see `selectProductCardBadges`); it is not drawn when the
- * caller fills the top-left slot with `overlayStart`. The list layout shows only
- * the trade icon (top-left of the image) — the discount stays beside the price.
+ * The title is the card's one link, stretched over the whole card
+ * (`ProductCardTitleLink`), so nothing else is inside an `<a>`: the favorite
+ * heart at the image's top-right (`ProductCardFavorite`) and the card action
+ * in the price row (`ProductCardPriceRow`: cart toggle, or "Öne Çıkar" /
+ * "Süre Ekle" on the viewer's own listing, from `productCardAction`) are
+ * sibling buttons above it. The heart is skipped for non-navigating cards
+ * (`href={null}`), where the caller opts out with `showFavorite={false}`, and
+ * on grid cards that fill the top-right slot with their own `overlay`. The
+ * action is skipped for non-navigating cards and for cards with a `footer`
+ * (Favorites puts a full-width cart toggle there, from the same rule and
+ * without the boost action). The grid image's top-left holds
+ * the badge stack (max 2: %discount → boosted → trade → campaign, see
+ * `selectProductCardBadges`); it is not drawn when the caller fills the
+ * top-left slot with `overlayStart`. The list layout shows the trade icon
+ * (top-left of the image) and the boosted badge above the title; the discount
+ * stays beside the price.
  */
-
-/**
- * Görselsiz ilan için YEREL placeholder (`_home/lib/helpers.ts` ile aynı dosya).
- * Burada bir zamanlar harici placehold.co URL'lerinden oluşan bir liste vardı ve
- * üzerlerinde "Hot Wheels", "Premium", "Rare Model" yazıyordu: her görselsiz
- * ilan hem üçüncü parti bir servise istek atıyor hem de taşımadığı bir marka
- * iddiasını taşıyordu.
- */
-const PRODUCT_PLACEHOLDER = "/product-placeholder.svg";
 
 function cardImageUrl(image: ProductImage | string | undefined): string {
   const url =
@@ -93,7 +103,10 @@ export interface ProductCardProps {
   overlay?: React.ReactNode;
   /** Click-isolated slot pinned to the top-left of the card (e.g. a SOLD badge). */
   overlayStart?: React.ReactNode;
-  /** Click-isolated slot below the card (e.g. an add-to-cart button). */
+  /**
+   * Click-isolated slot below the card (e.g. an add-to-cart button). When set,
+   * the card shows no action of its own in the price row.
+   */
   footer?: React.ReactNode;
   /**
    * Card link target. Defaults to the listing detail page; pass `null` for a
@@ -106,26 +119,6 @@ export interface ProductCardProps {
    * Never shown on non-navigating cards (`href={null}`).
    */
   showFavorite?: boolean;
-}
-
-/** Wraps the card body in a `Link` — or a plain `div` when `href` is null. */
-function CardLink({
-  href,
-  className,
-  onClick,
-  children,
-}: {
-  href: string | null;
-  className?: string;
-  onClick?: () => void;
-  children: React.ReactNode;
-}) {
-  if (!href) return <div className={className}>{children}</div>;
-  return (
-    <Link href={href} className={className} onClick={onClick}>
-      {children}
-    </Link>
-  );
 }
 
 export default function ProductCard({
@@ -141,8 +134,9 @@ export default function ProductCard({
   showFavorite = true,
 }: ProductCardProps) {
   const t = useTranslations();
+  const badgeLabels = productBadgeLabels(t);
 
-  const linkHref = href === undefined ? `/listings/${product.id}` : href;
+  const linkHref = href === undefined ? listingPath(product) : href;
   const trackClick =
     href === undefined
       ? () => {
@@ -155,18 +149,14 @@ export default function ProductCard({
   // Kalp yalnız gerçek ilan kartında: özel (ilansız) koleksiyon öğesi
   // favorilenemez.
   const favorite = showFavorite && linkHref !== null;
-  const sellerId = product.seller?.id ?? product.sellerId;
+  // The card action needs a real listing, and gives way to a caller's footer.
+  const withAction = linkHref !== null && !footer;
+  const listing = toProductCardListing(product);
 
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
-  // Liste kartı yalnız indirim + takas gösterir; seçim/koşul grid yığınıyla aynı
-  // tek kaynaktan (`selectProductCardBadges`) gelir.
-  const listBadges = selectProductCardBadges(product, Infinity).filter(
-    (badge) => badge.kind === "sale" || badge.kind === "trade",
-  );
-  const isTrade = listBadges.some((badge) => badge.kind === "trade");
   const salePercent = getProductDiscountPercent(product);
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
@@ -190,6 +180,16 @@ export default function ProductCard({
     ) : null;
 
   if (layout === "list") {
+    // The list row shows the discount, boosted and trade badges (the
+    // selection is the grid stack's `selectProductCardBadges`).
+    const listBadges = selectProductCardBadges(product, Infinity).filter(
+      (badge) =>
+        badge.kind === "sale" ||
+        badge.kind === "boosted" ||
+        badge.kind === "trade",
+    );
+    const isTrade = listBadges.some((badge) => badge.kind === "trade");
+    const isBoosted = listBadges.some((badge) => badge.kind === "boosted");
     return (
       <div className="relative">
         {/*
@@ -198,10 +198,9 @@ export default function ProductCard({
           fiyat) başlığa 25px kalıyordu — kart okunamaz hâle geliyordu. Görsel
           ve yazı ölçüleri de aynı gerekçeyle kademeli.
 
-          Link "gerilmiş" bir başlık linkidir: `after:inset-0` bütün kartı
-          tıklanır yapar, ama satır `<a>`'nın İÇİNDE değildir — böylece favori
-          kalbi görselin kendi hücresinde (kenar/padding'den bağımsız, köşede)
-          durabilir ve link içinde buton olmaz.
+          The title is a stretched link: the whole row is clickable, but the
+          row is not inside the `<a>`, so the heart and the action can sit in
+          it as buttons.
         */}
         <div className="relative bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex flex-wrap items-center gap-3 p-3 sm:gap-4">
           <div className="relative w-20 h-20 xs:w-28 xs:h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
@@ -227,32 +226,32 @@ export default function ProductCard({
             {favorite && (
               <ProductCardFavorite
                 productId={product.id}
-                sellerId={sellerId}
+                sellerId={listing.sellerId}
                 frameClassName="inset-0"
               />
             )}
           </div>
           <div className="flex-1 min-w-0">
+            {isBoosted && (
+              // Above the stretched link for its paid-placement tooltip.
+              <ProductBadge
+                variant="boosted"
+                className="relative z-10 mb-1"
+                aria-hidden="true"
+                title={badgeLabels.boostedHint}
+                icon={<RocketLaunchIcon className="w-3 h-3" />}
+              >
+                {badgeLabels.boosted}
+              </ProductBadge>
+            )}
             <h3 className="font-semibold text-heading line-clamp-2 text-base xs:text-xl sm:text-2xl leading-tight">
               {linkHref ? (
-                <Link
+                <ProductCardTitleLink
                   href={linkHref}
+                  title={product.title}
+                  badgeSummary={describeProductBadges(listBadges, badgeLabels)}
                   onClick={trackClick}
-                  className="after:absolute after:inset-0"
-                >
-                  {product.title}
-                  {/* Rozetler linkin dışında: erişilebilir ad onları da taşısın. */}
-                  {listBadges.length > 0 && (
-                    <span className="sr-only">
-                      {" "}
-                      {describeProductBadges(listBadges, {
-                        discount: t("product.discount"),
-                        sponsored: t("product.sponsored"),
-                        trade: t("faq.trade"),
-                      })}
-                    </span>
-                  )}
-                </Link>
+                />
               ) : (
                 product.title
               )}
@@ -277,11 +276,15 @@ export default function ProductCard({
             )}
           </div>
           {/*
-            `xs` altında tam genişlikte, sağa yaslı TEK satır (eski fiyat ·
-            fiyat · indirim rozeti yan yana); `xs` üstünde eski hâli — sağda
-            dikey sütun. Tek render, iki düzen.
+            Below `xs`: one full-width, right-aligned line (old price, price,
+            discount badge, icon-only action). From `xs` up: the right column,
+            the text action under the price.
           */}
-          <div className="flex w-full flex-shrink-0 flex-row items-baseline justify-end gap-2 text-right xs:ml-4 xs:w-auto xs:flex-col xs:items-end xs:gap-0">
+          <ProductCardPriceRow
+            listing={listing}
+            layout="list"
+            withAction={withAction}
+          >
             {onSale && (
               <span className="text-sm text-subtle line-through">
                 {fmtTL(originalPrice)}
@@ -299,7 +302,7 @@ export default function ProductCard({
                 %{salePercent}
               </ProductBadge>
             )}
-          </div>
+          </ProductCardPriceRow>
         </div>
         {overlay && (
           <div className="absolute top-2 right-2 z-10">{overlay}</div>
@@ -309,73 +312,81 @@ export default function ProductCard({
     );
   }
 
+  // Badges are drawn only when the caller leaves the top-left slot free.
+  const gridBadges = overlayStart ? [] : selectProductCardBadges(product);
+
   return (
-    <div className="relative group h-full flex flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
-      <CardLink
-        href={linkHref}
-        className="flex flex-1 flex-col"
-        onClick={trackClick}
-      >
-        <div className="relative aspect-square bg-surface-alt">
-          <OptimizedImage
-            src={imageUrl}
-            alt={product.title}
-            fill
-            sizes={IMAGE_SIZES.productGrid}
-            className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${outOfStock ? " opacity-50" : ""}`}
-            fallbackSrc={PRODUCT_PLACEHOLDER}
-            logContext={{ listingId: product.id, page: "product-card" }}
-            priority={priority}
-          />
-          {outOfStock && <OutOfStockOverlay />}
-          {/* Sol üst yuva `overlayStart`'ındır; doluysa rozet yığını çizilmez. */}
-          {!overlayStart && (
-            <ProductCardBadges
-              product={product}
-              sponsoredLabel={t("product.sponsored")}
-              tradeLabel={t("faq.trade")}
-              discountLabel={t("product.discount")}
+    <div className="@container relative group h-full flex flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
+      <div className="relative aspect-square bg-surface-alt">
+        <OptimizedImage
+          src={imageUrl}
+          alt={product.title}
+          fill
+          sizes={IMAGE_SIZES.productGrid}
+          className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${outOfStock ? " opacity-50" : ""}`}
+          fallbackSrc={PRODUCT_PLACEHOLDER}
+          logContext={{ listingId: product.id, page: "product-card" }}
+          priority={priority}
+        />
+        {outOfStock && <OutOfStockOverlay />}
+        {/* The top-left slot is `overlayStart`'s; when set, no badge stack. */}
+        {!overlayStart && (
+          <ProductCardBadges product={product} labels={badgeLabels} />
+        )}
+      </div>
+      <div className="p-2.5 flex-1 flex flex-col">
+        <h3 className="font-medium text-heading line-clamp-2 text-sm sm:text-md leading-tight mb-1 group-hover:text-primary-600 transition-colors">
+          {linkHref ? (
+            <ProductCardTitleLink
+              href={linkHref}
+              title={product.title}
+              badgeSummary={describeProductBadges(gridBadges, badgeLabels)}
+              onClick={trackClick}
             />
+          ) : (
+            product.title
           )}
-        </div>
-        <div className="p-2.5 flex-1 flex flex-col">
-          <h3 className="font-medium text-heading line-clamp-2 text-sm sm:text-md leading-tight mb-1 group-hover:text-primary-600 transition-colors">
-            {product.title}
-          </h3>
-          {/* Meta + price pinned to the bottom so views/likes align across
-						    cards regardless of a 1- or 2-line title. */}
-          <div className="mt-auto">
-            {showMeta && (
-              <div className="flex items-center gap-3 mb-1.5 text-xs sm:text-sm text-subtle">
-                {ratingBlock("w-4 h-4")}
-                <span className="flex items-center gap-0.5">
-                  <HeartSolidIcon className="w-4 h-4 text-danger-500" />
-                  {product.likeCount ?? 0}
-                </span>
-                <span className="flex items-center gap-0.5">
-                  <EyeIcon className="w-4 h-4 text-primary-500" />
-                  {product.viewCount ?? 0}
-                </span>
-              </div>
-            )}
-            <div className="pt-1.5 border-t border-border-subtle">
-              {onSale && (
-                <span className="text-sm text-subtle line-through ml-1.5">
-                  {fmtTL(originalPrice)}
-                </span>
-              )}
-              <p className="font-bold text-primary-600 text-md sm:text-lg">
-                {fmtTL(effectivePrice)}
-              </p>
+        </h3>
+        {/* Meta + price pinned to the bottom so views/likes align across
+            cards regardless of a 1- or 2-line title. */}
+        <div className="mt-auto">
+          {showMeta && (
+            <div className="flex items-center gap-3 mb-1.5 text-xs sm:text-sm text-subtle">
+              {ratingBlock("w-4 h-4")}
+              <span className="flex items-center gap-0.5">
+                <HeartSolidIcon className="w-4 h-4 text-danger-500" />
+                {product.likeCount ?? 0}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <EyeIcon className="w-4 h-4 text-primary-500" />
+                {product.viewCount ?? 0}
+              </span>
             </div>
-          </div>
+          )}
+          <ProductCardPriceRow
+            listing={listing}
+            layout="grid"
+            withAction={withAction}
+          >
+            {onSale && (
+              <span className="text-sm text-subtle line-through ml-1.5">
+                {fmtTL(originalPrice)}
+              </span>
+            )}
+            <p className="font-bold text-primary-600 text-base sm:text-lg">
+              {fmtTL(effectivePrice)}
+            </p>
+          </ProductCardPriceRow>
         </div>
-      </CardLink>
-      {/* Sağ üst yuva `overlay`'indir; doluysa kalp çizilmez. */}
+      </div>
+      {/* The top-right slot is `overlay`'s; when set, no heart. */}
       {favorite && !overlay && (
-        <ProductCardFavorite productId={product.id} sellerId={sellerId} />
+        <ProductCardFavorite
+          productId={product.id}
+          sellerId={listing.sellerId}
+        />
       )}
-      {footer && <div className="px-2.5 pb-2.5">{footer}</div>}
+      {footer && <div className="relative z-10 px-2.5 pb-2.5">{footer}</div>}
       {overlay && (
         <div className="absolute top-1.5 right-1.5 z-10">{overlay}</div>
       )}

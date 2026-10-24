@@ -3,19 +3,23 @@ import { RefundAttemptStatus } from "@prisma/client";
 import {
   IsEnum,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Min,
   MaxLength,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { IsTlAmount } from "../../../common/validators/tl-amount";
 
 export class ManualRefundDto {
+  // TL with at most two decimals. `@IsNumber({ maxDecimalPlaces })` threw on
+  // an exponent form (1e-7) and the pipe answered 500; `IsTlAmount` refuses it
+  // with a 400. The service bounds it by what is refundable. Text is still
+  // converted (`@Type`): the admin form sends a number.
   @ApiPropertyOptional({ minimum: 0.01 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsTlAmount()
   @Min(0.01)
   amount?: number;
 

@@ -1,5 +1,6 @@
 /** @format */
 
+import { CheckIcon } from "@heroicons/react/24/outline";
 import { tradeStatusConfig } from "@tarodan/ui";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
@@ -196,9 +197,16 @@ export const getTradeStatusMeta = (
   };
 };
 
+export interface ShipmentChipMeta {
+  label: string;
+  className: string;
+  /** Leading design-system icon (no glyphs in copy). */
+  Icon?: typeof CheckIcon;
+}
+
 export const SHIPMENT_STATUS_CHIP = (
   t: Translate,
-): Record<string, { label: string; className: string; icon?: string }> => ({
+): Record<string, ShipmentChipMeta> => ({
   label_created: {
     label: t("page.trades.types.etiketHazir"),
     className: "bg-surface-muted text-muted border border-border-subtle",
@@ -214,7 +222,7 @@ export const SHIPMENT_STATUS_CHIP = (
   delivered: {
     label: t("page.trades.types.depoyaUlasti"),
     className: "bg-success-50 text-success-700 border border-success-200",
-    icon: "✓",
+    Icon: CheckIcon,
   },
 });
 

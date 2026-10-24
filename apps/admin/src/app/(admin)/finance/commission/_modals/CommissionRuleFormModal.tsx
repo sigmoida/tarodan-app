@@ -65,21 +65,22 @@ function RateBlock({
           min="0"
           max="100"
         />
+        {/* TL bounds are text, not type="number" (see `@/lib/schemas/amount`). */}
         <FormInput
           name={minName}
           label={t("admin.finance.commission.minTl")}
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           disabled={boundsDisabled}
           placeholder={t("admin.finance.commission.noFloor")}
         />
         <FormInput
           name={maxName}
           label={t("admin.finance.commission.maxTl")}
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           disabled={boundsDisabled}
           placeholder={t("admin.finance.commission.noCap")}
         />
@@ -335,19 +336,20 @@ export function CommissionRuleFormModal({
           {t("admin.finance.commission.amountRangeStrictHint")}
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* TL amounts are text, not type="number" (see `@/lib/schemas/amount`). */}
           <FormInput
             name="minAmount"
             label={t("admin.finance.commission.minAmountLabel")}
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
           />
           <FormInput
             name="maxAmount"
             label={t("admin.finance.commission.maxAmountLabel")}
-            type="number"
-            step="0.01"
-            min="0.01"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
             placeholder="∞"
           />
         </div>
@@ -393,16 +395,16 @@ export function CommissionRuleFormModal({
           <FormInput
             name="tradeFeeSellerAmount"
             label={t("admin.finance.commission.tradeFeeSeller")}
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
           />
           <FormInput
             name="tradeFeeBuyerAmount"
             label={t("admin.finance.commission.tradeFeeBuyer")}
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
           />
         </div>
       </Panel>

@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, ClockIcon, TagIcon } from "@heroicons/react/24/outline";
 import {
   Alert,
   Badge,
@@ -14,14 +14,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@tarodan/ui";
-import BoostModal from "./_modals/BoostModal";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
+import { useBoostLauncher } from "@/components/boost/useBoostLauncher";
+import { useBoostDeepLink } from "./_hooks/useBoostDeepLink";
 import type { SellerRemovalAction } from "@/components/listings/listingRemovalSchema";
-import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import {
   useMyListings,
@@ -48,14 +48,13 @@ export default function ProfileListingsPage() {
   const t = useTranslations();
   const searchParams = useSearchParams();
   const { ready } = useRequireAuth();
-  const user = useAuthStore((s) => s.user);
-  const isPremiumUser =
-    !!(user as any)?.membershipTier && (user as any).membershipTier !== "free";
 
   const [activeFilter, setActiveFilter] = useState(
     searchParams.get("status") || "all",
   );
-  const [boostTarget, setBoostTarget] = useState<Listing | null>(null);
+  const boost = useBoostLauncher();
+  // `?boost=<productId>` (payment-fail "Tekrar dene") opens the dialog once.
+  useBoostDeepLink(ready, boost.open);
   // Silme ve pasife alma önce NEDEN sorar; hangi ilan, hangi eylem.
   const [removalTarget, setRemovalTarget] = useState<{
     id: string;
@@ -182,7 +181,14 @@ export default function ProfileListingsPage() {
           ))}
         </div>
       ) : listings.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={
+            isExpiredTab ? (
+              <ClockIcon className="h-7 w-7" />
+            ) : (
+              <TagIcon className="h-7 w-7" />
+            )
+          }
           title={
             isExpiredTab
               ? t("profile.expiredListings.empty")
@@ -234,7 +240,13 @@ export default function ProfileListingsPage() {
                   setRemovalTarget({ id, action: "deactivate" })
                 }
                 onRenew={(id) => renewMutation.mutate(id)}
-                onBoost={setBoostTarget}
+                onBoost={(l: Listing) =>
+                  boost.open({
+                    id: l.id,
+                    title: l.title,
+                    boostedUntil: l.boostedUntil ?? null,
+                  })
+                }
               />
             </div>
           ))}
@@ -258,16 +270,7 @@ export default function ProfileListingsPage() {
         />
       )}
 
-      {boostTarget && (
-        <BoostModal
-          listingId={boostTarget.id}
-          listingTitle={boostTarget.title}
-          boostedUntil={boostTarget.boostedUntil ?? null}
-          isPremium={isPremiumUser}
-          open={!!boostTarget}
-          onClose={() => setBoostTarget(null)}
-        />
-      )}
+      {boost.dialog}
     </PageShell>
   );
 }

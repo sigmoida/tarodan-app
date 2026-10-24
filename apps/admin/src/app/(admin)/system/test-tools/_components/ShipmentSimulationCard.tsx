@@ -44,9 +44,9 @@ export function ShipmentSimulationCard({ isProd }: { isProd: boolean }) {
             })}
           </p>
           {isProd && (
-            <p className="text-xs text-danger-700">
+            <Alert variant="danger">
               {t("admin.system.testTools.prodDataWarning")}
-            </p>
+            </Alert>
           )}
         </div>
       ),

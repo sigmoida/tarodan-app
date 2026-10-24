@@ -7,7 +7,14 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { OrderStatus, RatingStatus, TradeStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  RatingStatus,
+  TradeStatus,
+  Prisma,
+  type ProductRating,
+  type Rating,
+} from "@prisma/client";
 import {
   CreateUserRatingDto,
   CreateProductRatingDto,
@@ -22,6 +29,8 @@ import { NotificationType } from "../notification/dto";
 import { StorageService } from "../storage/storage.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import {
+  isPublicRatingStatus,
+  PUBLIC_RATING_STATUS,
   publicProductRatingWhere,
   publicUserRatingWhere,
 } from "../../common/helpers/public-rating";
@@ -29,10 +38,53 @@ import {
   PUBLIC_NAME_SELECT,
   publicIdentityFields,
   publicName,
+  type PublicIdentityInput,
 } from "../../common/helpers/public-identity";
 import { i18nMessage } from "../i18n";
 import { UserBlockService } from "../user-block/user-block.service";
 import { excludeIds } from "../user-block/user-block.helpers";
+import { virtualOrderKind } from "../payment/helpers/virtual-order-kind";
+
+/** A rating's author as the mappers read it (public identity + avatar). */
+type RatingAuthor = PublicIdentityInput & {
+  id: string;
+  avatarUrl?: string | null;
+};
+
+/** The `Rating` columns and relations `mapUserRatingToDto` reads. */
+type UserRatingRow = Pick<
+  Rating,
+  | "id"
+  | "giverId"
+  | "receiverId"
+  | "orderId"
+  | "tradeId"
+  | "score"
+  | "comment"
+  | "createdAt"
+> & {
+  giver?: RatingAuthor | null;
+  receiver?: PublicIdentityInput | null;
+};
+
+/** The `ProductRating` columns and relations `mapProductRatingToDto` reads. */
+type ProductRatingRow = Pick<
+  ProductRating,
+  | "id"
+  | "productId"
+  | "userId"
+  | "orderId"
+  | "score"
+  | "title"
+  | "review"
+  | "images"
+  | "isVerifiedPurchase"
+  | "helpfulCount"
+  | "createdAt"
+> & {
+  product?: { title: string } | null;
+  user?: RatingAuthor | null;
+};
 
 @Injectable()
 export class RatingService {
@@ -124,8 +176,10 @@ export class RatingService {
         throw new NotFoundException(i18nMessage("server.order.notFound"));
       }
 
-      // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
-      if (order.orderNumber?.startsWith("MEM-")) {
+      // Platform-service orders (membership, boost: a virtual product sold
+      // by the platform account) cannot be rated. A completed boost order
+      // used to pass, as only the membership order number was checked.
+      if (virtualOrderKind(order)) {
         throw new BadRequestException(
           i18nMessage("server.rating.membershipOrder"),
         );
@@ -300,8 +354,8 @@ export class RatingService {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
-    // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
-    if (order.orderNumber?.startsWith("MEM-")) {
+    // Platform-service orders (membership, boost) cannot be rated.
+    if (virtualOrderKind(order)) {
       throw new BadRequestException(
         i18nMessage("server.rating.membershipOrder"),
       );
@@ -391,13 +445,30 @@ export class RatingService {
    * Recalculate and update Product.averageRating and Product.ratingCount.
    * Called after create/delete/update of ProductRating. Prisma middleware emits product.changed for ES sync.
    *
-   * Bu kolonlar ürün kartındaki sayaç/ortalamanın TEK kaynağıdır (kart hiç
-   * ProductRating okumaz), bu yüzden yalnız yayınlanmış yorumları saymalıdır —
-   * aksi halde admin bir yorumu reddettiğinde kartta sayaç kalır, detayda
-   * yorum çıkmaz.
+   * These columns are the ONLY source of the product card's counter and
+   * average (the card never reads ProductRating), so they count published
+   * reviews only; otherwise a review an admin hides would stay counted on the
+   * card while the detail page no longer lists it.
+   *
+   * The product row is locked (`FOR UPDATE`) before the aggregate, so two
+   * recomputes of one product (a new review and an admin moderation) run one
+   * after the other and the later one counts the earlier commit; without the
+   * lock a stale count could overwrite a fresh one. With `db` (a moderation's
+   * transaction) the recompute commits with the status change; without it,
+   * it runs in its own short transaction.
    */
-  async updateProductRatingStats(productId: string): Promise<void> {
-    const stats = await this.prisma.productRating.aggregate({
+  async updateProductRatingStats(
+    productId: string,
+    db?: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (!db) {
+      await this.prisma.$transaction((tx) =>
+        this.updateProductRatingStats(productId, tx),
+      );
+      return;
+    }
+    await lockProductRow(db, productId);
+    const stats = await db.productRating.aggregate({
       where: publicProductRatingWhere({ productId }),
       _avg: { score: true },
       _count: true,
@@ -406,7 +477,7 @@ export class RatingService {
     const count = stats._count ?? 0;
     const avg = stats._avg?.score;
 
-    await this.prisma.product.update({
+    await db.product.update({
       where: { id: productId },
       data: {
         averageRating: avg != null ? avg : null,
@@ -509,7 +580,9 @@ export class RatingService {
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
 
     // Build orderBy based on sortBy parameter
-    let orderBy: any = { createdAt: "desc" };
+    let orderBy: Prisma.ProductRatingOrderByWithRelationInput = {
+      createdAt: "desc",
+    };
     switch (sortBy) {
       case "oldest":
         orderBy = { createdAt: "asc" };
@@ -638,11 +711,13 @@ export class RatingService {
       where: { id: ratingId },
       select: { status: true },
     });
-    if (!existing || existing.status !== RatingStatus.approved) {
+    // A non-public (hidden, legacy pending/rejected) review cannot be voted
+    // on: to the public it does not exist.
+    if (!existing || !isPublicRatingStatus(existing.status)) {
       throw new NotFoundException(i18nMessage("server.rating.reviewNotFound"));
     }
     const rating = await this.prisma.productRating.update({
-      where: { id: ratingId, status: RatingStatus.approved },
+      where: { id: ratingId, status: PUBLIC_RATING_STATUS },
       data: { helpfulCount: { increment: 1 } },
       include: {
         product: { select: { id: true, title: true } },
@@ -657,7 +732,7 @@ export class RatingService {
   // HELPER METHODS
   // ==========================================================================
   private mapUserRatingToDto(
-    rating: any,
+    rating: UserRatingRow,
     resolvedGiverAvatar?: string | null,
   ): UserRatingResponseDto {
     return {
@@ -683,7 +758,7 @@ export class RatingService {
   }
 
   private mapProductRatingToDto(
-    rating: any,
+    rating: ProductRatingRow,
     resolvedAvatarUrl?: string | null,
   ): ProductRatingResponseDto {
     return {
@@ -709,4 +784,15 @@ export class RatingService {
         : undefined,
     };
   }
+}
+
+/**
+ * Locks a product row for the rest of the transaction: the one lock every
+ * writer of the rating counters takes first (lock order product -> review).
+ */
+export async function lockProductRow(
+  db: Prisma.TransactionClient,
+  productId: string,
+): Promise<void> {
+  await db.$queryRaw`SELECT id FROM "products" WHERE id = ${productId} FOR UPDATE`;
 }

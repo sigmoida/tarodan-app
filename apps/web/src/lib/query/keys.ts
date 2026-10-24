@@ -1,6 +1,18 @@
 // Banka hesabı hesap alanında tek öğedir (`useWebItem` kaynağı + sabit id).
 const BANK_ACCOUNT_RESOURCE = "bank-account";
 const BANK_ACCOUNT_ID = "me";
+// The trade pickers' own-listings lists (new trade and counter offer, both
+// `useWebInfiniteList` entries under this resource).
+const TRADE_ELIGIBLE_RESOURCE = "trade-eligible-products";
+// The counter-offer editor's other-side picker (a `useWebInfiniteList`
+// resource); its own-side picker shares `TRADE_ELIGIBLE_RESOURCE`.
+const COUNTER_THEIR_PRODUCTS_RESOURCE = "counter-offer-their-products";
+// The signed-in account's sign-in methods (password yes/no, linked providers).
+const SIGN_IN_METHODS_RESOURCE = "profile-sign-in-methods";
+// The signed-in user's server-side saved searches (a `useWebList` resource).
+const SAVED_SEARCHES_RESOURCE = "profile-saved-searches";
+// The signed-in seller's "My boosts" sections (a `useWebList` resource).
+const BOOST_MY_RESOURCE = "boost-my";
 
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
@@ -104,7 +116,11 @@ export const queryKeys = {
     tiers: () => ["membership", "tiers"] as const,
     /** The current user's membership (tier + status + period). */
     me: () => ["membership", "me"] as const,
-    /** The current user's permissions/limits, incl. the tier's `isAdFree` flag. */
+    /**
+     * The whole `GET /membership/me/limits` body (the effective tier's values).
+     * One entry for every consumer (`hooks/useMembershipLimits`), each picking
+     * its field (`isAdFree`, `maxSavedSearches`) with `select`.
+     */
     limits: () => ["membership", "limits"] as const,
   },
   // NOTE: every factory below returns the SAME array a call site used inline
@@ -215,9 +231,30 @@ export const queryKeys = {
   profileListings: {
     all: () => ["profile-listings"] as const,
   },
+  /**
+   * The trade pickers' own-listings lists (`useTradeableProducts` and the
+   * counter offer's own side). `resource` is the `useWebInfiniteList` resource;
+   * `all()` is its prefix and matches every picker (per user + target or
+   * picker). The pickers refetch on open and on tab focus anyway;
+   * listing writes still mark it stale (`invalidateListingQueries`, or the
+   * resource in `useWebMutation({ invalidates })`) so a cached list is never
+   * served as fresh.
+   */
+  tradeEligible: {
+    resource: TRADE_ELIGIBLE_RESOURCE,
+    all: () => webKeys.all(TRADE_ELIGIBLE_RESOURCE),
+  },
+  /** The counter-offer editor's other-side picker, paged. */
+  counterOffer: {
+    theirResource: COUNTER_THEIR_PRODUCTS_RESOURCE,
+  },
   boost: {
-    pricing: () => ["boost-pricing"] as const,
+    /** The owner's package and price matrix for one listing. */
     options: (productId: string) => ["boost-options", productId] as const,
+    /** The signed-in seller's boost switch and due offers (one per session). */
+    offers: () => ["boost-offers"] as const,
+    /** "My boosts": `resource` is the `useWebList` resource (also what writes invalidate). */
+    my: { resource: BOOST_MY_RESOURCE },
   },
   // Hesap alanındaki tek öğe: `useWebItem` anahtarıyla BİREBİR aynı
   // (`webKeys.detail(resource, id)`), böylece `invalidates: ['bank-account']`
@@ -226,6 +263,20 @@ export const queryKeys = {
     resource: BANK_ACCOUNT_RESOURCE,
     id: BANK_ACCOUNT_ID,
     detail: () => webKeys.detail(BANK_ACCOUNT_RESOURCE, BANK_ACCOUNT_ID),
+  },
+  // Same key as `useWebList({ resource })`, so the writes can put their fresh
+  // `SignInMethods` answer straight into the cache.
+  signInMethods: {
+    resource: SIGN_IN_METHODS_RESOURCE,
+    list: () => webKeys.list(SIGN_IN_METHODS_RESOURCE),
+  },
+  /** Saved searches: `resource` is the `useWebList` resource (also what writes invalidate). */
+  savedSearches: {
+    resource: SAVED_SEARCHES_RESOURCE,
+  },
+  /** The 2FA page's status query (`GET /security/2fa/status`). */
+  twoFactor: {
+    status: () => ["2fa-status"] as const,
   },
   sellerDocuments: {
     all: () => ["seller-documents"] as const,
@@ -260,4 +311,9 @@ export const webKeys = {
       ? ([resource, "list"] as const)
       : ([resource, "list", params] as const),
   detail: (resource: string, id: string) => [resource, "detail", id] as const,
+  /** A paged list (`useInfiniteQuery`): one entry holds every loaded page. */
+  infinite: (resource: string, params?: unknown) =>
+    params === undefined
+      ? ([resource, "infinite"] as const)
+      : ([resource, "infinite", params] as const),
 };

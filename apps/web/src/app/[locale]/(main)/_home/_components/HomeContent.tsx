@@ -1,4 +1,5 @@
 import { PageShell } from "@/components/layout/PageShell";
+import { HOME_RAILS } from "../lib/rails";
 import type { HomePageData } from "../lib/types";
 import BrandsMarquee from "../sections/BrandsMarquee";
 import FeaturedRail from "../sections/FeaturedRail";
@@ -22,12 +23,9 @@ export default function HomeContent({
 }) {
   const featuredCollector =
     data.featuredCollector ?? data.topCollections[0] ?? null;
-  const hasProducts =
-    data.featured.length +
-      data.discounted.length +
-      data.trade.length +
-      data.popular.length >
-    0;
+  // Only server-seeded cards can anchor the tour step; a rail loading
+  // client-side (`null` seed) does not count.
+  const hasProducts = HOME_RAILS.some((rail) => (data[rail]?.length ?? 0) > 0);
 
   return (
     <PageShell>

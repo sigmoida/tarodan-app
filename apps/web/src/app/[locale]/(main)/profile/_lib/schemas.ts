@@ -48,9 +48,10 @@ export const bankAccountSchema = (t: Translate) =>
   z.object({
     accountHolder: z.string().trim().min(2, t("validation.accountHolderMin2")),
     iban: z.string().refine(isValidIban, t("validation.ibanInvalid")),
-    // TCKN burada SORULMAZ: tek kaynak üyenin yasal kimliği (kimlik kapısı /
-    // profildeki "Kimlik bilgileri"). Banka formunda ikinci, çelişebilen bir
-    // kopya tutulmaz; sunucu da gönderilmeyen numaraya dokunmaz.
+    // The TCKN is NOT asked here: its one source is the member's legal
+    // identity (the identity gate / "Identity details" on the profile). The
+    // bank form keeps no second copy that could disagree, and the server
+    // leaves a number that is not sent untouched.
     taxId: z
       .string()
       .trim()
@@ -75,4 +76,26 @@ export const changePasswordSchema = (t: Translate) =>
     });
 export type ChangePasswordValues = z.infer<
   ReturnType<typeof changePasswordSchema>
+>;
+
+/** The first password of an account without one (no current password). */
+export const setPasswordSchema = (t: Translate) =>
+  z
+    .object({
+      newPassword: newPasswordSchema(t),
+      confirmPassword: z.string().min(1, t("validation.repeatNewPassword")),
+    })
+    .refine((d) => d.newPassword === d.confirmPassword, {
+      message: t("validation.passwordMatch"),
+      path: ["confirmPassword"],
+    });
+export type SetPasswordValues = z.infer<ReturnType<typeof setPasswordSchema>>;
+
+/** The step-up password proof: sent as typed (the API compares it with bcrypt). */
+export const reauthPasswordSchema = (t: Translate) =>
+  z.object({
+    password: z.string().min(1, t("validation.passwordRequired")),
+  });
+export type ReauthPasswordValues = z.infer<
+  ReturnType<typeof reauthPasswordSchema>
 >;

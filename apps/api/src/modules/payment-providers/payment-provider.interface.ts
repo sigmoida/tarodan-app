@@ -57,6 +57,11 @@ export interface IPaymentProvider {
     testMode?: boolean;
   };
 
+  /**
+   * Sends one refund; never retries (it moves money). A failure is one of the
+   * typed outcomes in `refund-errors.ts`: not sent (safe to resend), rejected
+   * (`nothingLeftToRefund` when the payment has nothing left) or unknown.
+   */
   createRefund(
     merchantOid: string,
     amount: number,
@@ -71,7 +76,8 @@ export interface IPaymentProvider {
     basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      successQueryParams?: string;
+      /** The query of both return URLs (`paymentReturnQuery`). */
+      returnQueryParams?: string;
       storeCard?: boolean;
       utoken?: string;
       savedCard?: {
@@ -126,6 +132,13 @@ export interface IPaymentProvider {
     ctoken: string,
   ): Promise<{ status: string; reason?: string }>;
 
+  /**
+   * Platform transfer instruction (seller payout). Resolves with the
+   * provider's parsed answer, accepted or rejected; rejects with
+   * `PlatformTransferRequestError` (`./transfer-errors`) when no usable answer
+   * came back, telling whether the request could have been processed.
+   * `totalAmount` is the slice of the payment this transfer settles.
+   */
   createPlatformTransfer(params: {
     merchantOid: string;
     transId: string;

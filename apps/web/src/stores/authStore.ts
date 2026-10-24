@@ -6,10 +6,18 @@ import {
   googleLoginAction,
   appleLoginAction,
   logoutAction,
+  type WebLoginResult,
 } from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
 import { getQueryClient } from "@/lib/query/getQueryClient";
-import { forgetWishlistOnUserChange } from "@/lib/wishlist";
+import {
+  isSignedIn,
+  syncQueryCacheWithSession,
+} from "@/lib/query/sessionCache";
+import {
+  isSessionPreservedPath,
+  setSessionGoneHandler,
+} from "@/lib/sessionGone";
 
 // Membership tier types
 export type MembershipTier = "free" | "basic" | "premium" | "business";
@@ -196,6 +204,17 @@ const mapApiUser = (apiUser: any): User => ({
  * (phone / taxId). checkAuth refreshes the full user right after.
  */
 const USER_SNAPSHOT_KEY = "tarodan_user_snapshot";
+
+/** Bumped by `clearSession`; a check of an older session never writes. */
+let sessionGeneration = 0;
+/** The pending `checkAuth` run, if any (single flight). */
+let activeCheck: Promise<void> | null = null;
+/** Set while a check is pending to ask for one more run after it. */
+let rerunCheck = false;
+/** Tags the pending check's own `/users/me` request (see the 401 report). */
+let checkSignal: AbortSignal | null = null;
+/** A hung `/users/me` must not hold the single flight forever. */
+const PROFILE_TIMEOUT_MS = 15_000;
 function readUserSnapshot(): User | null {
   if (typeof window === "undefined") return null;
   try {
@@ -214,8 +233,29 @@ function writeUserSnapshot(user: User) {
     /* ignore quota / serialization errors */
   }
 }
+/**
+ * Best-effort removal: `localStorage` throws (SecurityError) when site storage
+ * is blocked, and a sign-out must still reset the store after that.
+ */
+function removeStoredKeys(...keys: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    /* storage unavailable: nothing was stored either */
+  }
+}
 function clearUserSnapshot() {
-  if (typeof window !== "undefined") localStorage.removeItem(USER_SNAPSHOT_KEY);
+  removeStoredKeys(USER_SNAPSHOT_KEY);
+}
+/**
+ * Cleanup of retired localStorage keys, on every session check and sign-out:
+ * the old token keys (tokens now live in cookies) and the device-local saved
+ * searches (`diecast_saved_searches`; the list is on the server now and the
+ * old one is discarded, not imported, so it must not linger undisclosed).
+ */
+function clearLegacyStorageKeys() {
+  removeStoredKeys("auth_token", "refresh_token", "diecast_saved_searches");
 }
 
 interface AuthState {
@@ -243,7 +283,18 @@ interface AuthState {
     acceptMarketing?: boolean,
   ) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Resets the store to a guest without calling the server, for a session
+   * the server already ended (expired, or signed out in another tab).
+   */
+  clearSession: () => void;
   checkAuth: () => Promise<void>;
+  /**
+   * Re-runs `checkAuth` when the store disagrees with the session another
+   * tab or the server may have changed: the marker appeared or disappeared,
+   * or the stored snapshot belongs to another user.
+   */
+  reconcileSession: () => void;
   setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
   refreshUserData: () => Promise<void>; // Alias for refreshUser
@@ -295,6 +346,108 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => {
       const initial = getInitialAuthFromStorage();
+
+      /**
+       * One session check: the marker, the snapshot fast path, then
+       * `/users/me`. Its answer is dropped when the session ended meanwhile
+       * (`clearSession`) or another run was asked for (`rerunCheck`), which
+       * then answers with the current cookies.
+       */
+      const runSessionCheck = async () => {
+        const generation = sessionGeneration;
+        const superseded = () => generation !== sessionGeneration || rerunCheck;
+        clearLegacyStorageKeys();
+        // Could we be signed in? The server writes a JS-readable marker
+        // cookie with the session. Without it a guest stays a guest with no
+        // profile call; a signed-in store asks the server first, because
+        // the marker can be missing for a moment while two refreshes race.
+        if (!hasAuthMarker() && !isSignedIn(get())) {
+          get().clearSession();
+          return;
+        }
+
+        // FAST PATH: hydrate the account from the cached snapshot instantly (no
+        // network) so the header renders authed within one frame; the request
+        // below then refreshes the full, live user. Skipped when the store
+        // already holds that user: the snapshot lacks phone and taxId.
+        const snapshot = readUserSnapshot();
+        const current = get().user;
+        if (snapshot && snapshot.id !== current?.id) {
+          set({
+            user: snapshot,
+            isAuthenticated: true,
+            limits: getMembershipLimitsForUser(snapshot),
+            isLoading: false,
+          });
+        } else if (!current && !get().isAuthenticated) {
+          // Only an unresolved visitor shows the loading state: a signed-in
+          // store retrying its profile must not unmount the page's forms.
+          set({ isLoading: true });
+        }
+
+        try {
+          // /users/me: on a 401 the gateway proxy first tries a silent
+          // refresh from the session cookie.
+          const request = new AbortController();
+          checkSignal = request.signal;
+          const response = await userApi.getProfile({
+            timeout: PROFILE_TIMEOUT_MS,
+            signal: request.signal,
+          });
+          if (superseded()) return;
+          const apiUser = response.data.user || response.data;
+          const user = mapApiUser(apiUser);
+          const limits = getMembershipLimitsForUser(user);
+          // The server owns the tarodan_authed marker; the client never writes it.
+          writeUserSnapshot(user);
+          set({
+            user,
+            token: null,
+            refreshToken: null,
+            isAuthenticated: true,
+            limits,
+          });
+        } catch (error: unknown) {
+          if (superseded()) return;
+          const status = (error as { response?: { status?: number } })?.response
+            ?.status;
+          const isUnauthorized = status === 401 || status === 403;
+          // The BFF proxy expires the `tarodan_authed` marker ONLY when the session
+          // is genuinely dead (refresh token rejected). So a 401 whose marker is
+          // now gone is a real logout; a 401 whose marker SURVIVED was a transient
+          // refresh failure (API redeploy / 5xx) — don't eject the user. The server
+          // owns marker clearing now, so we no longer clear it here.
+          if (isUnauthorized && !hasAuthMarker()) {
+            get().clearSession();
+          } else {
+            // Transient error (API unreachable / 5xx / network / timeout, or a
+            // 401 that didn't kill the session) — the session may still be
+            // valid. Stay authenticated (user data fills on the next
+            // refreshUser/checkAuth). Otherwise an API hiccup — notably on the
+            // payment return refresh — ejected the user.
+            set({ isAuthenticated: true });
+          }
+        } finally {
+          if (!superseded()) set({ isLoading: false });
+        }
+      };
+
+      /**
+       * Shared tail of every sign-in action. The server action already wrote
+       * the httpOnly session cookies and the `tarodan_authed` marker; the
+       * client never writes them. The guest cache is dropped by the session
+       * listener below once checkAuth sets the user.
+       */
+      const completeSignIn = async (result: WebLoginResult) => {
+        if (result.status === "error") {
+          const error = new Error(result.message) as Error & { code: string };
+          error.code = result.reason;
+          throw error;
+        }
+        if (result.status === "2fa") throw twoFactorRequired();
+        await get().checkAuth();
+      };
+
       return {
         user: null,
         token: initial.token,
@@ -316,42 +469,17 @@ export const useAuthStore = create<AuthState>()(
             password,
             twoFactorCode,
           });
-          if (result.status === "error") {
-            const error = new Error(result.message) as Error & {
-              code: string;
-            };
-            error.code = result.reason;
-            throw error;
-          }
-          if (result.status === "2fa") throw twoFactorRequired();
-          // loginAction (server) yazdı: web_at/web_rt + tarodan_authed. Client yazmaz.
-          await get().checkAuth();
+          await completeSignIn(result);
         },
 
         loginWithGoogle: async (code: string) => {
           const result = await googleLoginAction(code);
-          if (result.status === "error") {
-            const error = new Error(result.message) as Error & {
-              code: string;
-            };
-            error.code = result.reason;
-            throw error;
-          }
-          if (result.status === "2fa") throw twoFactorRequired();
-          await get().checkAuth();
+          await completeSignIn(result);
         },
 
         loginWithApple: async (idToken: string, fullName?: string) => {
           const result = await appleLoginAction(idToken, fullName);
-          if (result.status === "error") {
-            const error = new Error(result.message) as Error & {
-              code: string;
-            };
-            error.code = result.reason;
-            throw error;
-          }
-          if (result.status === "2fa") throw twoFactorRequired();
-          await get().checkAuth();
+          await completeSignIn(result);
         },
 
         register: async (
@@ -376,23 +504,27 @@ export const useAuthStore = create<AuthState>()(
           // await get().login(email, password);
         },
 
+        // Never throws: callers (reset password, banned, delete account, ...)
+        // rely on the local session always being reset.
         logout: async () => {
           try {
-            await logoutAction(); // Server Action: API'de revoke + web_at/web_rt temizle
-          } catch (e) {
+            await logoutAction(); // Server Action: revoke on the API + clear web_at/web_rt
+          } catch {
             // Ignore logout errors
           }
 
-          if (typeof window !== "undefined") {
-            // tarodan_authed cookie'sini logoutAction (server) sildi; yine de yerel
-            // olarak da süresini geçir ki bir sonraki okuma anında misafir görsün.
-            clearAuthMarker();
-            // Eski anahtarların tek seferlik temizliği (token artık cookie'de).
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("refresh_token");
-          }
-          clearUserSnapshot();
+          // logoutAction (server) already deleted the tarodan_authed cookie;
+          // expire it locally too so the very next read sees a guest.
+          clearAuthMarker();
+          clearLegacyStorageKeys();
+          get().clearSession();
+        },
 
+        clearSession: () => {
+          // Answers of checks started before this point belong to the ended
+          // session and must not write it back (see runSessionCheck).
+          sessionGeneration++;
+          clearUserSnapshot();
           set({
             user: null,
             token: null,
@@ -403,87 +535,55 @@ export const useAuthStore = create<AuthState>()(
           });
         },
 
-        checkAuth: async () => {
-          // Eski (güvensiz) token anahtarlarının tek seferlik temizliği — artık httpOnly cookie kullanıyoruz.
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("refresh_token");
+        // Single flight: a call while a check is pending asks for one more run
+        // and resolves after it, so `await checkAuth()` (e.g. after a sign-in)
+        // always sees an answer for the cookies set before the call.
+        checkAuth: () => {
+          if (activeCheck) {
+            rerunCheck = true;
+            return activeCheck;
           }
-          // Girişli olabilir miyiz? Server'ın yazdığı JS-okunabilir cookie. Yoksa profil
-          // çağrısı yapmadan misafir say.
-          const maybeAuthed = hasAuthMarker();
+          activeCheck = (async () => {
+            do {
+              rerunCheck = false;
+              await runSessionCheck();
+            } while (rerunCheck);
+          })().finally(() => {
+            activeCheck = null;
+          });
+          return activeCheck;
+        },
 
-          if (!maybeAuthed) {
-            clearUserSnapshot();
-            set({
-              user: null,
-              token: null,
-              refreshToken: null,
-              isAuthenticated: false,
-              limits: null,
-              isLoading: false,
-            });
-            return;
-          }
-
-          // FAST PATH: hydrate the account from the cached snapshot instantly (no
-          // network) so the header renders authed within one frame; the request
-          // below then refreshes the full, live user.
-          const snapshot = readUserSnapshot();
-          if (snapshot) {
-            set({
-              user: snapshot,
-              isAuthenticated: true,
-              limits: getMembershipLimitsForUser(snapshot),
-              isLoading: false,
-            });
+        reconcileSession: () => {
+          const state = get();
+          const marker = hasAuthMarker();
+          const pending = activeCheck !== null;
+          let stale: boolean;
+          if (!isSignedIn(state)) {
+            // A pending check already answers a guest store with a marker.
+            stale = marker && !pending;
           } else {
-            set({ isLoading: true });
+            const snapshotId = readUserSnapshot()?.id;
+            const otherUser =
+              !!state.user && !!snapshotId && snapshotId !== state.user.id;
+            // A missing marker on checkout and payment pages keeps the
+            // session, as on a 401 there; another account taking over never
+            // does.
+            const markerGone =
+              !marker && !isSessionPreservedPath(window.location.pathname);
+            // Signed in without a profile (a failed or timed-out check):
+            // retry, except on checkout and payment pages.
+            const noProfile =
+              !state.user &&
+              !pending &&
+              !isSessionPreservedPath(window.location.pathname);
+            stale = otherUser || markerGone || noProfile;
           }
-
-          try {
-            // /users/me — 401 olursa api interceptor'ı cookie ile sessiz refresh deneyip tekrarlar.
-            const response = await userApi.getProfile();
-            const apiUser = response.data.user || response.data;
-            const user = mapApiUser(apiUser);
-            const limits = getMembershipLimitsForUser(user);
-            // tarodan_authed cookie'sini server yönetir; client yazmaz.
-            writeUserSnapshot(user);
-            set({
-              user,
-              token: null,
-              refreshToken: null,
-              isAuthenticated: true,
-              limits,
-            });
-          } catch (error: unknown) {
-            const status = (error as { response?: { status?: number } })
-              ?.response?.status;
-            const isUnauthorized = status === 401 || status === 403;
-            // The BFF proxy expires the `tarodan_authed` marker ONLY when the session
-            // is genuinely dead (refresh token rejected). So a 401 whose marker is
-            // now gone is a real logout; a 401 whose marker SURVIVED was a transient
-            // refresh failure (API redeploy / 5xx) — don't eject the user. The server
-            // owns marker clearing now, so we no longer clear it here.
-            if (isUnauthorized && !hasAuthMarker()) {
-              clearUserSnapshot();
-              set({
-                user: null,
-                token: null,
-                refreshToken: null,
-                isAuthenticated: false,
-                limits: null,
-              });
-            } else {
-              // Transient error (API unreachable / 5xx / network, or a 401 that didn't
-              // kill the session) — the token may still be valid. Stay authenticated
-              // (user data fills on the next refreshUser/checkAuth). Otherwise an API
-              // hiccup — notably on the payment return refresh — ejected the user.
-              set({ isAuthenticated: true });
-            }
-          } finally {
-            set({ isLoading: false });
-          }
+          if (!stale) return;
+          // A pending check may be answering for the old session: it is
+          // dropped and runs once more with the current cookies.
+          if (pending) rerunCheck = true;
+          else void get().checkAuth();
         },
 
         setUser: (user) => {
@@ -547,10 +647,33 @@ export const useAuthStore = create<AuthState>()(
   ),
 );
 
-// Kullanıcıya özel önbellek: çıkışta / kullanıcı değişince önceki
-// kullanıcının favori listesi QueryClient'ta kalmasın (bkz. lib/wishlist).
+// User-scoped cache: on sign-in, sign-out or an account change the previous
+// visitor's queries must not stay in the tab-wide QueryClient
+// (see lib/query/sessionCache).
 if (typeof window !== "undefined") {
-  useAuthStore.subscribe(forgetWishlistOnUserChange(getQueryClient));
+  useAuthStore.subscribe(
+    syncQueryCacheWithSession(getQueryClient, useAuthStore.getState()),
+  );
+  // The API client saw a 401 with the marker gone: re-check with the server
+  // and drop to a guest if the session really ended, also on the public
+  // pages the client does not redirect away from.
+  // A pending check meets its own /users/me 401 itself (recognised by its
+  // request's abort signal); queueing a re-run for it would loop. A 401 of
+  // any other request is reconciled, so a check answered just before the
+  // session ended does not keep its user.
+  setSessionGoneHandler((requestSignal) => {
+    if (activeCheck && requestSignal && requestSignal === checkSignal) return;
+    useAuthStore.getState().reconcileSession();
+  });
+  // Another tab signed in, signed out or switched account: it wrote or
+  // removed the user snapshot. Covers every route, with or without Header.
+  // A pending check may be answering for the previous account whatever the
+  // store shows, so it always runs once more.
+  window.addEventListener("storage", (event) => {
+    if (event.key !== USER_SNAPSHOT_KEY && event.key !== null) return;
+    if (activeCheck) rerunCheck = true;
+    else useAuthStore.getState().reconcileSession();
+  });
 }
 
 export default useAuthStore;

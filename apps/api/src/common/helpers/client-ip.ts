@@ -1,4 +1,5 @@
 import { BlockList, isIP } from "net";
+import { normalizeIp } from "@nestjs/throttler";
 import { GATEWAY_CLIENT_IP_HEADER } from "@tarodan/types";
 
 /**
@@ -72,11 +73,27 @@ export function resolveUserAgent(req: ClientIpRequest): string | null {
 }
 
 /**
- * `@Throttle` için iz sürücü: gateway trafiği tek bir web sunucusu IP'sinde
- * toplanmasın, her tarayıcı kendi kovasına düşsün (yukarıdaki güven kuralıyla).
+ * `@Throttle` tracker: gateway traffic does not collect in the web server's
+ * one IP; each browser gets its own bucket (with the trust rule above).
+ *
+ * The address is normalised like the throttler's own default tracker
+ * (`normalizeIp`, IPv6 grouped by /64): a client usually holds a whole /64,
+ * so rotating addresses inside it must not open new buckets. IPv4 stays as
+ * it is. Without any address all such requests share one bucket.
  */
 export async function clientIpThrottleTracker(
   req: Record<string, unknown>,
 ): Promise<string> {
-  return resolveClientIp(req as ClientIpRequest) ?? "unknown";
+  const ip = resolveClientIp(req as ClientIpRequest);
+  return ip ? normalizeIp(ip) : "unknown";
+}
+
+/**
+ * `@Throttle(clientIpThrottle(limit))`: a strict per-route limit counted per
+ * real client IP (`clientIpThrottleTracker`). Use it on every route the web
+ * calls through the gateway; the default `req.ip` bucket would put every web
+ * user into the one bucket of the web server and let one user lock out all.
+ */
+export function clientIpThrottle(limit: number, ttl = 60_000) {
+  return { default: { limit, ttl, getTracker: clientIpThrottleTracker } };
 }

@@ -9,21 +9,21 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import { Badge, Button } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useListingDetail } from "../_context/ListingDetailContext";
+import { formatRating } from "@/lib/format";
 import { publicNameOf } from "@/lib/public-name";
 
 export default function SellerCard() {
-  const { t, listing, isAuthenticated, isOwner, requireAuth } =
+  const { t, locale, listing, isAuthenticated, isOwner, requireAuth } =
     useListingDetail();
 
   const seller = listing?.seller;
   if (!seller) return null;
 
-  const isPremium = (seller as { isPremium?: boolean }).isPremium;
   const totalRatings = (seller as { totalRatings?: number }).totalRatings;
   const rating = seller.rating ?? 0;
   const listingsCount = seller.listings_count || seller.productsCount || 0;
@@ -60,19 +60,13 @@ export default function SellerCard() {
             <span className="font-semibold text-heading truncate transition-colors group-hover:text-primary-500">
               {name}
             </span>
-            {isPremium && (
-              <Badge variant="warning" size="sm" className="gap-1">
-                <StarIconSolid className="w-3 h-3" />
-                {t("seller.premiumBadge")}
-              </Badge>
-            )}
           </div>
           <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-sm text-muted mt-1">
             {rating > 0 ? (
               <span className="flex items-center gap-1">
                 <StarIconSolid className="w-4 h-4 text-warning-400" />
                 <span className="font-medium text-heading">
-                  {rating.toFixed(1)}
+                  {formatRating(rating, locale)}
                 </span>
                 {totalRatings != null && totalRatings > 0 && (
                   <span className="text-subtle">({totalRatings})</span>

@@ -1,8 +1,9 @@
 /**
- * Sentry Client Configuration
- * This file configures Sentry for the browser
+ * Sentry for the browser. `withSentryConfig` (see `sentry.build.js`) injects
+ * this file into the client entry, so it runs only in builds with a DSN.
  */
 import * as Sentry from "@sentry/nextjs";
+import { scrubSentryEvent, scrubSentryTransaction } from "@tarodan/logger";
 
 import {
   sentryEnvironment,
@@ -13,23 +14,22 @@ import { replaySampleRates } from "./src/lib/replayPolicy.mjs";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-
-  // Performance monitoring
-  tracesSampleRate: sentryTracesSampleRate,
-
-  // Session replay (captures user sessions for debugging). Kart sayfasına
-  // DOĞRUDAN girilirse oranlar 0'dır → replay hiç kurulmaz (PCI DSS 6.4.3:
-  // ödeme sayfasındaki script yüzeyini gerekçelendirilebilir tut). SPA ile
-  // sonradan girişte PaymentReplayGuard çalışan kaydı durdurur.
-  ...replaySampleRates(
-    typeof window === "undefined" ? undefined : window.location.pathname,
-  ),
-
-  // Environment
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
   environment: sentryEnvironment,
   release: sentryRelease,
+  initialScope: { tags: { app: "web" } },
 
-  // Filter out noisy errors
+  tracesSampleRate: sentryTracesSampleRate,
+
+  // Session Replay sample rates. A DIRECT visit to the card page gets 0, so
+  // replay is never set up there (PCI DSS 6.4.3: keep the payment page script
+  // surface justifiable); after an SPA navigation PaymentReplayGuard stops a
+  // running recording. See docs/PCI_PAYMENT_PAGE.md.
+  ...replaySampleRates(
+    typeof window === "undefined" ? undefined : window.location.pathname,
+    sentryEnvironment,
+  ),
+
   ignoreErrors: [
     // Network errors
     "Network request failed",
@@ -40,17 +40,9 @@ Sentry.init({
     /^moz-extension:/,
   ],
 
-  // Only enable in production or when DSN is set
-  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
-
-  // Attach user context
-  beforeSend(event) {
-    // Remove sensitive data
-    if (event.request?.data) {
-      const data = event.request.data as Record<string, unknown>;
-      if (data.password) data.password = "[REDACTED]";
-      if (data.token) data.token = "[REDACTED]";
-    }
-    return event;
-  },
+  // Ids only: no IP, cookies or user e-mail; every event and transaction
+  // goes through the shared scrubber (tarodan-ops: docs/observability.md).
+  sendDefaultPii: false,
+  beforeSend: scrubSentryEvent,
+  beforeSendTransaction: scrubSentryTransaction,
 });

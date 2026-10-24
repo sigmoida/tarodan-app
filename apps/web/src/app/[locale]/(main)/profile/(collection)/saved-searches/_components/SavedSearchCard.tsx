@@ -2,85 +2,56 @@
 
 "use client";
 
-import {
-  MagnifyingGlassIcon,
-  BellIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, IconButton } from "@tarodan/ui";
+import type { SavedSearch } from "@tarodan/types";
+import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
-import type { SavedSearch } from "../_lib/types";
-import { useTranslations } from "next-intl";
+import type { ColorOption } from "@/lib/listingFilterLabels";
+import { savedSearchChips } from "../_lib/chips";
 
 export default function SavedSearchCard({
   search,
-  onToggleNotify,
+  colorOptions,
   onDelete,
   onRun,
 }: {
   search: SavedSearch;
-  onToggleNotify: (id: string) => void;
-  onDelete: (id: string) => void;
+  /** The listings filter catalog's colours, to name colour chips. */
+  colorOptions?: readonly ColorOption[];
+  onDelete: (search: SavedSearch) => void;
   onRun: (search: SavedSearch) => void;
 }) {
   const t = useTranslations();
-  const filters = search.filters;
-  const hasFilters = filters && Object.keys(filters).length > 0;
+  const locale = useLocale();
+  const chips = savedSearchChips(search, t, locale, colorOptions);
 
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-6">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h3 className="mb-2 text-lg font-semibold text-heading">
-            &quot;{search.query || t("profile.savedSearchCard.tumIlanlar")}
-            &quot;
+            {search.name ?? t("savedSearch.untitled")}
           </h3>
-          {hasFilters && (
+          {chips.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
-              {filters?.category && (
-                <Badge variant="outline" size="sm">
-                  Kategori: {filters.category}
+              {chips.map((chip, i) => (
+                <Badge key={`${i}:${chip}`} variant="outline" size="sm">
+                  {chip}
                 </Badge>
-              )}
-              {filters?.brand && (
-                <Badge variant="outline" size="sm">
-                  Marka: {filters.brand}
-                </Badge>
-              )}
-              {(filters?.minPrice || filters?.maxPrice) && (
-                <Badge variant="outline" size="sm">
-                  {t("search.priceLabel")} {filters.minPrice || 0}₺ -{" "}
-                  {filters.maxPrice || "∞"}₺
-                </Badge>
-              )}
-              {filters?.condition && (
-                <Badge variant="outline" size="sm">
-                  Durum: {filters.condition}
-                </Badge>
-              )}
+              ))}
             </div>
           )}
           <p className="text-sm text-muted">
-            Kaydedildi: {formatDate(search.createdAt)}
+            {t("savedSearch.savedOn", { date: formatDate(search.createdAt) })}
           </p>
         </div>
 
         <div className="ml-4 flex items-center gap-2">
           <IconButton
-            variant={search.notifyEnabled ? "primary" : "ghost"}
-            aria-label={
-              search.notifyEnabled
-                ? t("profile.savedSearchCard.bildirimleriKapat")
-                : t("profile.savedSearchCard.bildirimleriAc")
-            }
-            onClick={() => onToggleNotify(search.id)}
-          >
-            <BellIcon className="h-5 w-5" />
-          </IconButton>
-          <IconButton
             variant="danger"
-            aria-label={t("page.savedSearches.savedsearchcard.sil")}
-            onClick={() => onDelete(search.id)}
+            aria-label={t("savedSearch.deleteTitle")}
+            onClick={() => onDelete(search)}
           >
             <TrashIcon className="h-5 w-5" />
           </IconButton>

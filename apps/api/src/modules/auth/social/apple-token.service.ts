@@ -188,6 +188,7 @@ export class AppleTokenService implements OnModuleInit {
       verifiedRefreshToken = refreshToken;
       const stored = await this.persistToken(
         input.userId,
+        input.appleUserId,
         input.clientId,
         this.cipher.encrypt(refreshToken),
       );
@@ -227,6 +228,11 @@ export class AppleTokenService implements OnModuleInit {
    * İptali istenmiş satırın üzerine ASLA yazılmaz: güncelleme yalnız
    * kullanıcının canlı (`revokeRequestedAt` boş) satırına yapılır.
    *
+   * The same holds when the Apple identity is no longer linked to the user
+   * (an unlink, `requestRevocation` under the same lock, committed while the
+   * exchange ran): the token is written revoke-requested and its revocation
+   * queued, so an unlinked Apple identity keeps no unrevoked authorization.
+   *
    * İkinci cihaz girişi önceki refresh token'ı İPTAL ETMEDEN ezer (bilinçli):
    * Apple'ın revoke'u yalnız token'ı değil kullanıcının o uygulamaya verdiği
    * yetkiyi de geçersiz kılar — eski token'ı iptal etmek, aynı kullanıcının
@@ -238,6 +244,7 @@ export class AppleTokenService implements OnModuleInit {
    */
   private async persistToken(
     userId: string,
+    appleUserId: string,
     clientId: string,
     refreshTokenEncrypted: string,
   ): Promise<boolean> {
@@ -247,7 +254,15 @@ export class AppleTokenService implements OnModuleInit {
 
       if (!user) return false;
 
-      if (user.deleted_at) {
+      // A deleted user, or an Apple identity no longer linked to the user
+      // (an unlink committed while the exchange ran): keep no unrevoked
+      // authorization.
+      const unlinkedReason = user.deleted_at
+        ? "after account deletion"
+        : (await this.isAppleIdentityLinked(tx, userId, appleUserId))
+          ? null
+          : "for an Apple identity no longer linked";
+      if (unlinkedReason) {
         const row = await tx.appleSignInToken.create({
           data: {
             userId,
@@ -259,7 +274,7 @@ export class AppleTokenService implements OnModuleInit {
         });
         await this.enqueueRevoke(tx, row.id);
         this.logger.warn(
-          `Apple token arrived after account deletion (user=${userId}, client=${clientId}) — queued for revocation`,
+          `Apple token arrived ${unlinkedReason} (user=${userId}, client=${clientId}) — queued for revocation`,
         );
         return true;
       }
@@ -284,6 +299,23 @@ export class AppleTokenService implements OnModuleInit {
       }
       return true;
     }, PERSIST_TOKEN_TX_OPTIONS);
+  }
+
+  private async isAppleIdentityLinked(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    appleUserId: string,
+  ): Promise<boolean> {
+    const link = await tx.oAuthAccount.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: "apple",
+          providerUserId: appleUserId,
+        },
+      },
+      select: { userId: true },
+    });
+    return link?.userId === userId;
   }
 
   /**
@@ -367,14 +399,18 @@ export class AppleTokenService implements OnModuleInit {
   }
 
   /**
-   * Hesap silme transaction'ı İÇİNDE çağrılır: kullanıcının iptal edilmemiş
-   * token satırlarını damgalar ve her biri için iptal işini outbox'a yazar.
-   * Önce kullanıcı satırını kilitler (`persistToken` ile sıralanır: eşzamanlı
-   * bir girişin token'ı ya burada görülür ya da iptal-istenmiş yazılır).
-   * Apple çağrısı commit sonrası drainer'dadır; başarısızlık silmeyi
-   * engellemez, outbox geri çekilerek yeniden dener (kalıcı hatada DLQ).
+   * Called INSIDE the account deletion transaction and the Apple unlink
+   * transaction (`SocialIdentityService.unlinkFromUser`): stamps the user's
+   * unrevoked token rows and writes one revocation job per row to the outbox.
+   * It locks the user row first, so it is ordered with `persistToken`: a
+   * concurrent sign-in's token is either seen here or written as
+   * revoke-requested (deletion only). The Apple call runs in the drainer
+   * after commit; a failure never blocks the deletion or the unlink, and the
+   * outbox retries with backoff (DLQ on a permanent error). After an unlink a
+   * later Apple sign-in writes a new live row, because a revoke-requested row
+   * is never updated.
    *
-   * @returns kuyruğa alınan iptal sayısı
+   * @returns the number of revocations queued
    */
   async requestRevocation(
     tx: Prisma.TransactionClient,

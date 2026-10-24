@@ -13,10 +13,15 @@ import { ProductRankingService } from "./ranking/product-ranking.service";
 import { ProductStatsService } from "./ranking/product-stats.service";
 import { ProductEngagementService } from "./ranking/product-engagement.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
+import { BoostNoticeService } from "./ranking/boost-notice.service";
+import { BoostAudienceService } from "./boost-seller/boost-audience.service";
+import { BoostSellerService } from "./boost-seller/boost-seller.service";
+import { BoostOfferService } from "./boost-seller/boost-offer.service";
 import { ProductController } from "./product.controller";
 import { ProductSchedulerService } from "./jobs/product-scheduler.service";
 import { BoostScheduledProcessor } from "./jobs/boost-scheduled.processor";
 import { ProductLockModule } from "./lock/product-lock.module";
+import { BoostTimelineModule } from "./boost-timeline/boost-timeline.module";
 import { MembershipModule } from "../membership/membership.module";
 import { SearchModule } from "../search/search.module";
 import { WishlistModule } from "../wishlist/wishlist.module";
@@ -26,6 +31,8 @@ import { StorageModule } from "../storage/storage.module";
 import { PaymentModule } from "../payment";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { CommissionModule } from "../commission/commission.module";
+import { SellerTrustModule } from "../seller-trust";
+import { ConsentModule } from "../consent/consent.module";
 
 import { UserBlockModule } from "../user-block/user-block.module";
 
@@ -40,11 +47,17 @@ import { UserBlockModule } from "../user-block/user-block.module";
     StorageModule,
     PaymentModule,
     ProductLockModule,
+    // The expire-boosts cron changes listing timelines through their owner.
+    BoostTimelineModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
     // Pilot: cron-tipi işler için 'scheduled' kuyruğu (Bull Board otomatik gösterir).
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     ModerationModule,
     CommissionModule,
+    // Ranking reads the stored seller trust score. A leaf, no cycle.
+    SellerTrustModule,
+    // The boost purchase records its consents with the order. A leaf.
+    ConsentModule,
   ],
   controllers: [ProductController],
   providers: [
@@ -59,6 +72,12 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductStatsService,
     ProductEngagementService,
     ProductBoostService,
+    // Seller notices of a boost (outbox handler + immediate send).
+    BoostNoticeService,
+    // The seller's side: who may buy what, "My boosts" and the offers.
+    BoostAudienceService,
+    BoostSellerService,
+    BoostOfferService,
     ProductSchedulerService,
     ...scheduledProcessors(BoostScheduledProcessor),
   ],
@@ -69,6 +88,7 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductCommonService,
     ProductRankingService,
     ProductBoostService,
+    BoostNoticeService,
     ProductSchedulerService,
     // Admin bakım işlemi (süresi dolmuş ilanları işaretle/reaktive et) yazmayı
     // alan servisten yapar — doğrudan Prisma yazımı değil.

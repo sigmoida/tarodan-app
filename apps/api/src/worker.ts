@@ -3,29 +3,20 @@
  * Standalone worker process for background job processing
  */
 import { NestFactory } from "@nestjs/core";
-import { Logger } from "@nestjs/common";
+import { INestApplicationContext, Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
-import {
-  applySentryBreadcrumbPolicy,
-  applySentryEventPolicy,
-  applySentryTransactionPolicy,
-  isProductionRuntime,
-  resolveSentryEnvironment,
-  resolveSentryRelease,
-} from "./modules/sentry/sentry-event";
+import { buildSentryNodeOptions } from "./modules/sentry/sentry-event";
 import { errorStack } from "./common/helpers/error-message";
 
 /**
- * Initialize Sentry for the worker process (#71). The worker runs as a separate
- * process and does NOT import the API's SentryModule, so without this every
- * background-job error — and any uncaught exception in the worker — went
- * unreported. Mirrors the API's Sentry config. The breadcrumb policy is NOT
- * optional here: Sentry's default fetch instrumentation records every outbound
- * call (Sürat tracking polls run in this process) and the Sürat contract carries
- * credentials in the query string — without the policy the password landed in
- * Sentry breadcrumbs verbatim.
+ * Initializes Sentry for the worker process (#71) before Nest boots, so a
+ * crash while the headless AppModule loads is reported too. The options are
+ * the API's (`buildSentryNodeOptions`): same environment tag, sample rates
+ * and privacy gates (the Sürat tracking polls run in this process and carry
+ * credentials in their query string). `SentryModule`, loaded later with
+ * AppModule, sees the client and does not initialize Sentry a second time.
  */
 function initWorkerSentry(logger: Logger): boolean {
   const dsn = process.env.SENTRY_DSN;
@@ -33,17 +24,7 @@ function initWorkerSentry(logger: Logger): boolean {
     logger.warn("Sentry DSN not configured — worker error tracking disabled");
     return false;
   }
-  Sentry.init({
-    dsn,
-    // API ile aynı çözümleme: etiket SENTRY_ENVIRONMENT'tan (staging ile prod
-    // ayrılsın), örnekleme gerçek çalışma kipinden, sürüm commit sha'sından.
-    environment: resolveSentryEnvironment(),
-    release: resolveSentryRelease(),
-    tracesSampleRate: isProductionRuntime() ? 0.2 : 1.0,
-    beforeSend: applySentryEventPolicy,
-    beforeBreadcrumb: applySentryBreadcrumbPolicy,
-    beforeSendTransaction: applySentryTransactionPolicy,
-  });
+  Sentry.init(buildSentryNodeOptions(dsn));
   logger.log("Sentry initialized (worker)");
   return true;
 }
@@ -65,14 +46,29 @@ async function bootstrap() {
 
   logger.log("Starting Tarodan Worker...");
 
-  // Faz 7.2: worker, AppModule'ü BAŞSIZ (HTTP yok) application-context olarak yükler.
-  // Böylece hem klasik kuyruk worker'ları (WorkerModule) hem de feature modüllerine
-  // gömülü `scheduled` kuyruğu processor'ları (outbox-drain, ledger-reconcile, payout,
-  // membership, boost, ...) ayrı worker process'inde koşar. Rol env'den okunur; worker
-  // servisine `PROCESS_ROLE=worker` verilir (WorkerModule yine yüklenir — `web` değil).
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: new AppNestLogger(),
-  });
+  // The worker loads AppModule as a HEADLESS application context (no HTTP), so
+  // both the classic queue workers (WorkerModule) and the `scheduled` queue
+  // processors embedded in feature modules (outbox-drain, ledger-reconcile,
+  // payout, membership, boost, ...) run in this separate process. The role
+  // comes from the env: the worker service gets `PROCESS_ROLE=worker`
+  // (WorkerModule still loads; it is not `web`).
+  let app: INestApplicationContext;
+  try {
+    app = await NestFactory.createApplicationContext(AppModule, {
+      logger: new AppNestLogger(),
+    });
+  } catch (err) {
+    // Exit like main.ts does: a worker that failed to boot must not stay up
+    // with no queues running, looking healthy to the orchestrator. Flush the
+    // event first; the unhandledRejection listener would keep the process
+    // alive and never flush it.
+    logger.error("Worker failed to start", errorStack(err));
+    if (sentryEnabled) {
+      Sentry.captureException(err);
+      await Sentry.close(2000);
+    }
+    process.exit(1);
+  }
 
   logger.log(
     "Worker started successfully (headless AppModule application-context)",

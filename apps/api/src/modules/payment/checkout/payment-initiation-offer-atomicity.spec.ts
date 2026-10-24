@@ -57,6 +57,7 @@ describe("PaymentInitiationService — teklif reserve+Payment atomikliği (#3)",
       {} as any,
       {} as any,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     return { service, calls, tx };
   };

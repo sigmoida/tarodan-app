@@ -6,13 +6,19 @@ import { Prisma, ShipmentStatus, OrderStatus } from "@prisma/client";
 import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
 import { OrderShipmentProvisioner } from "./order-shipment-provisioner.service";
 import { notifyUser } from "./surat-tracking-support";
+import { errorMessage } from "../../../common/helpers/error-message";
 
-/** Kargo kodu (barkod) retry job istatistiği — yüzey başına. */
+/** Carrier code (barcode) retry stats, per surface. */
 export interface BarcodeRetryStat {
-  /** Bu tick'te kodu başarıyla tamamlanan kayıt sayısı. */
+  /** Records whose code was completed in this tick. */
   retried: number;
-  /** Denenip yine kod alamayan kayıt sayısı (geçici/kalıcı hata). */
+  /** Records tried that still got no code (temporary or lasting failure). */
   failed: number;
+  /**
+   * Which records failed and why: `<surface> <id> (<reason>)`. Ids and reason
+   * text only, no personal data. The scheduler puts these in the cron alarm.
+   */
+  failures: string[];
 }
 
 /**
@@ -72,10 +78,23 @@ export class BarcodeRetryService {
     return (await this.cache.get(this.backoffKey(surface, id))) != null;
   }
 
-  /** Başarısız denemede sayacı artırıp üstel TTL'li backoff penceresi açar.
-   * Sayaç pencereden UZUN yaşar (3 gün) ki pencere kapanınca üstel büyüme
-   * sıfırlanmasın. */
-  private async recordRetryFailure(surface: string, id: string): Promise<void> {
+  /**
+   * Records a failed attempt: names the record in the run summary (the cron
+   * alarm) and on a `warn` line of its own (the summary lists only the first
+   * few), bumps the attempt counter and opens an exponential backoff window.
+   * The counter outlives the window (3 days) so the growth does not reset when
+   * the window closes.
+   */
+  private async recordRetryFailure(
+    surface: string,
+    id: string,
+    reason: string,
+    failures: string[],
+  ): Promise<void> {
+    const entry = `${surface} ${id} (${reason})`;
+    failures.push(entry);
+    // warn, not error: one failure, one alarm, and the summary is the alarm.
+    this.logger.warn(`Barcode retry failed: ${entry}`);
     const attempts =
       ((await this.cache.get<number>(this.attemptsKey(surface, id))) ?? 0) + 1;
     await this.cache.set(this.attemptsKey(surface, id), attempts, {
@@ -114,38 +133,43 @@ export class BarcodeRetryService {
     const createdBefore = new Date(now - BarcodeRetryService.RETRY_MIN_AGE_MS);
     const createdAfter = new Date(now - BarcodeRetryService.RETRY_MAX_AGE_MS);
 
-    const empty: BarcodeRetryStat = { retried: 0, failed: 0 };
-    let order = empty;
-    let trade = empty;
+    const empty = (): BarcodeRetryStat => ({
+      retried: 0,
+      failed: 0,
+      failures: [],
+    });
+    let order = empty();
+    let trade = empty();
     const failedSteps: string[] = [];
     const failureDetails: string[] = [];
 
     try {
       order = await this.retryPendingOrderBarcodes(createdAfter, createdBefore);
-    } catch (e: any) {
-      this.logger.error(`Order barcode retry failed: ${e?.message}`);
+    } catch (e: unknown) {
+      this.logger.error(`Order barcode retry failed: ${errorMessage(e)}`);
       failedSteps.push("order-barcode-retry");
-      failureDetails.push(`order-barcode-retry: ${e?.message ?? e}`);
+      failureDetails.push(`order-barcode-retry: ${errorMessage(e)}`);
     }
     try {
       trade = await this.retryPendingTradeBarcodes(createdAfter, createdBefore);
-    } catch (e: any) {
-      this.logger.error(`Trade barcode retry failed: ${e?.message}`);
+    } catch (e: unknown) {
+      this.logger.error(`Trade barcode retry failed: ${errorMessage(e)}`);
       failedSteps.push("trade-barcode-retry");
-      failureDetails.push(`trade-barcode-retry: ${e?.message ?? e}`);
+      failureDetails.push(`trade-barcode-retry: ${errorMessage(e)}`);
     }
 
     // M2: pencereden kodsuz düşen kayıtlar sessizce kaybolmasın.
     try {
       await this.alertAgedOutBarcodes(createdAfter);
-    } catch (e: any) {
-      this.logger.error(`Barcode age-out alert failed: ${e?.message}`);
+    } catch (e: unknown) {
+      this.logger.error(`Barcode age-out alert failed: ${errorMessage(e)}`);
       failedSteps.push("barcode-ageout-alert");
-      failureDetails.push(`barcode-ageout-alert: ${e?.message ?? e}`);
+      failureDetails.push(`barcode-ageout-alert: ${errorMessage(e)}`);
     }
 
     if (failedSteps.length > 0) {
-      throw new CronStepFailuresError(failedSteps, failureDetails);
+      // Each step above logged its own failure at error.
+      throw new CronStepFailuresError(failedSteps, failureDetails, true);
     }
     return { order, trade };
   }
@@ -299,11 +323,12 @@ export class BarcodeRetryService {
     }
 
     if (candidates.length === 0 && orphanOrders.length === 0) {
-      return { retried: 0, failed: 0 };
+      return { retried: 0, failed: 0, failures: [] };
     }
 
     let retried = 0;
     let failed = 0;
+    const failures: string[] = [];
 
     // Önce onarım: satırı oluştur/revive et (kod da mümkünse hemen dolar; barkod
     // yine üretilemezse satır `pending`+kodsuz kalır ve aşağıdaki yüzey sonraki
@@ -336,20 +361,30 @@ export class BarcodeRetryService {
             }
           } else {
             failed++;
+            failures.push(
+              `order-orphan ${o.id} (carrier registration still pending)`,
+            );
             this.logger.warn(
               `Retry created shipment row but carrier registration is still pending for order ${o.orderNumber}`,
             );
           }
         } else if (res === "skipped") {
           failed++;
-          await this.recordRetryFailure("order-orphan", o.id);
+          await this.recordRetryFailure(
+            "order-orphan",
+            o.id,
+            "ensure-shipment skipped",
+            failures,
+          );
         }
         // "exists": eşzamanlı onarımla yarıştık — no-op, sayma.
-      } catch (e: any) {
+      } catch (e: unknown) {
         failed++;
-        await this.recordRetryFailure("order-orphan", o.id);
-        this.logger.error(
-          `Retry ensure-shipment threw order=${o.orderNumber}: ${e?.message}`,
+        await this.recordRetryFailure(
+          "order-orphan",
+          o.id,
+          errorMessage(e),
+          failures,
         );
       }
     }
@@ -389,17 +424,19 @@ export class BarcodeRetryService {
           }
         } else {
           failed++;
-          await this.recordRetryFailure("order", s.id);
+          await this.recordRetryFailure(
+            "order",
+            s.id,
+            "carrier returned no barcode",
+            failures,
+          );
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         failed++;
-        await this.recordRetryFailure("order", s.id);
-        this.logger.error(
-          `Retry order barcode threw shipment=${s.id}: ${e?.message}`,
-        );
+        await this.recordRetryFailure("order", s.id, errorMessage(e), failures);
       }
     }
-    return { retried, failed };
+    return { retried, failed, failures };
   }
 
   /** Takas bacakları kodsuzları: depoya-giriş (to_warehouse) bacaklarını
@@ -458,11 +495,12 @@ export class BarcodeRetryService {
     }
 
     if (inbound.length === 0 && returns.length === 0) {
-      return { retried: 0, failed: 0 };
+      return { retried: 0, failed: 0, failures: [] };
     }
 
     let retried = 0;
     let failed = 0;
+    const failures: string[] = [];
 
     if (inbound.length > 0) {
       const { TradeShipmentService } =
@@ -473,6 +511,9 @@ export class BarcodeRetryService {
           `TradeShipmentService not resolvable; skipping ${inbound.length} trade inbound barcode retries`,
         );
         failed += inbound.length;
+        failures.push(
+          `trade-inbound x${inbound.length} (service not resolvable)`,
+        );
       } else {
         for (const ts of inbound) {
           if (await this.inRetryBackoff("trade-inbound", ts.id)) continue;
@@ -483,13 +524,20 @@ export class BarcodeRetryService {
               await this.clearRetryBackoff("trade-inbound", ts.id);
             } else {
               failed++;
-              await this.recordRetryFailure("trade-inbound", ts.id);
+              await this.recordRetryFailure(
+                "trade-inbound",
+                ts.id,
+                "retry reported not completed",
+                failures,
+              );
             }
-          } catch (e: any) {
+          } catch (e: unknown) {
             failed++;
-            await this.recordRetryFailure("trade-inbound", ts.id);
-            this.logger.error(
-              `Retry trade barcode threw trade-shipment=${ts.id}: ${e?.message}`,
+            await this.recordRetryFailure(
+              "trade-inbound",
+              ts.id,
+              errorMessage(e),
+              failures,
             );
           }
         }
@@ -507,6 +555,9 @@ export class BarcodeRetryService {
           `AdminTradeWarehouseService not resolvable; skipping ${returns.length} trade return barcode retries`,
         );
         failed += returns.length;
+        failures.push(
+          `trade-return x${returns.length} (service not resolvable)`,
+        );
       } else {
         for (const ts of returns) {
           if (await this.inRetryBackoff("trade-return", ts.id)) continue;
@@ -517,19 +568,26 @@ export class BarcodeRetryService {
               await this.clearRetryBackoff("trade-return", ts.id);
             } else {
               failed++;
-              await this.recordRetryFailure("trade-return", ts.id);
+              await this.recordRetryFailure(
+                "trade-return",
+                ts.id,
+                "retry reported not completed",
+                failures,
+              );
             }
-          } catch (e: any) {
+          } catch (e: unknown) {
             failed++;
-            await this.recordRetryFailure("trade-return", ts.id);
-            this.logger.error(
-              `Retry trade return barcode threw trade-shipment=${ts.id}: ${e?.message}`,
+            await this.recordRetryFailure(
+              "trade-return",
+              ts.id,
+              errorMessage(e),
+              failures,
             );
           }
         }
       }
     }
 
-    return { retried, failed };
+    return { retried, failed, failures };
   }
 }

@@ -28,6 +28,12 @@ import { tradeHandedToCargo } from "../../trade/helpers/trade-handed-to-cargo";
 import { isProduction } from "../../../config/environment";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { testLaneRefundResult } from "../helpers/test-lane-refund";
+import { errorMessage } from "../../../common/helpers/error-message";
+import {
+  isPaymentNotYetSyncedRejection,
+  providerRefundFailure,
+  refundAttemptFailureData,
+} from "../helpers/refund-provider-failure";
 import { OutboxService } from "../../outbox/outbox.service";
 import {
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
@@ -232,7 +238,9 @@ export class PaymentTradeRefundService {
 
   /** Tek bir takas ödemesinin PayTR iadesi (tutar çağırandan gelir). */
   private async refundOneTradeCashPayment(
-    payment: any,
+    payment: Prisma.PaymentGetPayload<{
+      include: { tradeCashPayment: true };
+    }>,
     tradeId: string,
     amount: number,
     opts?: { shippingRefunded?: boolean },
@@ -345,18 +353,17 @@ export class PaymentTradeRefundService {
               amount,
               refundAttempt.attempt.id,
             )) as unknown as Record<string, unknown>;
-        } catch (e: any) {
-          const reason = e?.message || "trade refund request failed";
-          if (e instanceof ProviderRefundRejectedException) {
+        } catch (e: unknown) {
+          // Same outcome table as the order refund
+          // (helpers/refund-provider-failure).
+          const failure = providerRefundFailure(e);
+          if (!failure.needsReconciliation) {
             await this.prisma.refundAttempt.updateMany({
               where: {
                 id: refundAttempt.attempt.id,
                 status: RefundAttemptStatus.submitting,
               },
-              data: {
-                status: RefundAttemptStatus.failed,
-                failureReason: reason,
-              },
+              data: refundAttemptFailureData(failure),
             });
             await this.prisma.payoutTransfer.updateMany({
               where: {
@@ -369,9 +376,8 @@ export class PaymentTradeRefundService {
               data: { status: "pending", failureReason: null },
             });
             if (
-              /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-                reason,
-              )
+              e instanceof ProviderRefundRejectedException &&
+              isPaymentNotYetSyncedRejection(failure.failureReason)
             ) {
               throw new BadRequestException(
                 i18nMessage("server.payment.paymentNotYetSynced"),
@@ -385,13 +391,12 @@ export class PaymentTradeRefundService {
                 id: refundAttempt.attempt.id,
                 status: RefundAttemptStatus.submitting,
               },
-              data: {
-                status: RefundAttemptStatus.manual_review,
-                failureReason: reason,
-              },
+              data: refundAttemptFailureData(failure),
             })
             .catch(() => undefined);
-          throw new RefundPendingReconciliationException(reason);
+          throw new RefundPendingReconciliationException(
+            localizedPayloadOf(e) ?? errorMessage(e),
+          );
         }
       }
 
@@ -432,9 +437,9 @@ export class PaymentTradeRefundService {
             },
           });
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.error(
-          `Trade refund provider event could not be recorded attempt=${refundAttempt.attempt.id}: ${e?.message}`,
+          `Trade refund provider event could not be recorded attempt=${refundAttempt.attempt.id}: ${errorMessage(e)}`,
         );
       }
     }
@@ -518,9 +523,9 @@ export class PaymentTradeRefundService {
           });
         });
         persisted = true;
-      } catch (persistErr: any) {
+      } catch (persistErr: unknown) {
         this.logger.error(
-          `refundTradeCash persist denemesi ${attempt}/3 başarısız (tradeId=${tradeId}): ${persistErr?.message}`,
+          `refundTradeCash persist denemesi ${attempt}/3 başarısız (tradeId=${tradeId}): ${errorMessage(persistErr)}`,
         );
       }
     }
@@ -560,9 +565,9 @@ export class PaymentTradeRefundService {
           // bedeli artık hiç iade edilmediği için hiçbir zaman tutmazdı.
           shippingReversal: opts?.shippingRefunded ? shippingAmount : 0,
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.warn(
-          `Ledger takas iade kaydı başarısız (tcp ${payment.tradeCashPaymentId}): ${e?.message}`,
+          `Ledger takas iade kaydı başarısız (tcp ${payment.tradeCashPaymentId}): ${errorMessage(e)}`,
         );
       }
     }
@@ -571,6 +576,37 @@ export class PaymentTradeRefundService {
     // hiçbir iptalde iade edilmediği için fatura geçerli kalır (yalnız
     // kargo/nakit fark iade edilir ve bunlar faturalanan hizmet bedeli değildir).
     return { refunded: true, paymentId: payment.id };
+  }
+
+  /**
+   * Writes the trade's refund failure marker. True when this call started
+   * the failure episode (no marker before: a CAS on the trade row, so two
+   * concurrent failures notify once), false when it only refreshed an
+   * existing marker. If the write fails, true: the payer is told rather than
+   * left without a word (the retry sweep cannot see an unmarked trade).
+   */
+  private async markRefundFailure(
+    tradeId: string,
+    reason: string,
+  ): Promise<boolean> {
+    const data = {
+      refundFailureReason: reason.slice(0, 500),
+      refundFailureAt: new Date(),
+    };
+    try {
+      const started = await this.prisma.trade.updateMany({
+        where: { id: tradeId, refundFailureReason: null },
+        data,
+      });
+      if (started.count === 1) return true;
+      await this.prisma.trade.update({ where: { id: tradeId }, data });
+      return false;
+    } catch (persistErr: unknown) {
+      this.logger.error(
+        `Failed to persist refund failure for trade ${tradeId}: ${errorMessage(persistErr)}`,
+      );
+      return true;
+    }
   }
 
   /**
@@ -592,7 +628,15 @@ export class PaymentTradeRefundService {
    */
   async refundTradeCashTracked(
     tradeId: string,
-    opts?: { payerId?: string; deferIfNotYetSynced?: boolean },
+    opts?: {
+      payerId?: string;
+      deferIfNotYetSynced?: boolean;
+      /**
+       * The caller raises its own, rate-limited alarm (the retry sweep: once
+       * a day per trade): the failure is logged here at warn, not error.
+       */
+      callerAlarms?: boolean;
+    },
   ): Promise<{
     refunded: boolean;
     failed: boolean;
@@ -648,8 +692,12 @@ export class PaymentTradeRefundService {
         failed: false,
         skippedReason: result.skippedReason,
       };
-    } catch (err: any) {
-      const reason = err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
+    } catch (err: unknown) {
+      // The rendered catalog text, not Nest's class name ("Service
+      // Unavailable Exception") for a localized refusal such as a refund
+      // PayTR never received: it is the marker admins and the retry read.
+      const reason =
+        errorMessage(err) || "Bilinmeyen hata (PayTR iade başarısız)";
       if (
         opts?.deferIfNotYetSynced &&
         localizedPayloadOf(err)?.i18nKey ===
@@ -660,29 +708,30 @@ export class PaymentTradeRefundService {
         );
         return { refunded: false, failed: false, deferred: true, reason };
       }
-      this.logger.error(
-        `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`,
-      );
-      // Marker'ı yaz ki admin retryTradeRefund + retryFailedTradeRefunds cron'u
-      // bu takası bulup yeniden denesin (yoksa para alıcıda sessizce kalır).
-      await this.prisma.trade
-        .update({
-          where: { id: tradeId },
-          data: {
-            refundFailureReason: reason.slice(0, 500),
-            refundFailureAt: new Date(),
-          },
-        })
-        .catch((persistErr: any) =>
-          this.logger.error(
-            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
-          ),
-        );
+      const failureLine = `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`;
+      if (opts?.callerAlarms) {
+        this.logger.warn(failureLine);
+      } else {
+        this.logger.error(failureLine);
+      }
+      // Write the marker so the admin retry and the retry sweep find the
+      // trade (otherwise the refund silently never happens).
+      const startedFailure = await this.markRefundFailure(tradeId, reason);
+      // The payer hears it once per failure episode: when this call set the
+      // marker. A retry while it is set (the sweep, every few minutes) used
+      // to push "refund failed" again each time. Success clears the marker.
+      // A scoped call (`payerId`) always tells its own party: it is a
+      // one-shot of a flow (one outbox event per payer on a cancel, a dispute
+      // compensation), never the sweep, and on a two-payer trade the marker
+      // may already carry the other party's failure.
+      if (!startedFailure && !opts?.payerId) {
+        return { refunded: false, failed: true, reason };
+      }
       try {
-        // Kapsamlı iadede hata bildirimi o tarafa; kapsamsızda tek ödeme
-        // satırı varsa (v1) sahibi bellidir, iki satırlı v2'de taraf
-        // belirsizdir → null (yanlış tarafa "iade başarısız" bildirmektense
-        // kimseye kişisel bildirim atmamak doğrudur; admin marker'ı görür).
+        // A scoped refund notifies that party. Unscoped, a single payment
+        // row (v1) names its payer; with two rows (v2) the party is unclear,
+        // so nobody gets a personal notice (better than telling the wrong
+        // party "refund failed"; admins see the marker).
         let cashPayerId: string | null = opts?.payerId ?? null;
         if (!cashPayerId) {
           const rows = await this.prisma.tradeCashPayment.findMany({

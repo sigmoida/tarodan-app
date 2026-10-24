@@ -1,23 +1,11 @@
+import type { OrderOwnReview } from "@tarodan/types";
 import { api } from "./client";
 
 // Orders
 export const ordersApi = {
   /** The buyer's own submitted review for an order (read-only view). */
   getMyReview: (id: string) =>
-    api.get<{
-      product: {
-        score: number;
-        title: string | null;
-        review: string | null;
-        images: string[];
-        createdAt: string;
-      } | null;
-      seller: {
-        score: number;
-        comment: string | null;
-        createdAt: string;
-      } | null;
-    }>(`/orders/${id}/my-review`),
+    api.get<OrderOwnReview>(`/orders/${id}/my-review`),
   // Direct buy for authenticated users (Buy Now)
   directBuy: (data: {
     productId: string;

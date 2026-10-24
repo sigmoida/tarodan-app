@@ -366,6 +366,285 @@ yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte
 yeniden-onay penceresini görür. Belge metni değiştiğinde
 `packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
 
+### One-off: trade consents onto the cash payment column
+
+Migration `20261022180000_consent_records_trade_cash_payment` adds
+`consent_records.trade_cash_payment_id` (nullable FK, `ON DELETE SET NULL`), a
+partial unique index (one granted distance sales consent per trade cash
+payment) and widens the append-only guard for that column (`CONSENTS.md`,
+"Trade binding"). It runs on deploy and moves no data. Trade consents written
+before it (or by the previous image during the deploy) have the reference only
+in `details`; the API still finds them there. After the release is live, copy
+the reference into the column, dry run first (the default, writes nothing):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-consent-trade-cash-payments.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-consent-trade-cash-payments.js --apply --db=<database name>'
+```
+
+`--db` must match the target database the dry run prints. Locally:
+`pnpm --filter @tarodan/api backfill:prod:consent-trade-cash-payments` (run
+`build:seed` first).
+
+The dry run lists each candidate (consent id, cash payment id, outcome) and
+the totals; ids only, no personal data:
+
+- `set`: `--apply` fills the column.
+- `payment_missing`: the cash payment no longer exists (test-lane purge); the
+  row stays NULL and keeps its `details`.
+- `duplicate`: another granted consent of the same payment holds it (an
+  earlier double submit); only the earliest row is filled. Nothing to do.
+
+Each write is a compare-and-set on the column being NULL, so a re-run is safe
+and a second run reports no `set` rows. Once it is clean in production, the
+legacy `details` fallback (`legacyTradeConsentDetailsWhere`) can be removed in
+a later release.
+
+### One-off: require the step-up for account deletion and e-mail change
+
+`DELETE /users/me` and `POST /auth/email/request-change` check a step-up token
+(`POST /auth/reauth`) whenever the client sends one, but by default they do
+not require one: mobile versions without the step-up send none (which ones:
+tarodan-ops `compat.md`). Switch the requirement on only when all three are true:
+
+1. A mobile version that sends the token is live, and
+   `min_supported_app_version_ios` and `min_supported_app_version_android` are
+   at least that version, the first one that sends it. Raising them past the
+   version live today is not enough: a later version without the step-up
+   would lose account deletion and e-mail change.
+2. The web release that sends the token is live.
+3. Google sign-in on Android is live. Until then the setting stays off
+   (user decision, 2026-10-21): Apple-only accounts on Android, and
+   Google-only accounts while Google is off on Android, cannot pass the
+   step-up in the app, so in-app account deletion would need a password set by
+   e-mail first (App Store 5.1.1(v) and Play account-deletion risk).
+
+Then, in the admin panel, **Settings -> Security**, turn on "Require step-up
+confirmation for account deletion and email change" (platform setting
+`auth_require_reauth_for_sensitive_actions = "true"`; no deploy). It applies
+on the next request. While it is on, a request without a token gets
+`403 REAUTH_REQUIRED`. To roll back, turn it off.
+
+### Seller trust score (nightly batch)
+
+Reference: `docs/SELLER_TRUST.md`. The repeatable `seller-trust-refresh` runs
+at 02:30 Europe/Istanbul in the worker role and writes only its own table,
+`seller_trust_scores`.
+
+- **First deploy (no manual step).** Migration
+  `20261021165740_seller_trust_scores` creates the empty table. On boot, an
+  instance that finds the table empty queues one run with the fixed Bull job
+  id `seller-trust-bootstrap`, so several instances queue it once; the worker
+  runs it. If it fails, the next nightly run fills the table (the read path
+  shows "new seller" until then).
+- **Monitoring.** The job has no Sentry cron monitor (see "Sentry cron
+  monitor (API)"). A failed run logs its alarm at `error`, which reaches
+  Sentry; a run that never starts shows only on the admin jobs page and in
+  Bull Board, as do the bootstrap and manual runs.
+- **Manual run.** Admin, Test Tools, "Satıcı güven skorları". On staging this
+  is the calibration step. In production it is a production write: only with
+  the user's approval.
+- **A failed run** keeps every existing row (no cleanup) and fails the Bull
+  job, which retries three times. The job log names the failed batch index
+  and the error class.
+- **Calibration** (read-only, on staging after a run):
+
+  ```sql
+  SELECT width_bucket(score_x100, 0, 500, 10) AS bucket, count(*)
+  FROM seller_trust_scores GROUP BY bucket ORDER BY bucket;
+  SELECT count(*) FILTER (WHERE score_x100 IS NULL) AS new_sellers, count(*)
+  FROM seller_trust_scores;
+  SELECT user_id, score_x100, components FROM seller_trust_scores
+  ORDER BY score_x100 DESC NULLS LAST LIMIT 20;
+  ```
+
+- **Rollback.** Revert the job code; on the next boot the repeatable is no
+  longer registered (remove the leftover one from Bull Board). The table is
+  harmless if left.
+
+### Review moderation (hide / show again)
+
+Admins hide a product review or a user rating (Accounts, Reviews) with a
+required reason (5-500 characters) and show it again. Only `approved` reviews
+are public (`common/helpers/public-rating.ts`): a hidden one leaves the lists,
+counts, averages, product cards and search at once, and the seller trust score
+at the next nightly run. The author still sees it on the order, flagged
+`hidden` (`GET /orders/:id/my-review`).
+
+- **Deploy (no manual step).** Migration
+  `20261023140000_review_moderation_fields` adds the `hidden` status and
+  `moderation_reason`, `moderated_at`, `moderated_by_admin_id` on `ratings` and
+  `product_ratings`: additive, no backfill. It sorts after
+  `20261023120000_payout_submitted_total_amount` and ships after that hotfix.
+  Existing `pending` / `rejected` rows stay as they are (non-public); an admin
+  can publish or hide them.
+- **Trace.** Each change writes an audit row in the same transaction
+  (`review_status_update` / entity `ProductRating`,
+  `user_rating_status_update` / entity `Rating`, with the reason) and a Sentry
+  breadcrumb `review.moderation` (ids only). A failed post-commit refresh
+  (API cache, web revalidation) is reported to Sentry; the caches then
+  expire on their own (web ISR 60 s). The product's search document is
+  re-indexed through the outbox (`search.product_reindex`): a failed inline
+  run is retried by the outbox drainer.
+- **Rollback.** Before reverting the code, set hidden rows to `rejected`
+  (still non-public), or the old image cannot read them:
+  `UPDATE ratings SET status = 'rejected' WHERE status = 'hidden';` and the
+  same for `product_ratings` (a production write: user approval). The columns
+  and the enum value are harmless if left; dropping the columns needs a new
+  migration.
+
+### One-off: saved-search tier limits
+
+Reference: `docs/SAVED_SEARCHES.md`. Migration `20261021174800_saved_searches`
+adds `membership_tiers.max_saved_searches` with DEFAULT 5 on every tier and
+the empty `saved_searches` table. Until the script below runs, every tier
+allows 5 saved searches. Run it once after the deploy, dry run first:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/set-saved-search-limits.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/set-saved-search-limits.js --apply'
+```
+
+The first command only prints the tiers and the planned changes (basic 10,
+premium 20, business 50; free keeps 5). Locally: `pnpm --filter @tarodan/api
+set:prod:saved-search-limits` (after `build:seed`). The script changes only
+tiers still at 5 whose launch value differs, so a re-run changes nothing and
+a value other than 5 set in **System -> Membership Tiers** stays. It cannot
+tell a paid tier deliberately set to 5 from an untouched one: run it right
+after the deploy, before anyone edits the field. If it reports fewer updated
+tiers than planned, a tier changed meanwhile; run the dry run again. In production this is a production write: only with the user's
+approval.
+
+Rollback: set the values back in the admin panel. The column and table are
+harmless if left; a later migration drops them.
+
+### Listing boost settings
+
+Reference: tarodan-ops plan `2026-10-21-listing-boost`. Migration
+`20261021195258_boost_source_and_offer_dismissals` adds the boost source,
+grant, cancel, refund and reminder columns to `product_boosts` and the empty
+`boost_offer_dismissals` table. No data step: every existing boost is a
+`purchase`.
+
+- `boost_enabled` (on/off). Unlike the other toggles, a **missing** row means
+  **on** (`isBoostEnabled` in `@tarodan/types`); only `"false"` stops new
+  boost purchases. Running boosts continue either way.
+- `boost_offer_since` (ISO timestamp). Listings created after it get a
+  one-time boost offer once they are live. Empty or invalid means the offer
+  is off, the state after the release. No step yet: the offer ships with the
+  seller boost API. Setting it in production is a production write, after
+  the app release and with the user's approval.
+- Boost prices come only from the ad package tiers; the legacy
+  `boost_price_3d`, `boost_price_7d` and `boost_price_30d` settings are no
+  longer read.
+- **Release blocker (boost purchase consents).** A boost purchase records
+  the `platform_service_sales` and `withdrawal_waiver` consents with its
+  order (`CONSENTS.md`, "Platform services (boost)"). Both texts are drafts
+  (versions ending in `-draft`) until legal signs them off; do not release
+  the boost purchase to production before the signed texts and their dated
+  versions are merged. No data step: a boost order created before the
+  release and still unpaid is refused at the card form
+  (`server.product.boostConsentRequired`); the seller starts the purchase
+  again from My listings.
+
+Migration `20261021211736_boost_own_showcase_window` adds each boost's own
+showcase end (`showcase_ends_at`) and its paused showcase remainder
+(`paused_showcase_seconds`). No data step: a row written before it reads the
+listing's `home_showcase_until` (capped by its own end) until its next
+timeline change writes the column, and a remainder paused before it is capped
+at the boost's bought and extended days on resume. Rollback: revert the API;
+the columns are harmless if left.
+
+### Check: ad package tier bands
+
+Reference: `docs/PAYMENTS.md`, "Boost tier band". An ad package tier's band
+of listing prices is half-open (`minAmount <= price < maxAmount`). Before
+this rule the upper bound was inside the band too, and the admin save did not
+refuse overlapping tiers. Two consequences for rows already in the database:
+
+- A listing priced exactly at a band's upper bound now falls in the next
+  band, or in none. The launch rows (migration `20260726234552_ad_packages`)
+  are 200-999, 1000-5000 and 5000-(none) per duration: 5000 now resolves to
+  the 5000-(none) tier only (before, the options showed both prices and the
+  purchase start could pick either), and a listing priced exactly 999 had
+  no tier until the first band's upper bound was set to 1000. The migration
+  `20261022165035_ad_package_tier_band_gaps` (runs with the deploy) does
+  that: it sets an active band's upper bound to the next active band's lower
+  bound when they are at most 1 apart and the widened band overlaps no other
+  active tier of the duration. It writes only `max_amount`, a second run
+  changes nothing, and its header carries the rollback SQL.
+- Overlapping active tiers of one duration still resolve, deterministically
+  (`BOOST_TIER_PRECEDENCE`), but the price may not be the one meant.
+
+**Before the deploy (dry run and rollback record).** The migration runs at
+boot, so its dry run is this read-only query, the migration's UPDATE as a
+SELECT. Run it with a read-only SQL session against the database of the
+environment about to be deployed (staging before the push, production before
+the release; production only with the user's approval) and keep the output:
+each row is a tier the migration will widen, with its old upper bound, which
+is also the rollback record for rows other than the launch ones.
+
+```sql
+SELECT t."id", t."package_id", t."duration_days", t."min_amount",
+       t."max_amount" AS "old_max_amount", gap."next_min" AS "new_max_amount"
+FROM "ad_package_tiers" AS t
+JOIN (
+  SELECT cur."id", (
+    SELECT MIN(nxt."min_amount") FROM "ad_package_tiers" AS nxt
+    WHERE nxt."package_id" = cur."package_id"
+      AND nxt."duration_days" = cur."duration_days"
+      AND nxt."is_active"
+      AND (nxt."max_amount" IS NULL OR nxt."max_amount" > nxt."min_amount")
+      AND nxt."min_amount" > cur."max_amount"
+  ) AS "next_min"
+  FROM "ad_package_tiers" AS cur
+  WHERE cur."is_active" AND cur."max_amount" IS NOT NULL
+    AND cur."max_amount" > cur."min_amount"
+) AS gap ON gap."id" = t."id"
+WHERE gap."next_min" - t."max_amount" <= 1
+  AND NOT EXISTS (
+    SELECT 1 FROM "ad_package_tiers" AS other
+    WHERE other."package_id" = t."package_id"
+      AND other."duration_days" = t."duration_days"
+      AND other."id" <> t."id"
+      AND other."is_active"
+      AND (other."max_amount" IS NULL OR other."max_amount" > other."min_amount")
+      AND other."min_amount" < gap."next_min"
+      AND (other."max_amount" IS NULL OR other."max_amount" > t."min_amount")
+  )
+ORDER BY t."package_id", t."duration_days", t."min_amount";
+```
+
+On the launch data it lists the four 200-999 rows with `new_max_amount` 1000.
+
+After the deploy, run the read-only check on staging, then on production:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/check-ad-package-tiers.js'
+```
+
+Locally: `pnpm --filter @tarodan/api check:prod:ad-package-tiers` (after
+`build:seed`). It never writes and has no `--apply`. Per package it prints
+`OK` or the findings: `OVERLAP` (two active tiers of one duration that cover
+the same prices), `EMPTY` (an upper bound not above the lower bound),
+`GAP` (prices between two bands that no tier covers) and
+`UPPER BOUND NOW OUTSIDE` (a band's upper bound that no other active band of
+the duration covers, the 999 case). After the migration the launch packages
+should report no `GAP` or `UPPER BOUND NOW OUTSIDE` line; one that remains is a
+wider gap, or a band the migration left alone because widening it would
+overlap another tier. Fix each finding in **Marketing -> Ad packages**; the save
+refuses a package whose tiers still overlap, so a saved package is clean. A
+production fix is a production write: only with the user's approval. Run the
+check again until every package is `OK` or its remaining `GAP` lines are
+intended.
+
+Rollback: revert the API. An API from before the half-open rule reads the
+upper bound as inclusive, so a listing priced exactly 1000 then matches two
+bands (as 5000 always did); with such a revert, run the rollback SQL in the
+header of `20261022165035_ad_package_tier_band_gaps` and set any other row the
+dry run listed back to its `old_max_amount` (production only with the user's
+approval).
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`
@@ -632,6 +911,152 @@ The first case leaves no residual. In the second, if that order later closes
 Find it by the log line and leave it to the payout. Anything else the re-run
 finds is settled the same way as above.
 
+### When needed: payout transfers needing a decision
+
+Since 2026-10-23 a payout transfer that does not go through ends in `failed`
+with a reason code (`PAYOUT_FAILURE_REASONS`, `PAYMENTS.md` §6) instead of
+being retried blindly, and the cron never resends it. The team resolves
+these rows in **admin → Finance → Payouts → Transfers**. The row says what
+fits: `resolution.retryRequiresProviderCheck`, `resolution.markPaidMethod`
+and `resolution.markPaidNetAmount`; the row menu offers only those actions.
+Click a row to see its PayTR `trans_id`, the reason, PayTR's message on a
+rejection and, on a parked row, the transfer total snapshot (net, allowed
+total, order and payment remaining). "Mark as paid" asks for the reference,
+a reason and the net typed again.
+
+| Reason                                                                                                                                                                                | What to do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transfer_outcome_unknown`, or a free-text reason from before 2026-10-23 after more than one send attempt, or after one attempt without a PayTR answer (e.g. "Bad Request Exception") | Find the `trans_id` in the PayTR panel (platform transfers). **Listed:** "Mark as paid", method `paytr_confirmed`, the panel reference, a reason. **Not listed:** "Retry" with "PayTR panel checked" ticked and a reason. Never retry without the check: PayTR may already have paid it. The old handler resent the same `trans_id` up to 3 times and kept only the last attempt's reason, so a legacy row showing PayTR's rejection text may still have had an earlier attempt ("fetch failed") that reached PayTR: the panel lookup is for the `trans_id`, whatever the reason says. If PayTR's result still arrives after the retry, the callback settles the row instead of sending it again (error log). |
+| `transfer_needs_manual_decision`                                                                                                                                                      | The net does not fit what the payment (merchant_oid) still has, typically a residual after a full refund. If the snapshot shows a missing payment or source, it is a data problem: do **not** pay it, hand it to a developer, retry once fixed. Otherwise finance pays the net (see below), then "Mark as paid", method `external_bank`.                                                                                                                                                                                                                                                                                                                                                                      |
+| `transfer_total_exceeds_remaining`                                                                                                                                                    | PayTR refused the total three times (err_no 010). Retry once: the processor recomputes against the current refunds and sibling transfers. If it then lands in `transfer_needs_manual_decision`, go on as above. Before paying it from the bank, confirm in the PayTR panel that its merchant_oid has a live payment (not test mode): err_no 010 with nothing at PayTR can also mean a test-mode payment, which owes nothing (the user decides those).                                                                                                                                                                                                                                                         |
+| `provider_unreachable`                                                                                                                                                                | The request never reached PayTR. Retry; if it keeps happening, the host's outbound network to PayTR needs a look (devops).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `provider_rejected`                                                                                                                                                                   | Any other PayTR refusal; PayTR's message is in the row's details. Fix the cause with PayTR, then retry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `no_bank_account`, `invalid_iban_format`, `bank_details_rejected`                                                                                                                     | The seller was e-mailed; saving their bank details requeues the payout. Nothing to do unless they ask.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+Retry and "Mark as paid" are for super_admin and admin with the `payouts`
+permission; both write an audit record (`payout_retry`, `payout_mark_paid`).
+
+**Paying from the company account (`external_bank`).** Decision of
+2026-10-23: a non-faulty seller's residual that PayTR cannot carry is paid
+by the platform. First, in the PayTR panel: the merchant_oid has a live
+payment (not test mode), and no transfer is listed for the row's
+`trans_id`. If PayTR lists a transfer for it, stop and hand the row to a
+developer (PayTR paid it although the row says otherwise; the callback logs
+an error for that). A row whose earlier send PayTR never confirmed (an
+unknown outcome that was retried, `resolution.markPaidRequiresProviderCheck`)
+cannot be marked `external_bank` without ticking "PayTR panel checked"
+(409 otherwise). If PayTR confirms a transfer for a row already paid from
+the bank, the callback logs "possible double payment": check the PayTR panel
+and the bank transfer and recover the duplicate from the seller.
+Otherwise finance transfers exactly `markPaidNetAmount` to the seller's IBAN (admin → Users → seller → bank account; its last 4 digits must
+match the transfer row), then the admin marks the row as paid with the bank
+reference and a reason. The API checks again, under the payment and order
+row locks, that the order (or trade cash payment) is payable, no refund is
+in flight and the net has not changed (409 otherwise: retry, so the
+processor recomputes, and do not pay a different amount). It writes in
+one transaction: the platform funding of what the order's escrow no longer
+holds (`payout-platform-funding:<payoutId>`), the payout
+(`payout-completed:<payoutId>`), the row (`completed`, nothing taken from
+the oid) and the audit record `payout_mark_paid`. The seller gets the normal
+"payout released" e-mail. A double click is harmless (the second request
+returns the first result).
+
+#### Recovery of the payouts that failed before the 2026-10-23 hotfix
+
+The payouts that failed before the fix carry PayTR's raw text or "Bad
+Request Exception" as reason. The list of affected transfers is kept in the
+hub plan, not here. **Every production step below needs the user's approval,
+each time.** Nothing is retried before the hotfix is live: the cron never
+picks `failed` rows, so they wait safely.
+
+1. **Read-only checks first** (approval: production DB read, `SELECT`
+   only). Per transfer:
+
+   ```sql
+   -- the transfer and its siblings on the same payment (merchant_oid)
+   SELECT id, trans_id, status, amount, net_amount, merchant_oid, failure_reason,
+          retry_count, submitted_at, submitted_total_amount, provider_response
+     FROM payout_transfers
+    WHERE merchant_oid = (SELECT merchant_oid FROM payout_transfers WHERE trans_id = :trans_id);
+   -- hold, order and payment behind it
+   SELECT h.amount, h.refunded_amount, h.status, o.order_number, o.status, o.total_amount,
+          p.id AS payment_id, p.amount AS payment_amount, p.is_test, p.paid_at, p.checkout_group_id
+     FROM payout_transfers t
+     JOIN payment_holds h ON h.id = t.payment_hold_id
+     JOIN orders o ON o.id = h.order_id
+     JOIN payments p ON p.id = h.payment_id
+    WHERE t.trans_id = :trans_id;
+   -- refunds on that payment, per order and status
+   SELECT order_id, trade_id, status, SUM(amount) FROM refund_attempts
+    WHERE payment_id = :payment_id GROUP BY order_id, trade_id, status;
+   -- the order's escrow in the ledger (debit +, credit -)
+   SELECT SUM(CASE direction WHEN 'debit' THEN amount ELSE -amount END)
+     FROM ledger_entries WHERE account = 'seller_escrow' AND order_id = :order_id;
+   ```
+
+   For a cart (`GRP…`) payment also compare the sum of its orders'
+   `total_amount` with the payment amount, and look up the finalized refund
+   requests (`fault_party`) of closed orders.
+
+2. **PayTR panel check** (user or finance, read-only), per merchant_oid: a
+   live payment (not test mode), its refunds, the platform transfers with
+   their `trans_id`, the remaining balance. For **every** affected row, not
+   only the "Bad Request Exception" one: is there a transfer with its
+   `trans_id`? The old handler kept only the last of up to 3 attempts, so a
+   row showing PayTR's 010 text may have had an earlier "fetch failed"
+   attempt (the Sentry history shows it) that reached PayTR. The admin retry
+   asks for this check on every legacy row with more than one attempt.
+3. **Classify** each transfer:
+   - partial refund, the net fits what the payment has left: retry after
+     the deploy (automatic from then on);
+   - residual larger than what the payment has left: `external_bank` after
+     the retry has parked it as `transfer_needs_manual_decision`, with the
+     panel check ticked again (the earlier sends stay unconfirmed);
+   - payment taken in PayTR test mode (no money at PayTR): the user decides
+     (nothing may be owed); leave the row `failed` until then;
+   - cart over-allocation: retry; if it still does not fit, `external_bank`;
+   - unknown outcome: `paytr_confirmed` if the panel lists the transfer,
+     otherwise retry with the panel check;
+   - a residual of a seller-fault order: not payable; settle it with
+     `settle-residual` (above) instead.
+4. **Deploy the hotfix** (approvals: push, PR merge to `master`, tag, deploy).
+   The migration runs on boot. Check the API health and, on the next
+   15-minute tick, a `Payouts processed` log line without errors.
+5. **Retry** the transfers that fit, one at a time (approval per batch).
+   Expect `completed` (or `processing` with `submitted_at` and a callback the
+   next day when `PAYTR_TRANSFER_CALLBACK_ENABLED=true`); the log shows the
+   computed total. One that lands in `transfer_needs_manual_decision` moves
+   to the next step.
+6. **Pay the residuals** from the company account and mark them
+   `external_bank` (approval per transfer), as described above.
+7. **Verify**: each affected order's `seller_escrow` sum in the ledger is 0;
+   the Finance overview shows no new mismatch; the related Sentry issues are
+   resolved with the release; the sellers got the "payout released" e-mail.
+   Support writes once to these sellers, because they earlier received a
+   "payout failed" e-mail with PayTR's raw text (decision U4).
+
+### When needed: refund attempts in manual review
+
+A refund attempt that a sweep cannot settle alone waits in `manual_review`
+(admin → Finance → Payments → Reconciliation; `PAYMENTS.md` §7, "Refund
+failures and the retry sweeps"). The alarm is one `REFUND_MANUAL_REVIEW` error
+per attempt, at most once a day. Resolve in the list, after checking the
+order's merchant_oid in the PayTR panel (refunds listed with their
+`reference_no` = the attempt id without hyphens):
+
+| Reason                                                        | What to do                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider_nothing_left: …`                                    | PayTR has nothing left to refund on that payment. If the panel lists a refund of this amount (by our reference, or one made by hand in the panel): "provider succeeded", which finalizes the order and the hold on the next run. If it does not: hand it to a developer; do **not** retry (PayTR refuses it again). |
+| "Refund submission ended without a durable provider response" | Our request may have reached PayTR. Listed in the panel: "provider succeeded". Not listed after 15 minutes: the status inquiry usually requeues it by itself; otherwise "retry".                                                                                                                                    |
+| `payout_completed` / `payout_processing`                      | The seller was already paid: the refund needs a clawback first (`CLAWBACK_REQUIRED` log line).                                                                                                                                                                                                                      |
+| anything else                                                 | Check the panel; "provider succeeded" if the refund is there, otherwise "retry".                                                                                                                                                                                                                                    |
+
+A refund that keeps failing without reaching review (`failed`, e.g.
+`provider_not_sent` while the host cannot reach PayTR) is retried by the sweep
+with a growing wait (10 minutes up to 6 hours) and alarmed once a day per
+order. On staging, refunds of payments copied from production are left out of
+the sweeps on purpose.
+
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 
 Hesap silme, Sign in with Apple refresh token'ının Apple'da iptalini outbox'a
@@ -677,6 +1102,84 @@ Dosya düzeni (biçim sürümü 2): 1. sayfa **Özet**, 2. sayfa **Bildirim
 YYYY-AA** (portala yüklenecek veri; kolon sırası değişmedi), son sayfa
 **Bilgi**. Portal ilk sayfayı okuyorsa yüklemeden önce Bildirim sayfasını
 ayrı kaydedin. Bkz. `docs/ADMIN_EXPORTS.md`.
+
+### Sentry for web and admin (Coolify)
+
+Sentry is compiled into web and admin only when `NEXT_PUBLIC_SENTRY_DSN` is
+set **at build time** (`apps/{web,admin}/sentry.build.js`); server and edge
+init run from `src/instrumentation.ts`, the browser init from
+`sentry.client.config.ts`. Every event passes the shared scrubber
+(`scrubSentryEvent` in `@tarodan/logger`): cookies dropped, credential
+headers, client-IP proxy headers (`x-forwarded-for`, `x-real-ip`, ...) and
+query parameters masked, user reduced to its id, card, IBAN, TCKN, TR phone
+and e-mail values removed.
+
+Per app (web -> project `tarodan-web`, admin -> project `tarodan-admin`, org
+`tarodan`) and per environment:
+
+| Variable                         | Build / runtime        | Value                                                 |
+| -------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `NEXT_PUBLIC_SENTRY_DSN`         | build (and runtime)    | the project's DSN (public; it ships in the JS bundle) |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | build                  | `staging` or `production`; unset = from the app URL   |
+| `NEXT_PUBLIC_SENTRY_RELEASE`     | build, optional        | leave unset: the short `SOURCE_COMMIT` is used        |
+| `SENTRY_AUTH_TOKEN`              | build only, **secret** | org auth token with release + source map upload scope |
+| `SENTRY_ORG`, `SENTRY_PROJECT`   | build, optional        | defaults `tarodan` / `tarodan-web` or `tarodan-admin` |
+
+Coolify settings, per app (Advanced > Build):
+
+- **Source commit availability: Available during build**, so the release is the
+  deployed short sha (the API tags its events the same way).
+- **Build secrets: Docker BuildKit secrets** _before_ adding `SENTRY_AUTH_TOKEN`.
+  In that mode Coolify passes every build variable with `--secret` and mounts
+  it on each `RUN` (`--mount=type=secret,id=<KEY>,env=<KEY>`), so nothing lands
+  in the image history. In the default build-arg mode Coolify injects an
+  `ARG` for every build variable and the token would be readable with
+  `docker history`; without the token the build still succeeds and only the
+  source map upload is skipped. Check the first deploy log for `--secret` (if
+  the build server has no BuildKit, Coolify silently falls back to build args).
+- `SENTRY_AUTH_TOKEN` is **build-time only**: untick "Available at runtime",
+  so the running container never holds it.
+- The Dockerfiles declare the public values as `ARG` only (no `ENV` re-export)
+  and must not mount secrets themselves; Coolify skips `RUN` lines that already
+  have a secret mount. `apps/*/src/sentry-build.test.ts` pins both rules.
+- In BuildKit secrets mode a secret's **value** is not part of the Docker layer
+  cache key. After changing only a variable's value (a new DSN, `staging` ->
+  `production`) on an already-built commit, deploy with **Force deploy
+  (without cache)**, or the cached `next build` layer keeps the old inlined
+  value. A new commit or a newly added variable rebuilds anyway.
+
+Sentry project settings (both projects): turn on "Prevent Storing of IP
+Addresses" and the server-side data scrubber; the client SDK does not send IPs
+(`sendDefaultPii: false`), this covers what Sentry would infer itself.
+
+### Sentry cron monitor (API)
+
+The Sentry plan includes one cron monitor and it watches `payout-process`
+(every 15 minutes, Europe/Istanbul): a payout run that is missed (10 minutes
+late), fails, or is still running after 30 minutes counts as failed. Every
+attempt checks in, Bull's automatic retries included, so two failed check-ins
+in a row (a run and its retry 30 seconds later, or two slots) open an issue
+and the first good one resolves it. The settings are the `monitor` of its
+entry in `apps/api/src/workers/cron-catalog.ts`.
+
+- **Production only.** Only a worker with `APP_ENV=production` and a Sentry
+  DSN sends check-ins, and only for catalog entries with a `monitor`; staging
+  and development send none, whatever their `SENTRY_ENVIRONMENT`. Manual runs
+  (the admin release fast path, a Bull Board retry of a failed job) are not
+  check-ins.
+- **No manual setup.** Every check-in carries the monitor config (schedule,
+  time zone, margin, runtime, thresholds), so the first production run creates
+  the monitor and a deploy that changes the settings updates it. Check after
+  the first production deploy that Crons in project `tarodan-api` lists
+  `payout-process` with environment `production`, and that the project's
+  issue alert e-mails cron monitor issues.
+- **Another monitor** needs a plan slot (or a paid one) first: add `monitor`
+  to the entry and update `cron-catalog.contract.spec.ts`, which pins the
+  monitored set and their schedules. The schedule must be plain 5-field
+  crontab (a 6-field one with a leading `0` seconds field is converted; others
+  get no config and a `warn`).
+- **Renaming** the `payout-process` key orphans the monitor: delete the old
+  one in Sentry after the deploy.
 
 ---
 

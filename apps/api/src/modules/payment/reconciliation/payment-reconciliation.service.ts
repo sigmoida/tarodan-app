@@ -4,6 +4,8 @@ import { ReservationReconciliationService } from "./reservation-reconciliation.s
 import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
 import { PspReconciliationService } from "./psp-reconciliation.service";
 import { RefundReconciliationService } from "../refund/refund-reconciliation.service";
+import { RefundOrderSweepService } from "../refund/refund-order-sweep.service";
+import { RefundTradeSweepService } from "../refund/refund-trade-sweep.service";
 import { MiscReconciliationService } from "./misc-reconciliation.service";
 
 /**
@@ -16,7 +18,9 @@ import { MiscReconciliationService } from "./misc-reconciliation.service";
  *  - ReservationReconciliationService: releaseExpiredOrderReservations, reconcileReservedQuantities
  *  - PaymentExpiryReconciliationService: expireUnpaidOrders, cancelExpiredPayments, handleExpiredPreparingOrders
  *  - PspReconciliationService: reconcilePendingPaytrPayments, detectOrphanCapturedFailedPayments
- *  - RefundReconciliationService: processRefundedOrders, reconcileStuckRefundMarkers
+ *  - RefundOrderSweepService: processRefundedOrders
+ *  - RefundTradeSweepService: retryFailedTradeRefunds
+ *  - RefundReconciliationService: reconcileStuckRefundMarkers, resolveUnknownRefundOutcomes
  *  - MiscReconciliationService: syncSavedCardsFromUtoken, reconcileMissingInvoices
  */
 @Injectable()
@@ -27,10 +31,16 @@ export class PaymentReconciliationService {
     private readonly psp: PspReconciliationService,
     private readonly refund: RefundReconciliationService,
     private readonly misc: MiscReconciliationService,
+    private readonly refundSweep: RefundOrderSweepService,
+    private readonly tradeRefundSweep: RefundTradeSweepService,
   ) {}
 
   processRefundedOrders(): Promise<{ refunded: number; failed: number }> {
-    return this.refund.processRefundedOrders();
+    return this.refundSweep.processRefundedOrders();
+  }
+
+  retryFailedTradeRefunds(): Promise<{ retried: number; recovered: number }> {
+    return this.tradeRefundSweep.retryFailedTradeRefunds();
   }
 
   syncSavedCardsFromUtoken(

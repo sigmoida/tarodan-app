@@ -1,21 +1,18 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-  StarIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
+import { StarIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import {
-  Avatar,
-  Badge,
-  EmptyState,
-  IconButton,
-  type BadgeVariant,
-} from "@tarodan/ui";
+import { Avatar, Badge, EmptyState, IconButton } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
-import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { ReviewModerationModal } from "@/components/reviews/ReviewModerationModal";
+import { reviewStatusConfig } from "@/components/reviews/reviewStatus";
+import {
+  REVIEW_TRANSITION_ICON,
+  REVIEW_TRANSITION_LABEL_KEY,
+  reviewTransitions,
+} from "@/components/reviews/transitions";
+import { useReviewModeration } from "@/components/reviews/useReviewModeration";
 import { fmtDate } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { Review } from "../_lib/types";
@@ -34,21 +31,6 @@ function Stars({ score }: { score: number }) {
   );
 }
 
-function ReviewStatusBadge({ status }: { status: string }) {
-  const t = useTranslations();
-  const map: Record<string, [BadgeVariant, string]> = {
-    approved: ["success", t("admin.catalog.products.reviewApproved")],
-    pending: ["warning", t("admin.catalog.products.reviewPending")],
-    rejected: ["danger", t("common.rejected")],
-  };
-  const [variant, label] = map[status] ?? ["outline", status];
-  return (
-    <Badge variant={variant} size="sm">
-      {label}
-    </Badge>
-  );
-}
-
 export function ProductReviewsSection({
   productId,
   reviews,
@@ -57,14 +39,11 @@ export function ProductReviewsSection({
   reviews: Review[];
 }) {
   const t = useTranslations();
-  const update = useAdminMutation(
-    (v: { id: string; status: string }) =>
-      adminApi.updateReviewStatus(v.id, v.status),
-    {
-      invalidates: ["product-reviews"],
-      successMessage: t("admin.catalog.products.reviewStatusUpdated"),
-    },
+  const { request, busyId, modalProps } = useReviewModeration(
+    (id, body) => adminApi.updateReviewStatus(id, body),
+    t("admin.accounts.reviews.productReview"),
   );
+  const statusConfig = reviewStatusConfig(t);
 
   return (
     <SectionCard
@@ -97,7 +76,7 @@ export function ProductReviewsSection({
                         {t("admin.catalog.products.verifiedBuyer")}
                       </span>
                     )}
-                    <ReviewStatusBadge status={review.status} />
+                    <Badge status={review.status} config={statusConfig} />
                   </div>
                   <div className="mb-2 flex items-center gap-2">
                     <Stars score={review.score} />
@@ -116,51 +95,35 @@ export function ProductReviewsSection({
                 </div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-2">
-                {review.status !== "approved" && (
-                  <IconButton
-                    variant="ghost"
-                    aria-label={t("admin.catalog.products.approve")}
-                    title={t("admin.catalog.products.approve")}
-                    onClick={() =>
-                      update.mutate({ id: review.id, status: "approved" })
-                    }
-                    isLoading={
-                      update.isPending &&
-                      update.variables?.id === review.id &&
-                      update.variables.status === "approved"
-                    }
-                    disabled={
-                      update.isPending && update.variables?.id === review.id
-                    }
-                  >
-                    <CheckCircleIcon className="h-5 w-5 text-success-600" />
-                  </IconButton>
-                )}
-                {review.status !== "rejected" && (
-                  <IconButton
-                    variant="ghost"
-                    aria-label={t("admin.catalog.products.reject")}
-                    title={t("admin.catalog.products.reject")}
-                    onClick={() =>
-                      update.mutate({ id: review.id, status: "rejected" })
-                    }
-                    isLoading={
-                      update.isPending &&
-                      update.variables?.id === review.id &&
-                      update.variables.status === "rejected"
-                    }
-                    disabled={
-                      update.isPending && update.variables?.id === review.id
-                    }
-                  >
-                    <XCircleIcon className="h-5 w-5 text-danger-600" />
-                  </IconButton>
-                )}
+                {reviewTransitions(review.status).map((target) => {
+                  const Icon = REVIEW_TRANSITION_ICON[target];
+                  const label = t(REVIEW_TRANSITION_LABEL_KEY[target]);
+                  return (
+                    <IconButton
+                      key={target}
+                      variant="ghost"
+                      aria-label={label}
+                      title={label}
+                      onClick={() => request(review.id, target)}
+                      isLoading={busyId === review.id}
+                      disabled={busyId === review.id}
+                    >
+                      <Icon
+                        className={
+                          target === "hidden"
+                            ? "h-5 w-5 text-danger-600"
+                            : "h-5 w-5 text-success-600"
+                        }
+                      />
+                    </IconButton>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       )}
+      <ReviewModerationModal {...modalProps} />
     </SectionCard>
   );
 }

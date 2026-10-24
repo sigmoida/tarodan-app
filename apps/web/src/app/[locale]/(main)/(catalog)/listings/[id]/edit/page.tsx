@@ -1,6 +1,8 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { parseListingParam } from "@tarodan/types";
 import { redirect } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/lib/server/session";
@@ -18,13 +20,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Server guard: the edge middleware already bounces cookieless guests; this
 // re-validates the session against the API so an invalid/expired cookie can't
-// render the editor. Redirects back to the edit page after login.
+// render the editor. Redirects back to the edit page after login. The segment
+// may carry a slug (`<slug>-<uuid>/edit`); edit links themselves stay bare-UUID
+// and are not redirected (ADR 0017).
 export default async function EditListingPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const id = parseListingParam((await params).id);
+  if (!id) notFound();
   const session = await getSession();
   if (!session)
     redirect({

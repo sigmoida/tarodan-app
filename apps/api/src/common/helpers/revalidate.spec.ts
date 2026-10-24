@@ -1,5 +1,9 @@
 import { Logger } from "@nestjs/common";
-import { notifyWebRevalidate, resolveWebRevalidateUrl } from "./revalidate";
+import {
+  notifyWebRevalidate,
+  productListTags,
+  resolveWebRevalidateUrl,
+} from "./revalidate";
 
 describe("resolveWebRevalidateUrl", () => {
   it("appends the revalidate route to a bare origin", () => {
@@ -19,6 +23,20 @@ describe("resolveWebRevalidateUrl", () => {
 
   it("returns null for an unparsable value", () => {
     expect(resolveWebRevalidateUrl("not a url")).toBeNull();
+  });
+});
+
+describe("productListTags", () => {
+  it("tags the product lists and each listing's own page", () => {
+    expect(productListTags(["p1", "p2"])).toEqual([
+      "products:list",
+      "product:p1",
+      "product:p2",
+    ]);
+  });
+
+  it("still tags the lists when no listing is named", () => {
+    expect(productListTags([])).toEqual(["products:list"]);
   });
 });
 

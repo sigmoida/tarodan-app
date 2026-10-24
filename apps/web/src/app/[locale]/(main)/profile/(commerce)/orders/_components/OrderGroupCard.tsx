@@ -9,9 +9,11 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
 import { Button } from "@tarodan/ui";
+import { isDigitalOrder, listingPath } from "@tarodan/types";
 import {
   formatTL,
   getOrderPrimary,
+  isDigitalPackage,
   isGroupCancellable,
   productAmountOf,
   sellerNetOf,
@@ -42,6 +44,7 @@ function OrderLine({
   const locale = useLocale();
   const display = getDisplayStatus(order, t, locale);
   const { product, image } = getOrderPrimary(order);
+  const title = product?.title || t("order.product");
   // Kartta ürün bedeli gösterilir; alıcının ödediği toplam DEĞİL (bkz.
   // productAmountOf). Değer yoksa tutar hiç basılmaz.
   const productAmount = productAmountOf(order);
@@ -65,12 +68,15 @@ function OrderLine({
           />
         </div>
         <div className="min-w-0 flex-1">
-          {product ? (
+          {/* A digital order's virtual product has no listing page (D4). */}
+          {product && isDigitalOrder(order) ? (
+            <p className="font-medium text-heading">{title}</p>
+          ) : product ? (
             <Link
-              href={`/listings/${product.id}`}
+              href={listingPath(product)}
               className="font-medium text-heading transition-colors hover:text-primary-600"
             >
-              {product.title || t("order.product")}
+              {title}
             </Link>
           ) : (
             <p className="text-muted">{t("order.productInfoUnavailable")}</p>
@@ -199,12 +205,13 @@ export default function OrderGroupCard({
                   <OrderLine key={order.id} order={order} actions={actions} />
                 ))}
               </div>
-              {/* Kargo bedeli burada GÖSTERİLMEZ: kart tutarı zaten sepetin
-                  ödenen toplamıdır, kalem kalem döküm detay sayfasındadır. */}
-              {(pkg.packageNumber || cargoCode) && (
+              {/* No shipping fee here: the itemised breakdown lives on the
+                  detail page. A digital package ships nothing, so it has no
+                  parcel box. */}
+              {!isDigitalPackage(pkg) && (pkg.packageNumber || cargoCode) && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-surface-alt p-3 text-sm">
-                  {/* Teslimat no: bu kutudaki ürünler TEK kolide gider. Sürat'a
-                      giden ve kargo etiketinde yazan kod budur. */}
+                  {/* Parcel number: the items in this box ship in ONE parcel.
+                      This is the code sent to Surat and printed on the label. */}
                   {pkg.packageNumber && (
                     <p>
                       <span className="text-muted">
@@ -213,7 +220,7 @@ export default function OrderGroupCard({
                       <span className="font-mono">{pkg.packageNumber}</span>
                     </p>
                   )}
-                  {/* Taşıyıcının kendi kodu — Sürat barkodu oluştuğunda dolar. */}
+                  {/* The carrier's own code; filled once the Surat barcode exists. */}
                   {cargoCode ? (
                     <p>
                       <span className="text-muted">
@@ -222,16 +229,16 @@ export default function OrderGroupCard({
                       <span className="font-mono">{cargoCode}</span>
                     </p>
                   ) : (
-                    /* Kod yalnız koli şubede kabul edildikten sonra doluyor. O
-                       aralıkta hiçbir şey yazmamak, kullanıcıyı koli numarasını
-                       takip numarası sanıp taşıyıcı sitesinde aramaya itiyordu. */
+                    /* The code is filled only after the branch accepts the
+                       parcel. Showing nothing until then made users take the
+                       parcel number for a tracking number on the carrier site. */
                     pkg.cargo?.shippedAt && (
                       <p className="text-muted">
                         {t("order.cargoCodePending")}
                       </p>
                     )
                   )}
-                  {/* Takip TESLİMAT başına tektir — sorgu anahtarı da bu koddur. */}
+                  {/* Tracking is one per DELIVERY, and this code is its lookup key. */}
                   {(pkg.packageNumber || cargoCode) &&
                     group.viewerRole === "buyer" && (
                       <ButtonLink

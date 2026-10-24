@@ -5,18 +5,30 @@
 import type { ReactNode } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
-import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  BookmarkIcon,
+  FunnelIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { Button, Chip, Select } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { formatCondition } from "@/lib/format";
 import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
-import { useListingFiltersQuery } from "../_hooks/useListingFiltersQuery";
-import type { Translate } from "@/types/i18n";
+import { useListingFiltersQuery } from "@/hooks/useListingFiltersQuery";
+import { useSaveSearch } from "../_hooks/useSaveSearch";
+import {
+  colorLabel,
+  materialLabel,
+  priceRangeLabel,
+} from "@/lib/listingFilterLabels";
+import SaveSearchModal from "../_modals/SaveSearchModal";
+import { hasPriceFilter, priceFilterBound } from "../_lib/params";
 
 /**
  * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
- * the mobile "Filtreler" button, the product-layout selector and the sort Select.
+ * the mobile "Filters" button, "Save this search", the product-layout selector
+ * and the sort Select.
  * The title + result count live in the PageHeader itself (see ListingsClient).
  */
 export default function ListingsControls() {
@@ -29,6 +41,7 @@ export default function ListingsControls() {
     setShowMobileSidebar,
     handleFiltersChange,
   } = useListings();
+  const saveSearch = useSaveSearch();
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
@@ -45,6 +58,28 @@ export default function ListingsControls() {
           </span>
         )}
       </Button>
+      <Button
+        variant="secondary"
+        onClick={saveSearch.start}
+        disabled={saveSearch.draft.isEmpty}
+        title={
+          saveSearch.draft.isEmpty ? t("savedSearch.nothingToSave") : undefined
+        }
+        aria-label={t("savedSearch.save")}
+        className="flex flex-shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs sm:text-sm"
+      >
+        <BookmarkIcon className="w-4 h-4" />
+        <span className="hidden sm:inline">{t("savedSearch.save")}</span>
+      </Button>
+      <SaveSearchModal
+        open={saveSearch.open}
+        onClose={saveSearch.close}
+        defaultName={saveSearch.draft.defaultName}
+        refusal={saveSearch.refusal}
+        isSaving={saveSearch.isSaving}
+        onSave={saveSearch.save}
+      />
+      {saveSearch.authModal}
       <ProductLayoutSelector
         layout={productLayout}
         onLayoutChange={setProductLayout}
@@ -74,13 +109,6 @@ export default function ListingsControls() {
     </div>
   );
 }
-
-const MATERIAL_LABELS = (t: Translate): Record<string, string> => ({
-  diecast: t("page.listings.listingstoolbar.diecastMetal"),
-  resin: t("page.listings.listingstoolbar.resinRecine"),
-  composite: t("page.listings.listingstoolbar.composite"),
-  plastic: t("page.listings.listingstoolbar.plastic"),
-});
 
 // Per-filter active tint for the removable Chip.
 const CHIP_TINT = {
@@ -158,7 +186,7 @@ export function ActiveFilterChips() {
       k === "condition"
         ? formatCondition(v, locale)
         : k === "material"
-          ? MATERIAL_LABELS(t)[v] || v
+          ? materialLabel(v, t)
           : v;
     chips.push({
       key: k,
@@ -183,8 +211,7 @@ export function ActiveFilterChips() {
   for (const slug of filters.colors ?? []) {
     chips.push({
       key: `color:${slug}`,
-      label:
-        colorOptions?.find((option) => option.slug === slug)?.label ?? slug,
+      label: colorLabel(slug, colorOptions),
       onRemove: () =>
         handleFiltersChange({
           ...filters,
@@ -193,10 +220,15 @@ export function ActiveFilterChips() {
     });
   }
 
-  if (filters.minPrice || filters.maxPrice) {
+  // The bounds the search applies, not the typed text ("1.000" is refused,
+  // never shown as 1 TL).
+  if (hasPriceFilter(filters)) {
     chips.push({
       key: "price",
-      label: `₺${filters.minPrice || "0"} - ₺${filters.maxPrice || "∞"}`,
+      label: priceRangeLabel(
+        priceFilterBound(filters.minPrice),
+        priceFilterBound(filters.maxPrice),
+      ),
       onRemove: () =>
         handleFiltersChange({ ...filters, minPrice: "", maxPrice: "" }),
     });

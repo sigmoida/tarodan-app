@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
   ArgumentsHost,
+  Logger,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { AllExceptionsFilter } from "./all-exceptions.filter";
@@ -172,5 +173,135 @@ describe("AllExceptionsFilter", () => {
       run(new ForbiddenException("nope")),
     );
     expect(body).not.toHaveProperty("requestId");
+  });
+
+  /**
+   * The 5xx log line becomes the Sentry event message and fingerprint. The
+   * query string carries user input (search text, possibly an e-mail), so it
+   * never reaches the log: only the method, the path and the status do, and
+   * every query of one endpoint groups into one issue.
+   */
+  it("logs a 5xx with the request path only, never the query string", () => {
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const json = jest.fn();
+    const host = {
+      switchToHttp: () => ({
+        getResponse: () => ({ status: jest.fn(() => ({ json })) }),
+        getRequest: () => ({
+          method: "GET",
+          url: "/api/products?search=ali%40mail.com&page=2",
+          headers: {},
+        }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    try {
+      filter.catch(new Error("boom"), host);
+
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error.mock.calls[0][0]).toBe("GET /api/products -> 500");
+      expect(JSON.stringify(error.mock.calls)).not.toContain("ali");
+    } finally {
+      error.mockRestore();
+    }
+  });
+  describe("client aborts", () => {
+    const abort = (props: Record<string, unknown>, message = "aborted") =>
+      Object.assign(new Error(message), props);
+
+    function runAbort(
+      exception: unknown,
+      response: Record<string, unknown> = {},
+    ) {
+      const end = jest.fn();
+      const json = jest.fn();
+      const status = jest.fn(() => ({ json, end }));
+      const host = {
+        switchToHttp: () => ({
+          getResponse: () => ({ status, ...response }),
+          getRequest: () => ({
+            method: "POST",
+            url: "/api/media/upload/product?token=secret",
+            headers: {},
+            readableAborted: true,
+          }),
+        }),
+      } as unknown as ArgumentsHost;
+      const error = jest.spyOn(Logger.prototype, "error");
+      const debug = jest
+        .spyOn(Logger.prototype, "debug")
+        .mockImplementation(() => undefined);
+      try {
+        filter.catch(exception, host);
+        return {
+          status,
+          end,
+          json,
+          error: error.mock.calls,
+          debug: debug.mock.calls,
+        };
+      } finally {
+        error.mockRestore();
+        debug.mockRestore();
+      }
+    }
+
+    it.each([
+      ["multer", abort({}, "Request aborted")],
+      ["body-parser", abort({ type: "request.aborted", code: "ECONNABORTED" })],
+    ])("%s: no error log, debug only, no query string", (_name, err) => {
+      const out = runAbort(err);
+      expect(out.error).toHaveLength(0);
+      expect(out.debug).toHaveLength(1);
+      expect(String(out.debug[0][0])).toBe(
+        "POST /api/media/upload/product -> client aborted the request",
+      );
+      expect(out.json).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing when the socket is already closed", () => {
+      const out = runAbort(abort({}, "Request aborted"), {
+        socket: { destroyed: true },
+      });
+      expect(out.status).not.toHaveBeenCalled();
+    });
+
+    it("ends a still-open response with an empty 400", () => {
+      const out = runAbort(abort({}, "Request aborted"), {
+        socket: { destroyed: false },
+      });
+      expect(out.status).toHaveBeenCalledWith(400);
+      expect(out.end).toHaveBeenCalled();
+      expect(out.json).not.toHaveBeenCalled();
+    });
+
+    it("an upstream ECONNRESET with the client still connected is a logged 500", () => {
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      try {
+        const upstream = abort({ code: "ECONNRESET" }, "socket hang up");
+        expect(run(upstream).status).toBe(500);
+        expect(error).toHaveBeenCalledTimes(1);
+      } finally {
+        error.mockRestore();
+      }
+    });
+
+    it("still turns an unrelated error into a logged 500", () => {
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      try {
+        expect(run(new Error("Request aborted by admin policy")).status).toBe(
+          500,
+        );
+        expect(error).toHaveBeenCalledTimes(1);
+      } finally {
+        error.mockRestore();
+      }
+    });
   });
 });

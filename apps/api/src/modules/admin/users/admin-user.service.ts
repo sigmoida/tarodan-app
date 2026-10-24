@@ -7,13 +7,19 @@ import {
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
+import { SellerTrustService } from "../../seller-trust";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { enqueueSellerListingReindex } from "../../membership/helpers/seller-listing-reindex";
 import { fulltextUserSearch } from "../../../common/helpers/fulltext-search";
 import { AdminUserQueryDto } from "../dto";
-import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";
+import {
+  Prisma,
+  MembershipTierType,
+  OrderStatus,
+  SubscriptionStatus,
+} from "@prisma/client";
 import {
   ADMIN_LIST_DEFAULT_LIMIT,
   ADMIN_LIST_DEFAULT_PAGE,
@@ -69,6 +75,7 @@ export class AdminUserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly sellerTrust: SellerTrustService,
     @Optional()
     private readonly storageService: StorageService,
     // Admin katman değişikliği takas yetkisini değiştirir; arama dokümanı
@@ -373,12 +380,12 @@ export class AdminUserService {
     const [asBuyer, asSeller] = await Promise.all([
       this.prisma.order.groupBy({
         by: ["buyerId"],
-        where: { status: "cancelled" as any, buyerId: { in: ids } },
+        where: { status: OrderStatus.cancelled, buyerId: { in: ids } },
         _count: { _all: true },
       }),
       this.prisma.order.groupBy({
         by: ["sellerId"],
-        where: { status: "cancelled" as any, sellerId: { in: ids } },
+        where: { status: OrderStatus.cancelled, sellerId: { in: ids } },
         _count: { _all: true },
       }),
     ]);
@@ -610,6 +617,10 @@ export class AdminUserService {
       throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
+    // The stored trust score with its breakdown, from its owner (one
+    // primary-key lookup). `computedAt` null: not computed yet.
+    const trust = await this.sellerTrust.getAdminView(userId);
+
     const avgRating =
       user.receivedRatings.length > 0
         ? user.receivedRatings.reduce((sum, r) => sum + r.score, 0) /
@@ -728,6 +739,7 @@ export class AdminUserService {
       lastLoginAt: user.lastLoginAt ?? null,
       lastActivityAt: user.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
+      trust,
       // Address sütunları `address`/`zipCode`; ekran `fullAddress`/`postalCode`
       // okuyor. Eşleme yoktu, o iki satır boş basılıyordu.
       addresses: user.addresses.map((a) => ({

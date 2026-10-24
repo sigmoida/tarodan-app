@@ -8,12 +8,6 @@
       "reason": "Build-time-only dependency of Sentry's Next.js tooling; await an SDK-compatible Rollup update instead of overriding its peer graph."
     },
     {
-      "ghsa": "GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "expires": "2026-11-30",
-      "reason": "No patched release exists (3.0.3 is the latest and is affected). The only path is admin > @sentry/nextjs > @sentry/webpack-plugin > unplugin > chokidar, which runs at build time on file-watcher globs the build itself supplies; no request-controlled pattern reaches it. Re-check for an upstream fix before extending."
-    },
-    {
       "ghsa": "GHSA-f88m-g3jw-g9cj",
       "package": "sharp",
       "expires": "2026-11-30",
@@ -30,6 +24,12 @@
       "package": "sharp",
       "expires": "2026-10-31",
       "reason": "Time-boxed exception, owner devops. librsvg memory bug bundled with sharp <0.35.5; the fix (0.35.5) needs x86-64-v2 and the Coolify host is v1 (docs/SHARP_HOST_UPGRADE.md), and no 0.34.x patch exists. Not reachable here: (1) the API applies the upstream workaround, blocking VipsForeignLoadSvg in apps/api/src/common/image/sharp-safety.ts, pinned by a real-sharp test in strip-image-metadata.spec.ts; SVG is also not an accepted upload type. (2) Next.js 15.5 image optimisation (web, admin; dangerouslyAllowSVG is on) picks the decoder by sniffing the upstream bytes and returns SVG, BMP and the other bypass types untouched; only JPEG, PNG, GIF, WebP, TIFF and JP2 reach sharp, and libvips picks a non-SVG loader for those signatures (checked against sharp 0.34.5). remotePatterns do not limit this: s3.eu-west-1.amazonaws.com without a pathname admits any path-style bucket. (3) Defence in depth: the advisory names RCE only on glibc Linux and every image is node:20-alpine (musl); the use-after-free itself still exists on musl. Resolve by the host upgrade or a source build of sharp 0.35.5 before expiry; do not extend without re-review."
+    },
+    {
+      "ghsa": "GHSA-mrhx-c7xc-m3w5",
+      "package": "zod",
+      "expires": "2026-11-30",
+      "reason": "No patched zod 3 release exists (3.25.76 is the latest 3.x; the fix is zod >=4.6.6, a major upgrade of every form schema). Not reachable with untrusted input on a server: the API uses zod only in config/env.validation.ts (its own environment); request bodies go through class-validator DTOs. Web and admin run zod in the browser on the user's own form input. zod 4 (openai) is overridden to ^4.6.6. Resolve by the zod 4 migration before expiry; do not extend without re-review."
     }
   ]
 }

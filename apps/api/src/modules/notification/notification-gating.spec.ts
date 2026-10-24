@@ -1,3 +1,5 @@
+import { getQueueToken } from "@nestjs/bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { NotificationService } from "./notification.service";
@@ -72,6 +74,10 @@ describe("Notification preference gating (wiring)", () => {
           I18nService,
           NotificationCommerceService,
           NotificationAccountService,
+          {
+            provide: getQueueToken(QUEUE_NAMES.EMAIL),
+            useValue: { add: jest.fn() },
+          },
           { provide: PrismaService, useValue: mockPrisma },
           { provide: ConfigService, useValue: { get: jest.fn() } },
           {

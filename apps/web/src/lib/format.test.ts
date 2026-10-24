@@ -1,7 +1,40 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { formatPrice, formatPriceNumber, formatTL } from "./format";
+import {
+  formatDateTimeLong,
+  formatDayMonth,
+  formatPrice,
+  formatPriceNumber,
+  formatRating,
+  formatTL,
+} from "./format";
+
+describe("formatDateTimeLong", () => {
+  it("follows the UI locale for the month word", () => {
+    const iso = "2026-11-12T10:00:00.000Z";
+    expect(formatDateTimeLong(iso, "tr")).toContain("Kas");
+    expect(formatDateTimeLong(iso, "en")).toContain("Nov");
+  });
+
+  it("is empty for a missing or invalid value", () => {
+    expect(formatDateTimeLong(null, "tr")).toBe("");
+    expect(formatDateTimeLong("nope", "en")).toBe("");
+  });
+});
+
+describe("formatDayMonth", () => {
+  it("is the day and short month in the UI locale, without the year", () => {
+    expect(formatDayMonth("2026-11-12T10:00:00.000Z", "tr")).toBe("12 Kas");
+    expect(formatDayMonth("2026-11-12T10:00:00.000Z", "en")).toBe("Nov 12");
+  });
+
+  it("is empty for a missing or invalid date", () => {
+    expect(formatDayMonth(null, "tr")).toBe("");
+    expect(formatDayMonth("", "tr")).toBe("");
+    expect(formatDayMonth("not a date", "tr")).toBe("");
+  });
+});
 
 /**
  * Para biçimi UYGULAMADA TEK olmalı.
@@ -47,5 +80,14 @@ describe("para biçimi", () => {
     expect(formatPriceNumber(468)).toBe("468,00");
     expect(formatPriceNumber(1234.5)).toBe("1.234,50");
     expect(formatPriceNumber(null)).toBe("0,00");
+  });
+});
+
+describe("formatRating", () => {
+  it("has exactly one decimal with the UI locale's separator", () => {
+    expect(formatRating(4.25, "tr")).toBe("4,3");
+    expect(formatRating(4.25, "en")).toBe("4.3");
+    expect(formatRating(4, "tr")).toBe("4,0");
+    expect(formatRating(3.74, "en")).toBe("3.7");
   });
 });

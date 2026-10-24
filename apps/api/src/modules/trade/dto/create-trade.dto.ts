@@ -8,8 +8,8 @@ import {
   ArrayMinSize,
   Min,
   MaxLength,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
 
 export class TradeItemDto {
   @IsUUID()
@@ -31,7 +31,7 @@ export class CreateTradeDto {
    * Products the initiator is offering
    */
   @IsArray()
-  @ArrayMinSize(1, { message: 'En az 1 ürün teklif etmelisiniz' })
+  @ArrayMinSize(1, { message: "En az 1 ürün teklif etmelisiniz" })
   @ValidateNested({ each: true })
   @Type(() => TradeItemDto)
   initiatorItems: TradeItemDto[];
@@ -40,7 +40,7 @@ export class CreateTradeDto {
    * Products the initiator wants from receiver
    */
   @IsArray()
-  @ArrayMinSize(1, { message: 'En az 1 ürün talep etmelisiniz' })
+  @ArrayMinSize(1, { message: "En az 1 ürün talep etmelisiniz" })
   @ValidateNested({ each: true })
   @Type(() => TradeItemDto)
   receiverItems: TradeItemDto[];
@@ -49,6 +49,10 @@ export class CreateTradeDto {
    * Optional cash component to balance the trade (in TRY)
    * If positive, initiator pays to receiver
    * If negative, receiver pays to initiator
+   * At most two decimals and a magnitude of at most TL_NEGOTIATED_AMOUNT_MAX:
+   * the service refuses anything else with `server.trade.invalidCashAmount`
+   * (`assertTradeCashAmount`). Text such as "150" is still converted: released
+   * mobile clients send numbers, but the conversion is the existing contract.
    */
   @IsOptional()
   @IsNumber()

@@ -92,6 +92,7 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
       twoFactorSecret: { deleteMany: jest.fn() },
       savedCard: { deleteMany: jest.fn() },
       notificationLog: { deleteMany: jest.fn() },
+      savedSearch: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       newsletterSubscriber: { updateMany: jest.fn() },
     };
     const empty = { findMany: jest.fn().mockResolvedValue([]) };
@@ -118,6 +119,7 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
         notifyOfferCancelledListingRemoved: jest.fn(),
         notifyOfferCancelledBuyerDeleted: jest.fn(),
       } as never, // notifications
+      {} as never, // sellerTrust
       appleTokens as never,
     );
     return { service, tx, prisma };

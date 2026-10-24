@@ -2,8 +2,8 @@
 
 "use client";
 
-import { TrashIcon } from "@heroicons/react/24/outline";
-import { Badge, Button, IconButton } from "@tarodan/ui";
+import { CubeIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Badge, Button, EmptyState, IconButton } from "@tarodan/ui";
 import { ProductCard } from "@/components/ui";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import {
@@ -53,20 +53,21 @@ export default function CollectionItemsGrid() {
 
   if (sortedItems.length === 0) {
     return (
-      <div className="rounded border border-border bg-surface-elevated py-20 text-center">
-        <p className="mb-4 text-base text-muted">
-          {t("collection.noProductsYet")}
-        </p>
-        {isOwner && (
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setShowAddModal(true)}
-          >
-            {t("collection.addProduct")}
-          </Button>
-        )}
-      </div>
+      <EmptyState
+        icon={<CubeIcon className="h-7 w-7" />}
+        title={t("collection.noProductsYet")}
+        action={
+          isOwner ? (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setShowAddModal(true)}
+            >
+              {t("collection.addProduct")}
+            </Button>
+          ) : undefined
+        }
+      />
     );
   }
 

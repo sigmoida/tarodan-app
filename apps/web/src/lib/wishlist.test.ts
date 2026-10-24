@@ -1,13 +1,10 @@
 /** @format */
 
-import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({ wishlistApi: {} }));
 
-import { queryKeys } from "@/lib/query/keys";
 import {
-  forgetWishlistOnUserChange,
   isPendingWishlistEntry,
   settleWishlistEntry,
   unwrapWishlistItems,
@@ -128,34 +125,5 @@ describe("settleWishlistEntry", () => {
     const items = [row("a")];
     expect(settleWishlistEntry(items, "a", row("a"))).toBe(items);
     expect(settleWishlistEntry(pendingList(), "z")).toEqual(pendingList());
-  });
-});
-
-describe("forgetWishlistOnUserChange", () => {
-  const seeded = () => {
-    const client = new QueryClient();
-    client.setQueryData(queryKeys.wishlist.all(), [row("a")]);
-    return client;
-  };
-  const user = (id: string) => ({ user: { id } });
-
-  it("çıkışta önceki kullanıcının favori listesini önbellekten siler", () => {
-    const client = seeded();
-    forgetWishlistOnUserChange(() => client)({ user: null }, user("u1"));
-    expect(client.getQueryData(queryKeys.wishlist.all())).toBeUndefined();
-  });
-
-  it("aynı sekmede başka hesaba geçişte de siler", () => {
-    const client = seeded();
-    forgetWishlistOnUserChange(() => client)(user("u2"), user("u1"));
-    expect(client.getQueryData(queryKeys.wishlist.all())).toBeUndefined();
-  });
-
-  it("girişte ve aynı kullanıcının güncellemelerinde dokunmaz", () => {
-    const client = seeded();
-    const listener = forgetWishlistOnUserChange(() => client);
-    listener(user("u1"), { user: null });
-    listener(user("u1"), user("u1"));
-    expect(client.getQueryData(queryKeys.wishlist.all())).toEqual([row("a")]);
   });
 });

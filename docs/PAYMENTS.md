@@ -88,6 +88,88 @@ ile sipariş oluşturma anında e-posta doğrulamasıdır (Redis'te tek kullanı
 idempotency kontrolünden **sonra** tüketilir, replay kodu yakmaz). Misafir
 ödemesi `userId = null` ile sıradan `initiate`/`direct-form`'dur.
 
+### Return URLs and virtual orders
+
+Membership and boost are **virtual orders**: an ordinary Order on a virtual
+product (`membership-<tierId>`, `boost-<boostId>`, origin
+`platform_service`). `virtualOrderKind` (`payment/helpers/virtual-order-kind.ts`)
+is the one reader of those prefixes (`VIRTUAL_ORDER_KINDS` in
+`@tarodan/types`); the older prefix checks in fulfilment, refunds and
+invoicing are a backlog item.
+
+- **Return URLs.** `createDirectPaymentForm` builds
+  `merchant_ok_url = <FRONTEND_URL>/payment/success?<query>` and
+  `merchant_fail_url = <FRONTEND_URL>/payment/fail?<query>` with the same
+  query (`paymentReturnQuery`): `paymentId` always, `type=membership|boost`
+  for a virtual order, `guest=true` for a guest order or cart. A trade cash
+  payment carries `paymentId` only. Mobile matches only the path of these
+  URLs, so the query is safe for every app version.
+- **Fail page.** With the `paymentId` the web fail page calls
+  `POST /payments/:id/confirm-failed` while the payment is still `pending`.
+  It is a no-op while the 3DS charge may be live
+  (`metadata.lastChargeStartedAt` within `paymentFailTimeoutMinutes`); after
+  that it runs `processFailedPayment`, the same path as the PayTR failure
+  callback and the expiry cron (CAS to `failed`, order cancelled,
+  reservation released). A 3DS failure therefore needs a new checkout, as
+  before.
+- **Payment status.** `GET /payments/:id/status`, `/status-guest` and
+  `GET /payments/:id` add `isMembershipOrder: true` for a membership payment
+  and `isBoostOrder: true` with `boost: { id, productId, productTitle,
+endsAt }` for a boost payment (`endsAt` null until activation;
+  `VirtualOrderPaymentFields` in `@tarodan/types`). Orders of goods get
+  neither.
+- **Boost purchase consents.** `POST /products/:id/boost/initiate` needs the
+  pre-contract information and withdrawal waiver consents and writes the
+  boost, its virtual product, its order and both consents in one
+  transaction; `direct-form` refuses a boost order without them
+  (`400 server.product.boostConsentRequired`). Details and the legal release
+  blocker: `CONSENTS.md`, "Platform services (boost)".
+- **Boost price at consent.** The initiate body carries `expectedPrice`, the
+  price the dialog showed for the chosen package and duration (TL, VAT
+  included; required, a JSON number with at most two decimals, text is a
+  400). The server resolves the price itself (package tier for the listing's
+  price band and the seller's audience, campaign price inside its window: the
+  same rule `GET /products/:id/boost/options` shows) and compares the two in
+  whole kuruş (`boostPriceMatches` in `@tarodan/types`, the only comparison
+  rule). A mismatch (the package and duration are still offered, at another
+  price) is `409 server.product.boostPriceChanged` before any order lookup,
+  reference or write, so no boost, order, consent or payment row exists for
+  terms the seller did not see. The refusals that come before it win:
+  consents, boost off, listing, owner, status, package, tier, a zero price; so
+  a package or duration that is no longer offered at all is the 400
+  `boostPackageNotFound` or `boostPriceUndefined`, not the 409. On a match the
+  resolved price is what the boost, the order and the payment carry; the
+  client's number is never written. On the 409 the dialog reloads the prices
+  and asks for both consents again; it also refuses to open the pay page for
+  a started order whose price is not the one shown (same rule), which covers
+  an API that does not check the price yet while a release rolls out.
+- **Boost tier band.** A package tier prices one duration for a band of
+  listing prices (`boostTierBasePrice`). The band is half-open:
+  `minAmount <= price < maxAmount`, a null `maxAmount` has no upper bound,
+  the same rule as the commission bands. So 1000-5000 and 5000-(none) touch
+  without overlapping, and a listing priced exactly 5000 is in the second
+  band only. The rule lives in one file,
+  `product/helpers/boost-tier-band.ts`, read by the options, the purchase
+  start and the one-time offer. The admin save (create, and an update that
+  sends `tiers`) refuses, before any write, a band whose upper bound is not
+  above its lower bound (`400 server.admin.commission.maxAboveMin`) and two
+  active tiers of one duration whose bands share a price
+  (`400 server.admin.adPackage.tierOverlap`, with both ranges in the
+  message); both name the rows in `tierIndexes` (positions in `tiers`).
+  Inactive rows and other durations may overlap. For rows saved before the
+  check, the options and the purchase start read the covering tiers with the
+  same filter and the same order (`BOOST_TIER_PRECEDENCE`: highest lower
+  bound, then the narrower band, then the older row, then the id) and take
+  the first one per duration, so the options show one price per duration and
+  initiate resolves that same tier. `maintenance/check-ad-package-tiers.ts`
+  lists such rows (`OPERATIONS.md`, "Check: ad package tier bands").
+- **Tracing.** The boost purchase start tags its request `flow=boost`;
+  the purchase and the activation leave `boost.*` breadcrumbs with ids only
+  (boost, order, order number, listing; `boost.price_mismatch` carries the
+  listing, package and duration, no amount). Activation sets no tag because it
+  also runs in worker jobs, which share the process scope. A paid boost
+  order without its boost row is a Sentry error event.
+
 ---
 
 ## 2. Sipariş para formülü
@@ -292,43 +374,176 @@ paradır.
 
 ## 6. Payout
 
-`modules/payout/payout.service.ts`; scheduler: `payout-process` 15 dk'da bir,
-`payout-check-returned` her gün 06:00. Kill-switch: `PAYOUTS_DISABLED=true`.
+`modules/payout/payout.service.ts`; scheduler: `payout-process` every 15 min,
+`payout-check-returned` daily at 06:00. Kill switch: `PAYOUTS_DISABLED=true`.
 
-1. **Oluşturma** — `released` ve dondurulmamış her hold için (bloklayan iade
-   yoksa) `PYT…` referanslı transfer (tiresiz — PayTR `trans_id` şartı, bkz.
-   docs/CODE_SCHEME.md); `netPayout = hold − iade edilen`.
-2. **Satıcı borcu mahsubu** — açık `sellerAccountAdjustment` varsa FIFO tahsis
-   (`FOR UPDATE`), `netAmount = max(0, net − Σtahsis)`; dengeli ledger grubu
-   `seller_debt_recovery / seller_escrow`.
-3. **İşleme kontrolleri** — uygunluk + iade yeniden doğrulanır; **bayat-net
-   koruması** (yalnız aşağı düzeltme; `fully_refunded` → failed); IBAN her
-   seferinde güncel `SellerBankAccount`'tan okunur (snapshot'a güvenilmez);
-   `isValidTrIban` (mod-97) geçemeyen → failed; **3 günlük IBAN değişiklik
-   soğuması** → pending bekler; **aynı-gün koruması** (PayTR ödeme gününde
-   talimat kabul etmez; `paidAt` Türkiye takviminde bugünse pending bekler,
-   retry sayacı yanmaz); eski tireli `PYT-…` transId tiresiz yeniden üretilir;
-   atomik `pending → processing` claim + claim sonrası TOCTOU yeniden okuma.
-4. **Submitted / processed ayrımı** — PayTR `success` yalnız _talimat kabulü_
-   demektir. `PAYTR_TRANSFER_CALLBACK_ENABLED=true` iken payout `processing` +
-   `submittedAt` olarak kalır (**submitted**); tamamlanma yalnız callback'te.
-   Bayrak kapalıyken (varsayılan) senkron kabul `completed` sayılır. İki yol da
-   `applyPayoutCompletionEffects()`'te birleşir (IBAN oto-doğrulama, satıcıya
-   e-posta, ledger settle).
-5. **Callback** — `POST /payouts/callback/paytr-transfer` (public, hash
-   doğrulamalı, düz `"OK"` dönmek zorunda). 3 günü aşan callback gecikmesi alarm
-   üretir. `payout-failed-seller` / `payout-returned-seller` e-postaları maskeli
-   IBAN son-4 ve (varsa) sebep taşır; günlük returned taraması + 30 dk stuck-processing
-   tespiti vardır. **Geri dönen transfer eşlemesi**: PayTR'nin listesi bizim
-   `trans_id`'mizi değil kendi `ref_no`'sunu verir; talimat yanıtındaki `reference`
-   `PayoutTransfer.providerReference`'a yazılır ve eşleme onunla yapılır (migration
-   eski satırları `provider_response->>'reference'`'tan doldurur; referanssız kalan
-   eski satırlar için IBAN + tutar + tarih; belirsizlikte dokunulmaz, loglanır).
-   PayTR aynı satırı pencere boyunca her gün yeniden verir: referansı taşıyan
-   payout artık completed/processing değilse satır "işlendi" sayılır, sezgiye
-   düşülmez. Yeniden gönderim (admin retry, requeue) referansı sıfırlar;
-   `providerResponse` yeni gönderime dek kalır, admin retry'ın audit kaydı
-   önceki referans/yanıtı taşır.
+1. **Creation**: for every `released`, unfrozen hold without a blocking
+   refund, a transfer with a `PYT…` reference (no hyphen: PayTR `trans_id`
+   rule, see docs/CODE_SCHEME.md); `netPayout = hold − refunded`.
+2. **Seller debt offset**: open `sellerAccountAdjustment` rows are
+   allocated FIFO (`FOR UPDATE`), `netAmount = max(0, net − Σallocations)`;
+   balanced ledger group `seller_debt_recovery / seller_escrow`.
+3. **Processing checks**: eligibility and refunds are checked again;
+   **stale-net guard** (only lowers; `fully_refunded` → failed); the IBAN is
+   read from the current `SellerBankAccount` every time (never the
+   snapshot); `isValidTrIban` (mod-97) failures → failed; **3-day IBAN change
+   cooldown** → stays pending; **same-day guard** (PayTR refuses an
+   instruction on the payment day; `paidAt` today in the Turkish calendar →
+   stays pending, the retry counter does not move); legacy hyphenated
+   `PYT-…` trans ids are regenerated without the hyphen; atomic
+   `pending → processing` claim plus a TOCTOU re-read after the claim.
+4. **Transfer total (`total_amount`)**: the slice of the payment
+   (`merchant_oid`) this transfer settles. PayTR rejects a total above what
+   the oid has left (`err_no 010`); a cart payment pays several sellers from
+   one oid and refunds lower its balance. Computed on every attempt in
+   `payout/helpers/transfer-total.ts`, one formula for order and trade-cash
+   payouts, in kuruş:
+   `allowed = min(source total − cash refunded on it, payment − all refunds
+on the payment − totals the other transfers on the oid took)`.
+   - Refunds: `RefundAttempt`s that are not `failed` (one in flight reserves
+     its room), or `Payment.metadata.refundedOrders` when larger (refunds
+     before 2026-07-28 exist only there).
+   - Other transfers count when `processing`, `completed`, `returned` (PayTR
+     returns a bounced transfer to the merchant balance, not to the oid) or
+     `failed / transfer_outcome_unknown`, by `submittedTotalAmount`; rows
+     sent before 2026-10-23 count `amount` (what they sent), a zero net
+     counts 0. The total is stamped on `submittedTotalAmount` in the claim.
+   - The net (`submerchant_amount`) is never changed by this. If it does
+     not fit (including nothing left, e.g. a residual after a full refund)
+     PayTR is not called: `failed / transfer_needs_manual_decision`, inputs
+     in `providerResponse.transferTotal`, error log, no seller e-mail. The
+     platform pays such a payout from its own bank account and records it
+     in admin (decision of 2026-10-23); a non-faulty seller is paid as §5
+     says. A payout without a payment fails closed the same way.
+5. **Outcomes and retries**: `failureReason` is a code
+   (`PAYOUT_FAILURE_REASONS` in `@tarodan/types`); PayTR's answer or the
+   network cause goes to `providerResponse` and the log, never to the
+   seller.
+
+   | Outcome                                                                                                                                                                                                           | Action                                                                                                                                                         |
+   | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | PayTR `err_no 010`                                                                                                                                                                                                | `retry_pending` (60 min, then 4 h) with a recomputed total, 3 attempts, then `transfer_total_exceeds_remaining`                                                |
+   | Other PayTR rejection                                                                                                                                                                                             | `failed` at once: `bank_details_rejected` when `err_msg` says the IBAN or holder name is wrong (a detail word next to a defect word), else `provider_rejected` |
+   | Request not sent (connect phase: `UND_ERR_CONNECT_TIMEOUT`, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, a connect syscall error; HTTP 4xx other than 408/409 without a PayTR answer) | `retry_pending`, same `trans_id`, 3 attempts, then `provider_unreachable`                                                                                      |
+   | Outcome unknown (reset or timeout after sending, our 20 s timeout, HTTP 5xx, 408 or 409, unreadable answer)                                                                                                       | `failed / transfer_outcome_unknown` at once, never resent by a cron; total and net stay on the row                                                             |
+
+   Final failures log at `error` with the payout id, `trans_id` and cause
+   code (Sentry). The classifier is `classifyPaytrFetchError`
+   (`payment-providers/paytr/paytr-fetch-retry.util.ts`); the read-path retry
+   in that file is not for money writes. Only the PayTR call itself is
+   treated as the transfer: an error in the bookkeeping after PayTR
+   accepted is logged at `error`, leaves the row `processing` (zombie
+   alarm) and is never retried; the run goes on with the next payout. A
+   failure while building the request (credentials, signing, endpoint)
+   is a configuration problem: the claim is released and the run stops,
+   so no payout burns its retries. Saving the bank account puts the
+   seller's `failed / no_bank_account` rows back to `pending`, and also
+   `invalid_iban_format` and `bank_details_rejected` when the IBAN or
+   holder name changed. Admin retry puts a `failed` row back to
+   `pending` (same `trans_id`; `returned` gets a new one) and the processor
+   recomputes net and total (see 9).
+
+6. **Submitted / processed**: PayTR `success` only means the _instruction
+   was accepted_. With `PAYTR_TRANSFER_CALLBACK_ENABLED=true` the payout stays
+   `processing` with `submittedAt` (**submitted**); it completes only in the
+   callback. With the flag off (default) the synchronous acceptance counts
+   as `completed`. Both paths meet in `applyPayoutCompletionEffects()`
+   (seller e-mail, ledger settle).
+7. **Callback**: `POST /payouts/callback/paytr-transfer` (public, hash
+   verified, must answer a plain `"OK"`). It completes `processing` rows and
+   also `failed / transfer_outcome_unknown` rows (PayTR confirms a transfer
+   we did not hear back about), and `pending` / `retry_pending` rows (an
+   admin retried an unknown outcome before this late result came; the
+   money moved, so it is settled instead of sent again, error log), each
+   once by CAS. Other rows are never revived; a callback for one logs an
+   error (check the PayTR panel before paying it any other way), and so does
+   a callback for a row an admin paid from the bank (`external_bank`):
+   possible double payment. A row without a send snapshot (unknown outcome, or
+   bookkeeping failed after acceptance) gets the send time and net
+   stamped, so a later bank return still matches. A callback later than 3 days raises an alarm. Daily
+   returned-transfer scan plus a 30-minute stuck-`processing` check.
+   **Returned transfer matching**: PayTR's list carries its own `ref_no`,
+   not our `trans_id`; the instruction answer's `reference` is stored in
+   `PayoutTransfer.providerReference` and matching uses it (the migration
+   filled old rows from `provider_response->>'reference'`; old rows without
+   a reference fall back to IBAN + amount + date; ambiguous rows are left
+   alone and logged). PayTR repeats the same row every day of the window: a
+   row whose payout is no longer completed/processing counts as handled and
+   never falls back to the heuristic. A resend (admin retry, requeue) clears
+   the reference; `providerResponse` stays until the next send and the admin
+   retry's audit record keeps the previous reference and answer.
+8. **Seller e-mails**: `payout-failed-seller` only for the seller-fixable
+   codes `no_bank_account`, `invalid_iban_format` and `bank_details_rejected`,
+   with the mapped text of `payout/helpers/payout-failure-reasons.ts`
+   (masked IBAN last 4); never PayTR's text or an oid. Platform-side reasons
+   send nothing; the team resolves them. `payout-returned-seller` goes out
+   when the bank returns a transfer.
+9. **Manual resolution (admin → Finance → Payouts → Transfers)**, in the
+   payout domain (`payout/resolution/payout-resolution.service.ts`); one
+   policy (`payout/helpers/payout-resolution-policy.ts`) drives the API
+   guards and the list row's `resolution` flags. Every write is a CAS on the
+   row as read (status, reason, `updatedAt`), with the required audit record
+   in the same transaction (`payout_retry`, `payout_mark_paid`).
+   - **Retry** (`POST /admin/payouts/:transferId/retry`, super_admin/admin
+     with the `payouts` permission): `failed` or `returned` → `pending`,
+     retry counter and reference cleared (an earlier manual settlement too);
+     net and total are never set here. `submittedTotalAmount` and
+     `submittedAmount` stay: a pending row is not counted against the oid,
+     the next claim overwrites them, and a late callback settles with them.
+     A row PayTR may have taken needs `confirmProviderChecked: true` and a
+     reason (the PayTR panel shows no transfer with that `trans_id`), else
+     409: `transfer_outcome_unknown`, and rows from before the reason codes
+     with a free-text reason after more than one attempt (the old handler
+     resent the same `trans_id` and kept only the last attempt's reason and
+     answer, so an earlier attempt may have reached PayTR) or after one
+     attempt without a stored PayTR answer (a thrown error, e.g. "Bad
+     Request Exception"). One attempt answered by PayTR (`status: "error"`)
+     is a rejection, and a free-text row without an attempt failed before
+     sending; neither needs the check. A checked retry of a legacy row
+     records the net it may have sent (`submittedAmount`), so the row keeps
+     saying an earlier send is unconfirmed (a net without `submittedAt`)
+     until PayTR accepts a later attempt.
+   - **Mark as paid** (`POST /admin/payouts/transfers/:id/mark-paid`,
+     super_admin/admin with the `payouts` permission; body `method`,
+     `reference`, `reason`, `expectedNetAmount`). One method fits a row:
+     - `paytr_confirmed` for a row PayTR may have taken (as above) when the
+       panel shows it arrived. Net = `submittedAmount ?? netAmount`. Stamps
+       like the callback: `submittedAt` = the failure time, total kept.
+     - `external_bank` for `transfer_needs_manual_decision` (not a missing
+       payment or source: that is a data problem, fix and retry) and
+       `transfer_total_exceeds_remaining`, after finance paid the net from the
+       company account (decision of 2026-10-23). The processor's guards run
+       again inside the transaction, under the payment and then the order
+       row lock (refund attempts and refund requests take them) on the row
+       read after the locks: order payable, no refund in flight, the hold
+       still entitles the seller to the net; for trade cash, the cash payment
+       completed, released, not refunded and not below the net. Else 409 and
+       a retry recomputes. `submittedTotalAmount
+= 0` (siblings on the oid do not count it), `submittedAt` and
+       `submittedAmount` null (no PayTR transfer for the PSP comparison or
+       the returned-transfer scan, which never matches a row without a send
+       time).
+     - `expectedNetAmount` must equal the net to the kuruş (409 otherwise),
+       so a stale screen never books a different amount.
+     - `external_bank` on a row whose earlier send PayTR never confirmed
+       (`resolution.markPaidRequiresProviderCheck`) also needs
+       `confirmProviderChecked: true`: the panel shows no transfer with its
+       `trans_id` (409 `markPaidProviderCheckRequired` otherwise).
+     - Ledger, in the same transaction: `external_bank` first funds what the
+       escrow no longer holds, `F = max(0, net − max(0, seller_escrow))` per
+       order (per trade and recipient for trade cash): `adjustment`
+       `seller_escrow` debit / `platform_commission` credit, key
+       `payout-platform-funding:<payoutId>`. Then both methods book
+       `payout_completed` (`seller_escrow` credit / `payout` debit, net, key
+       `payout-completed:<payoutId>`, metadata method and reference). If
+       that key already exists (a transfer the bank returned, then retried)
+       nothing is booked again. The order's escrow ends at 0.
+     - The row keeps `providerResponse.manualSettlement` (method, reference,
+       admin, time, net, funded amount). The seller gets the normal "payout
+       released" e-mail after commit. A repeated request returns the first
+       result (`alreadySettled: true`) and writes nothing; a row a callback
+       or retry moved first gives 409.
+   - Runbook: OPERATIONS.md, "Payout transfers needing a decision".
 
 ---
 
@@ -474,6 +689,213 @@ ayrıdır; belirsizler `manual_review`'a park eder ve
 `refund-reconciliation.service.ts` PayTR **durum sorgusu**ndaki `returns[]`
 listesini `referenceNo` ile eşleyip CAS ile `succeeded`'a çevirir; referanssız
 ama tutarı tutan dönüş **belirsiz** bırakılır (insan kararı).
+
+### Refund failures and the retry sweeps
+
+Since 2026-10-23 (D1, the refund sweep loop: Sentry TARODAN-API-3M/3N/3P, 156
+events in three days for one order) a failed PayTR refund call is typed by
+what it means for the money, in `createRefund` and one table
+(`payment/helpers/refund-provider-failure.ts`) for the order refund and the
+trade cash refund. The `RefundAttempt` intent is written before the call.
+
+| PayTR outcome                                                                                                        | Attempt                                          | Resent by                            | Voided payout |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ | ------------- |
+| Not sent: connect phase (`classifyPaytrFetchError`: DNS, refused, connect timeout) or the request could not be built | `failed`, `provider_not_sent: <cause>`           | the retry sweeps                     | restored      |
+| Rejected                                                                                                             | `failed`, PayTR's text                           | the retry sweeps                     | restored      |
+| Rejected, nothing left ("kalan tutardan (0 TL) fazla olamaz")                                                        | `manual_review`, `provider_nothing_left: <text>` | a person (admin reconciliation list) | stays voided  |
+| Unknown: sent, then reset, our timeout, unreadable or empty answer                                                   | `manual_review`                                  | the status inquiry or a person       | stays voided  |
+
+"Nothing left" means PayTR holds no money of that payment any more: it was
+refunded in the PayTR panel, or by an earlier attempt we did not hear back
+from. The status inquiry leaves these attempts alone (it would find no refund
+with our reference and requeue a refund PayTR refuses again). A non-zero
+remaining ("kalan tutardan (15 TL)") is an ordinary rejection.
+
+The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
+`payment-expired`, every 5 minutes) and the attempt recovery
+(`RefundReconciliationService`) follow `payment/helpers/refund-sweep-policy.ts`:
+
+- An order whose refund attempt failed waits 10 minutes after the last
+  failure, doubled for every further definite failure of that attempt
+  (`RefundAttempt.failureCount`), at most 6 hours: 10, 20, 40, 80, 160, 320
+  minutes, then every 6 hours. It is not queried while it waits. The ledger is
+  the only source: nothing to lose on a cache flush, no lock between runs. A
+  requeue by the status inquiry (PayTR has no record of the refund) keeps the
+  count on purpose: the attempt was refused before and the requeue is no
+  evidence that a resend now goes through, so it keeps its longer wait. An
+  attempt that only ever went to review has 0 and waits 10 minutes.
+- A failure that never reached an attempt (a data problem before the claim,
+  e.g. the group refund cap or a missing merchant_oid) has nothing in the
+  ledger to wait on: the order cools down for an hour in the cache.
+- An order whose refund has an unresolved attempt (`prepared`, `submitting`,
+  `succeeded`, `manual_review`) is not swept: the attempt recovery, the
+  quarantine, the status inquiry or a person owns it. In the cancelled and
+  refunded branches an order with a `finalized` attempt is left out in SQL as
+  well: its refund was carried out (partial, or a zero-cash settlement that
+  records 0 on the payment) and is never repeated as a full refund. In the
+  returned-shipment branch such an order is reported as stuck instead.
+- Alarms are one line per order or attempt (`REFUND_MANUAL_REVIEW`, with its
+  ids, so the Sentry repeat throttle keys each one), at error at most once a
+  day each (an atomic claim per key in the cache; if the cache is unavailable
+  the alarm goes out), warn in between. A submission quarantined to
+  `manual_review` gets its own error line at once. The review alarm reads the
+  newest 500 attempts in review; past that, one daily line gives the count.
+- `processRefund` logs "Refund error for payment" at warn instead of error
+  when its caller alarms itself (`callerAlarms`, the order sweep) and no money
+  moved; when money may have moved it stays an error.
+- `createRefund` logs one warn line per failure; the caller logs the decision.
+
+**Trade cash refunds** follow the same rules in their retry sweep
+(`RefundTradeSweepService.retryFailedTradeRefunds`, cron `trade-expired`,
+every 5 minutes), for trades marked with `refundFailureReason`: the wait on
+the trade attempt's failure count, no retry while the refund has an
+unresolved attempt (a "nothing left" refusal parks it in review), the
+one-hour cooldown, one alarm line per trade once a day. The cash payer is
+told "refund failed" once per failure episode: `refundTradeCashTracked` sets
+the marker with a CAS on "no marker yet" and only that call notifies; an
+unscoped retry (the sweep) refreshes the marker without a notification, and
+success clears it. A scoped call (`payerId`: one outbox event per payer on a
+cancel, a dispute compensation) always tells its own payer, since on a
+two-payer trade the marker may carry the other party's failure. The admin
+"retry trade refund" action still notifies on its own failure.
+
+**Staging.** The staging database is a masked production copy
+([UAT_REFRESH.md](./UAT_REFRESH.md)), and the PayTR test store refuses the
+refunds of production's payments forever. On a deployment that is not live
+production (`isLiveProduction()`, fail closed), the refund sweeps (order sweep,
+attempt recovery and quarantine, status inquiry, review alarm) leave out
+payments created up to the last production copy
+(`UatProductionCopyService.copiedBefore`: the refresh's `sourceSnapshotAt`; an
+unfinished refresh counts up to now, capped at its timeout; a refresh that
+never reported back therefore also hides the staging payments of the hours
+before its timeout, the safe direction). Test-lane payments
+stay in (they never reach PayTR). On live production nothing is filtered.
+Payouts need no such filter: staging cannot boot without
+`PAYOUTS_DISABLED=true`, and with it the payout run sends nothing.
+
+### Boost refund and stop (admin)
+
+A boost (`BST-` order, `origin = platform_service`, the platform seller sells
+the virtual `boost-<id>` product) is refunded only from the admin Boost
+purchases screen: `POST /admin/ad-packages/purchases/:id/refund
+{ amount?, reason }` (`super_admin`, `admin`; the `ads` **and** `payments`
+permissions, `@RequireAllPermissions`). Every other refund path refuses an
+order that carries a boost, before any money moves (decision D16):
+
+- admin, `400 server.admin.payment.boostRefundUseBoostScreen`: the manual
+  refund (`POST /admin/payments/:id/manual-refund`), the order cancel and its
+  preview (`POST /admin/orders/:id/cancel`, `GET .../cancel-preview`; an
+  unpaid boost order still cancels, no money moves, and a closed one keeps
+  `cancelAlreadyClosed`), and approving or force-finalizing a refund request
+  (`POST /admin/refund-requests/:id/approve`, `.../force-finalize`). One
+  gate, `assertNotBoostOrderRefund`: a boost order (`virtualOrderKind`, so an
+  ordinary order costs no query) that still has its boost row
+  (`ProductBoost.orderId`). A boost order paid without its boost row has
+  nothing to stop and the boost screen cannot see it, so these paths still
+  settle it.
+- buyer: a refund request on any platform service order (`virtualOrderKind`)
+  answers `400 server.refund.orderStatusNotEligible` for a boost
+  (`membershipOrderNotEligible` for a membership). An order cancel is refused
+  as for any completed order (`server.order.cannotCancelShipped`), and one
+  still in a paid status (a boost order without its boost row) with
+  `400 server.refund.cancelPaidPreShipmentOnly`.
+- system paths still refund a boost order and stop its boost in the same
+  transaction: the auto-refund of a late payment on a cancelled order and the
+  stuck-refund recovery cron.
+
+- **Refundable**: a paid (`source = purchase`) boost that is `active` or
+  `paused` with a `completed` payment; not an ended boost (decision D2). The
+  maximum is `boostRefundableAmount` (`admin/finance/boost/`): the price minus
+  `refundedAmount`, never above what the payment still holds. The admin may
+  enter less (D1); empty means the maximum.
+- **Order of operations**: `processRefund` runs as for any order (the attempt
+  is written before PayTR, the refund goes to the store the boost was paid on,
+  the payment and the order record it, a full refund cancels the order with
+  `cancelledBy = platform`). Its finalize transaction also stops the boost
+  (`BoostTimelineService.stopForRefund`): status `cancelled`, the amount added
+  to `refundedAmount`, the admin and reason written, the boost's unused time
+  taken off the listing and the boosts queued behind it moved up. If PayTR
+  refuses or the outcome is uncertain, the boost is unchanged. Whichever path
+  finalizes the attempt (the admin call, a retry, the stuck-refund recovery
+  cron) stops the boost with the money.
+- **No ledger lines**: a virtual order never had a capture group, so the
+  refund writes no `refund_issued` group, no hold change, no seller debt and no
+  stock on the virtual product (this holds for membership orders too).
+- **Invoice**: the boost e-Arşiv is reversed through the outbox like any order
+  refund (`OUTBOX_INVOICE_REFUND_REVERSE`): cancelled within 8 days for a full,
+  unadjusted refund, otherwise a RETURN invoice per attempt in the refund's
+  ratio.
+- **Never twice**: every try gets a fresh attempt key
+  (`boost-refund:<boostId>:<n>`, `n` = the boost's earlier attempts), so a try
+  PayTR refused can be repeated with another amount. The attempt claim refuses
+  a new attempt while an earlier one is unresolved, and the claim guard
+  (`claimGuard`, under the payment lock) refuses a boost that a finished
+  refund stopped meanwhile. A retry after a finished refund answers with the
+  stopped boost.
+- **Notices**: `processRefund` itself sends no order refund or cancel notice,
+  no staff "order cancelled" mail and no shipment cancel for a boost order,
+  whichever path finalizes it (the platform's own services never ship).
+- **Audit and notice**: one `boost_refund` audit row with the real outcome
+  (`refunded`, `failed`, `pending_reconciliation` when this call's own
+  attempt, its key, may be moving money, also when the stuck-refund recovery
+  took it over; `in_flight_elsewhere` when the attempt claim turned it away
+  before anything was sent because another attempt of the order, another
+  key, is unresolved: `RefundAttemptInFlightException`, still a 503
+  `RefundPendingReconciliationException` for the admin); `refunded` is
+  written only when that call refunded; a failed audit write after the
+  money went back is reported
+  (`BOOST_REFUND_AUDIT_MISSING`, Sentry) and not turned into an error. The
+  seller gets `BOOST_REFUNDED` through the outbox. Sentry: tag `flow=boost`,
+  boost id and order number.
+- **One refund per boost**: the refund stops the boost, and a stopped boost
+  is not refundable again, so a partial refund leaves the rest of the payment
+  with no admin path (open product decision).
+
+A free grant (`source = admin_grant`, `POST /admin/ad-packages/purchases/grant`)
+has no order, payment or invoice and is not revenue (D3); it is stopped
+without money by `POST /admin/ad-packages/purchases/:id/revoke`. Boost
+revenue, counts and uplift in analytics read bought boosts only
+(`admin/analytics/sold-boost.predicate.ts`).
+
+### Boost end, reminder and the seller's view
+
+No money moves here; these rules only read and announce the boost timeline
+(`BoostTimelineService`, product domain).
+
+- **End of a boost** (`expire-boosts` cron, every 15 minutes, one
+  transaction per listing under its lock, `BoostExpiryService`): the ended
+  `active` boosts become `expired` with the listing's final counters, the
+  listing's promotion is rebuilt, and `BOOST_EXPIRED` goes out **once per
+  listing**, when no running boost of it ends later and none waits paused
+  (stacked boosts used to send one per boost). The notice is an outbox row
+  (`boost.notice`, kind `expired`, keyed by the boost that ended last)
+  written with the change.
+- **Ending-soon reminder** (premium only, decision D7; a reminder, never an
+  automatic charge): the switch is the listing's (on while any running or
+  paused boost of it has `autoRenew`). When the listing's last running boost
+  (its "tail") ends within `BOOST_REMINDER_LEAD_HOURS` (24), the
+  cron claims it with a compare-and-set on `reminderSentAt` and queues
+  `BOOST_ENDING_SOON` (outbox kind `ending_soon`, keyed by the stamp). It is
+  due again only when that end moves past the window the reminder announced
+  (a stacked purchase is a new tail; a staff extension or a resume moves the
+  end). A seller who is no longer premium gets none; the handler drops a
+  late reminder that no longer holds (the boost stopped, is no longer the
+  tail, or its end moved past the lead time).
+- **My boosts** (`GET /products/boost/my?state=current|history`, web only,
+  ADR 0015): the caller's `active` and `paused` boosts, or the `expired` and
+  `cancelled` ones, in the `{ data, meta }` envelope, with the order number,
+  source, refunded amount and the listing's real end (`boostedUntil`).
+  `pending` and `failed` rows (abandoned checkouts) are never shown. There is
+  no seller cancel. `PATCH /products/:id/boost/reminder` sets `autoRenew` on
+  the owner's running and paused boosts of the listing; turning it on needs
+  premium (`server.product.boostReminderPremiumOnly`).
+- **New-listing offer** (`GET /products/boost/offers`,
+  `POST /products/boost/offers/dismiss`): computed, never stored, for the
+  seller's live listings created after `boost_offer_since` and in the last 30
+  days, never boosted (`pending`/`failed` do not count), not dismissed, with a
+  package tier for the price (`boostTierBasePrice`) and the seller's
+  audience; at most 20, newest first. Only dismissals are stored
+  (`boost_offer_dismissals`, own listings only, idempotent).
 
 ---
 

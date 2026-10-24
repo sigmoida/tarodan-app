@@ -14,6 +14,9 @@ import { ReservationReconciliationService } from "../reconciliation/reservation-
 import { PaymentExpiryReconciliationService } from "../reconciliation/payment-expiry-reconciliation.service";
 import { PspReconciliationService } from "../reconciliation/psp-reconciliation.service";
 import { RefundReconciliationService } from "../refund/refund-reconciliation.service";
+import { RefundOrderSweepService } from "../refund/refund-order-sweep.service";
+import { RefundTradeSweepService } from "../refund/refund-trade-sweep.service";
+import { UatProductionCopyService } from "../../admin-test-tools/uat-refresh/uat-production-copy.service";
 import { MiscReconciliationService } from "../reconciliation/misc-reconciliation.service";
 import { PaymentInitiationService } from "../checkout/payment-initiation.service";
 import { PaymentCallbackService } from "../checkout/payment-callback.service";
@@ -24,9 +27,11 @@ import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
+import { BoostTimelineModule } from "../../product/boost-timeline/boost-timeline.module";
 import { PaymentLifecycleService } from "../checkout/payment-lifecycle.service";
 import { PrismaService } from "../../../prisma";
 import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
+import { PlatformServiceConsentService } from "../../consent/platform-service-consent.service";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { EventService } from "../../events";
@@ -200,6 +205,8 @@ describe("PaymentService group payment (checkout group)", () => {
     );
 
     const module: TestingModule = await Test.createTestingModule({
+      // The real timeline (activation), with its slices.
+      imports: [BoostTimelineModule],
       providers: [
         PaymentService,
         PaymentQueryService,
@@ -213,6 +220,13 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentExpiryReconciliationService,
         PspReconciliationService,
         RefundReconciliationService,
+        RefundOrderSweepService,
+        RefundTradeSweepService,
+        // Staging guard of the refund sweeps; not the subject here.
+        {
+          provide: UatProductionCopyService,
+          useValue: { copiedBefore: jest.fn().mockResolvedValue(null) },
+        },
         MiscReconciliationService,
         PaymentInitiationService,
         PaymentCallbackService,
@@ -253,6 +267,10 @@ describe("PaymentService group payment (checkout group)", () => {
         {
           provide: DistanceSalesConsentService,
           useValue: { ensureForPayment: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: PlatformServiceConsentService,
+          useValue: { isRecordedForOrder: jest.fn().mockResolvedValue(true) },
         },
         {
           provide: CacheService,

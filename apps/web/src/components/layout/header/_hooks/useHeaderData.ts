@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
-import { hasAuthMarker } from "@/lib/authMarker";
 import { useCart } from "@/hooks/useCart";
 import { wishlistItemsQuery } from "@/lib/wishlist";
 import { useHeaderBadgeCounts } from "@/hooks/useHeaderBadgeCounts";
@@ -24,17 +23,17 @@ export function useHeaderData() {
   const pathname = usePathname();
 
   // Initial auth check + self-heal. `checkAuth` runs once on mount, then again
-  // whenever the session marker says "logged in" but the client store has
-  // fallen out of sync to guest — on tab focus/visibility, bfcache restore
-  // (pageshow) and SPA route changes. Without this, a single transient guest
-  // resolution (e.g. the `tarodan_authed` marker briefly unreadable while the
-  // BFF proxy refreshes the session) would stick for the whole SPA session,
-  // showing "Giriş Yap" until a hard reload.
+  // whenever the store disagrees with the session (`reconcileSession`): a
+  // stale guest store while the marker says signed in, a signed-in store
+  // after another tab signed out (marker gone) or switched account (snapshot
+  // of another user). It runs on tab focus/visibility, bfcache restore
+  // (pageshow) and SPA route changes; the auth store itself listens for
+  // another tab writing or removing the user snapshot. Without this,
+  // a transient guest resolution would stick showing "sign in", and another
+  // tab's sign-out would leave this tab showing the old account and its
+  // cached data.
   useEffect(() => {
-    const reconcile = () => {
-      const s = useAuthStore.getState();
-      if (!s.isAuthenticated && hasAuthMarker()) s.checkAuth();
-    };
+    const reconcile = () => useAuthStore.getState().reconcileSession();
     const onVisibility = () => {
       if (document.visibilityState === "visible") reconcile();
     };
@@ -59,8 +58,7 @@ export function useHeaderData() {
       firstRender.current = false;
       return;
     }
-    const s = useAuthStore.getState();
-    if (!s.isAuthenticated && hasAuthMarker()) s.checkAuth();
+    useAuthStore.getState().reconcileSession();
   }, [pathname]);
 
   // Defer auth-dependent UI until after hydration so server and first client

@@ -288,7 +288,10 @@ describe("TradeQuoteService.previewQuote", () => {
         ],
       }),
     };
-    return { service: new TradeQuoteService(prisma as any, shipping as any) };
+    return {
+      service: new TradeQuoteService(prisma as any, shipping as any),
+      prisma,
+    };
   };
 
   it("kaydedilmemiş teklifi iki taraf için fiyatlar", async () => {
@@ -339,6 +342,25 @@ describe("TradeQuoteService.previewQuote", () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it.each([150.005, 1e-7, 10_000_000])(
+    "refuses cash %p as create and counter do, before any read",
+    async (cashAmount) => {
+      const { service, prisma } = makeService();
+
+      await expect(
+        service.previewQuote({
+          initiatorItems: [{ productId: "p-a" }],
+          receiverItems: [{ productId: "p-b" }],
+          cashAmount,
+          cashPayer: "initiator",
+        }),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.trade.invalidCashAmount" },
+      });
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+    },
+  );
 
   it("ürün yokken sorgu atmaz ve sıfır fiyat döner", async () => {
     const { service } = makeService();

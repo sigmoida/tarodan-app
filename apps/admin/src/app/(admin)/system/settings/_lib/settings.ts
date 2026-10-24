@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { useTranslations } from "next-intl";
 import { DEFAULT_PSP_FEE_RATE, settingsToMap } from "@/lib/settings";
+import {
+  amountField,
+  amountInputValue,
+  amountOrNull,
+  amountOrZero,
+} from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -47,6 +53,11 @@ export interface FieldDef {
   step?: number;
   /** Boş bırakılabilir: boş kaydetmek kuralı kapatır (API'de boş değer = kural yok). */
   optional?: boolean;
+  /**
+   * A TL amount: a text field read by the shared TL amount parser
+   * (`@/lib/schemas/amount`), so "1.000" is refused, never 1 TL.
+   */
+  money?: boolean;
 }
 
 type FieldMeta = Omit<FieldDef, "label" | "helper">;
@@ -62,16 +73,14 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
     {
       key: "minProductPrice",
       backendKey: "min_product_price",
-      min: 0,
-      step: 0.01,
       optional: true,
+      money: true,
     },
     {
       key: "maxProductPrice",
       backendKey: "max_product_price",
-      min: 0,
-      step: 0.01,
       optional: true,
+      money: true,
     },
   ],
   message: [
@@ -208,6 +217,16 @@ const numField = (t: T, min?: number, optional?: boolean) => {
   );
 };
 
+/** A field's schema: a TL amount or a plain number. */
+const settingField = (t: T, f: FieldMeta) =>
+  f.money
+    ? amountField(t, {
+        required: f.optional
+          ? undefined
+          : t("admin.settings.validation.required"),
+      })
+    : numField(t, f.min, f.optional);
+
 /** Zod schema for the whole settings form, derived from `FIELD_DEFS` (one source of truth). */
 export const settingsSchema = (t: T) =>
   z
@@ -216,10 +235,10 @@ export const settingsSchema = (t: T) =>
         .flat()
         .reduce(
           (shape, f) => {
-            shape[f.key] = numField(t, f.min, f.optional);
+            shape[f.key] = settingField(t, f);
             return shape;
           },
-          {} as Record<keyof Settings, ReturnType<typeof numField>>,
+          {} as Record<keyof Settings, ReturnType<typeof settingField>>,
         ),
     )
     // Alt sınır üst sınırdan büyükse hiçbir fiyat geçerli olmaz: ikisi de
@@ -227,10 +246,11 @@ export const settingsSchema = (t: T) =>
     // için bu kural sunucuda tek anahtar bazında uygulanamaz (ikisi birden
     // değişirken ara durum geçersiz görünürdü).
     .superRefine((values, ctx) => {
-      const min = values.minProductPrice.trim();
-      const max = values.maxProductPrice.trim();
-      if (min === "" || max === "") return;
-      if (Number(min) > Number(max)) {
+      // Blank or refused text: no pair to compare (refused has its own error).
+      const min = amountOrNull(values.minProductPrice);
+      const max = amountOrNull(values.maxProductPrice);
+      if (min == null || max == null) return;
+      if (min > max) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["minProductPrice"],
@@ -241,12 +261,26 @@ export const settingsSchema = (t: T) =>
 
 export type SettingsFormValues = z.infer<ReturnType<typeof settingsSchema>>;
 
-/** Server `Settings` (numbers) → form values (strings) for `useZodForm`'s `values`. */
+const MONEY_KEYS = new Set<keyof Settings>(
+  Object.values(FIELD_DEFS)
+    .flat()
+    .filter((f) => f.money)
+    .map((f) => f.key),
+);
+
+/**
+ * Server `Settings` (numbers) → form values (strings) for `useZodForm`'s
+ * `values`. TL amounts get a decimal comma, as their fields read it.
+ */
 export function toFormValues(s: Settings): SettingsFormValues {
   return Object.fromEntries(
     (Object.keys(s) as (keyof Settings)[]).map((k) => [
       k,
-      s[k] == null ? "" : String(s[k]),
+      MONEY_KEYS.has(k)
+        ? amountInputValue(s[k])
+        : s[k] == null
+          ? ""
+          : String(s[k]),
     ]),
   ) as SettingsFormValues;
 }
@@ -257,5 +291,6 @@ export function toFormValues(s: Settings): SettingsFormValues {
  */
 export function settingPayloadValue(field: FieldMeta, raw: string): string {
   if (field.optional && raw.trim() === "") return "";
+  if (field.money) return String(amountOrZero(raw));
   return String(Number(raw));
 }

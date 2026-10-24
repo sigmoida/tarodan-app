@@ -3,6 +3,7 @@ import {
   extractErrorI18nKey,
   extractErrorMessage,
   isNotFoundError,
+  isRefundOutcomeUnknown,
 } from "./error";
 
 function axiosError(data: unknown, status?: number) {
@@ -84,5 +85,28 @@ describe("extractErrorI18nKey", () => {
     expect(extractErrorI18nKey(axiosError({ message: "x" }, 400))).toBeNull();
     expect(extractErrorI18nKey(new Error("boom"))).toBeNull();
     expect(extractErrorI18nKey(null)).toBeNull();
+  });
+});
+
+describe("isRefundOutcomeUnknown", () => {
+  it("is true for the API's 503, whatever the body says", () => {
+    expect(
+      isRefundOutcomeUnknown(
+        axiosError({ i18nKey: "server.payment.refundInitiationFailed" }, 503),
+      ),
+    ).toBe(true);
+    expect(isRefundOutcomeUnknown(axiosError(undefined, 503))).toBe(true);
+  });
+
+  it("is true for any other 5xx and for no response (a timeout)", () => {
+    expect(isRefundOutcomeUnknown(axiosError({}, 500))).toBe(true);
+    expect(isRefundOutcomeUnknown(axiosError({}, 504))).toBe(true);
+    expect(isRefundOutcomeUnknown(new Error("Network Error"))).toBe(true);
+  });
+
+  it("is false for a clean refusal (4xx)", () => {
+    expect(isRefundOutcomeUnknown(axiosError({}, 400))).toBe(false);
+    expect(isRefundOutcomeUnknown(axiosError({}, 403))).toBe(false);
+    expect(isRefundOutcomeUnknown(axiosError({}, 409))).toBe(false);
   });
 });

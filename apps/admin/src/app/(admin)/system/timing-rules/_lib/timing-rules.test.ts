@@ -99,6 +99,25 @@ describe("timing rules form mapping", () => {
       ),
     ).toEqual([{ id: "returnWindowDays", value: 21 }]);
   });
+
+  it("never sends the action of a locked single-action rule", () => {
+    expect(isActionLocked("listingExpiryWarningDays")).toBe(true);
+    expect(
+      changedRules(
+        valuesWith({
+          listingExpiryWarningDays: "5",
+          [actionField("listingExpiryWarningDays")]: "",
+        }),
+        STATES,
+      ),
+    ).toEqual([{ id: "listingExpiryWarningDays", value: 5 }]);
+    expect(
+      changedRules(
+        valuesWith({ [actionField("listingExpiryWarningDays")]: "" }),
+        STATES,
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("timing rules schema — same rules as the server", () => {
@@ -186,6 +205,18 @@ describe("timing rules schema — same rules as the server", () => {
         offerExpiryHoursAction: "server.admin.timingRules.actionUnavailable",
       });
     });
+  });
+
+  it("does not validate the action of a locked single-action rule", () => {
+    expect(
+      issuesFor(valuesWith({ [actionField("listingExpiryWarningDays")]: "" })),
+    ).toEqual({});
+  });
+
+  it("still validates the action of a rule with several actions", () => {
+    expect(
+      issuesFor(valuesWith({ [actionField("listingTtlDays")]: "" })),
+    ).toHaveProperty("listingTtlDaysAction");
   });
 
   it("accepts the listing auto-renew action now that it is available", () => {

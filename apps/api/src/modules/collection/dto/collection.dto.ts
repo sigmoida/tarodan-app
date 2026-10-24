@@ -11,7 +11,7 @@ import {
   Max,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { FormBoolean } from "../../../common/transforms";
+import { FormBoolean, ListingIdField } from "../../../common/transforms";
 
 export class CreateCollectionDto {
   @IsString()
@@ -63,6 +63,8 @@ export class UpdateCollectionDto {
 }
 
 export class AddCollectionItemDto {
+  /** Product id; a listing URL segment `<slug>-<uuid>` is also accepted. */
+  @ListingIdField()
   @IsOptional()
   @IsUUID()
   productId?: string;

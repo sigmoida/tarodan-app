@@ -22,6 +22,7 @@ describe("isAdFree — katman kutusundan istemciye", () => {
     maxFreeListings: 5,
     maxTotalListings: 50,
     maxImagesPerListing: 10,
+    maxSavedSearches: 20,
     canCreateCollections: true,
     canTrade: true,
     isAdFree,

@@ -3,7 +3,7 @@
 "use client";
 
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Accordion, Button } from "@tarodan/ui";
+import { Accordion, Button, EmptyState } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ButtonLink } from "@/components/ui/ButtonLink";
@@ -75,36 +75,33 @@ function ManufacturersLayout() {
 
       {/* Accordion brand cards */}
       {filteredBrands.length === 0 ? (
-        <div className="py-20 text-center">
-          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-lg bg-surface-alt">
-            <MagnifyingGlassIcon className="h-8 w-8 text-subtle" />
-          </div>
-          {/*
-            "Sonuç bulunamadı" + boş tırnak ("" aramasıyla eşleşen üretici yok)
-            hiç üretici GİRİLMEMİŞ olma durumunu arama sonucu sanıyordu. İki hal
-            artık ayrı: aramayı temizle butonu yalnız gerçek bir arama varken.
-          */}
-          <h3 className="mb-1 text-lg font-bold text-heading">
-            {hasManufacturers
+        // An empty catalog (no manufacturer entered yet) is not a search
+        // miss: the clear-filters action shows only for a real search.
+        <EmptyState
+          icon={<MagnifyingGlassIcon className="h-7 w-7" />}
+          title={
+            hasManufacturers
               ? t("brands.manufacturersPage.sonucBulunamadi")
-              : t("brands.manufacturersPage.ureticiListesiHazirlaniyor")}
-          </h3>
-          <p className="mb-4 text-sm text-muted">
-            {hasManufacturers
+              : t("brands.manufacturersPage.ureticiListesiHazirlaniyor")
+          }
+          description={
+            hasManufacturers
               ? t(
                   "brands.manufacturersPage.searchqueryAramasiylaEslesenUreticiYok",
                   { searchQuery },
                 )
               : t(
                   "brands.manufacturersPage.ureticilerEklendikceBuradaListelenecek",
-                )}
-          </p>
-          {hasManufacturers && (
-            <Button variant="secondary" onClick={clearFilters}>
-              {t("brands.manufacturersPage.filtreleriTemizle")}
-            </Button>
-          )}
-        </div>
+                )
+          }
+          action={
+            hasManufacturers ? (
+              <Button variant="secondary" onClick={clearFilters}>
+                {t("brands.manufacturersPage.filtreleriTemizle")}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <Accordion
           type="single"

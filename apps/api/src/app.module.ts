@@ -36,7 +36,9 @@ import { TradeModule } from "./modules/trade";
 import { MessagingModule } from "./modules/messaging";
 import { MembershipModule } from "./modules/membership";
 import { RatingModule } from "./modules/rating";
+import { SellerTrustJobsModule } from "./modules/seller-trust/jobs/seller-trust-jobs.module";
 import { WishlistModule } from "./modules/wishlist";
+import { SavedSearchModule } from "./modules/saved-search";
 import { CollectionModule } from "./modules/collection";
 import { SupportModule } from "./modules/support";
 import { UserReportModule } from "./modules/user-report";
@@ -78,7 +80,7 @@ import { WebSocketModule } from "./modules/websocket";
 // Sentry for error tracking and performance monitoring
 import { SentryModule } from "./modules/sentry";
 
-// Cron job monitoring (in-app tracker + Sentry check-ins)
+// Cron job monitoring (in-app tracker + Sentry check-ins for monitored jobs)
 import { MonitoringModule } from "./monitoring/monitoring.module";
 
 // Health check for monitoring
@@ -202,7 +204,10 @@ import { isTest } from "./config/environment";
     MessagingModule, // GAP-002: Messaging with Content Filtering (BLOCKER)
     MembershipModule, // GAP-003: Membership Tiers & Subscriptions (BLOCKER)
     RatingModule, // GAP-010: Rating & Review System (HIGH)
+    // Nightly seller trust score batch (ADR 0014); nothing else imports it.
+    SellerTrustJobsModule,
     WishlistModule, // GAP-011: Wishlist/Favorites (MEDIUM)
+    SavedSearchModule, // Saved product searches with tier limits
     CollectionModule, // GAP-012: Collections System (MEDIUM)
     SupportModule, // GAP-013: Support Ticket System (MEDIUM)
     UserReportModule, // User-generated reports for products, users, collections

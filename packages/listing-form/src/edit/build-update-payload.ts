@@ -1,5 +1,6 @@
 /** @format */
 
+import { tlAmountValue } from "@tarodan/shared";
 import { saleDataToPayload, type SaleData } from "../form";
 import type { EditListingValues } from "./schema";
 
@@ -18,7 +19,8 @@ export function buildListingUpdatePayload(
   values: EditListingValues,
   saleData: SaleData,
 ): Record<string, unknown> {
-  const formPrice = Number(values.price);
+  // The schema has already refused text that is not a price.
+  const formPrice = tlAmountValue(values.price);
 
   const payload: Record<string, unknown> = {
     title: values.title,

@@ -63,6 +63,7 @@ const TABLES_TO_TRUNCATE = [
   "carts",
   "wishlist_items",
   "wishlists",
+  "saved_searches",
   "collection_items",
   "collection_likes",
   "collections",
@@ -102,6 +103,8 @@ const TABLES_TO_TRUNCATE = [
   // Onay kayıtları: ekleme-yalnız (UPDATE/DELETE tetikleyiciyle yasak) ama
   // TRUNCATE serbest; users'a RESTRICT FK ile bağlı olduğu için ondan önce.
   "consent_records",
+  // Derived per-user score; cascades with users, listed so it is explicit.
+  "seller_trust_scores",
   "users",
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
   "attributes",
@@ -201,6 +204,7 @@ export async function seedBaseline(): Promise<{
       maxFreeListings: 100,
       maxTotalListings: 100,
       maxImagesPerListing: 10,
+      maxSavedSearches: 5,
       canCreateCollections: true,
       canTrade: false,
       isAdFree: true,
@@ -216,6 +220,7 @@ export async function seedBaseline(): Promise<{
       maxFreeListings: 1000,
       maxTotalListings: 1000,
       maxImagesPerListing: 20,
+      maxSavedSearches: 10,
       canCreateCollections: true,
       canTrade: true,
       isAdFree: true,

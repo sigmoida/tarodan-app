@@ -32,16 +32,28 @@ test("treats an unknown path as recordable (SSR/no-DOM default)", () => {
   assert.equal(shouldRecordReplay(undefined), true);
 });
 
-test("zeroes both sample rates on the payment page", () => {
-  assert.deepEqual(replaySampleRates("/payment/abc"), {
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
-  });
+test("zeroes both sample rates on the payment page in every environment", () => {
+  for (const env of ["production", "staging", "development", undefined]) {
+    assert.deepEqual(replaySampleRates("/payment/abc", env), {
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0,
+    });
+    assert.deepEqual(replaySampleRates("/en/payment/abc", env), {
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0,
+    });
+  }
 });
 
-test("keeps the configured sampling elsewhere", () => {
-  assert.deepEqual(replaySampleRates("/products/1"), {
-    replaysSessionSampleRate: 0.1,
+test("takes the rates from the environment table elsewhere", () => {
+  assert.deepEqual(replaySampleRates("/products/1", "production"), {
+    replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 1,
   });
+  for (const env of ["staging", "development", "unknown", undefined]) {
+    assert.deepEqual(replaySampleRates("/products/1", env), {
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0,
+    });
+  }
 });

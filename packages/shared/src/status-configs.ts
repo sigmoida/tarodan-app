@@ -309,6 +309,48 @@ export const productStatusConfig: StatusConfigDefMap = {
 };
 
 /**
+ * What a seller's boost shows as its status ("My boosts"). `refunded` is a
+ * display state, not an API status: a `cancelled` boost with money refunded.
+ */
+export type BoostDisplayStatus =
+  "active" | "paused" | "expired" | "cancelled" | "refunded";
+
+/**
+ * Boost display status → Badge mapping
+ * Used in: web profile boosts (admin keeps its own operator wording)
+ */
+export const boostStatusConfig: Record<BoostDisplayStatus, StatusConfigDef> = {
+  active: { labelKey: "profile.boosts.status.active", variant: "success" },
+  paused: { labelKey: "profile.boosts.status.paused", variant: "warning" },
+  expired: { labelKey: "profile.boosts.status.expired", variant: "outline" },
+  cancelled: {
+    labelKey: "profile.boosts.status.cancelled",
+    variant: "danger",
+  },
+  refunded: { labelKey: "profile.boosts.status.refunded", variant: "danger" },
+};
+
+/**
+ * A boost row's display status. `pending` and `failed` (abandoned checkouts)
+ * are never listed to the seller; anything unknown reads as ended.
+ */
+export function boostDisplayStatus(row: {
+  status: string;
+  refundedAmount: number;
+}): BoostDisplayStatus {
+  if (row.status === "cancelled" && row.refundedAmount > 0) return "refunded";
+  if (
+    row.status === "active" ||
+    row.status === "paused" ||
+    row.status === "expired" ||
+    row.status === "cancelled"
+  ) {
+    return row.status;
+  }
+  return "expired";
+}
+
+/**
  * Product condition → label/Badge mapping (ProductCondition enum).
  * Şema değerleri: new, like_new, very_good, good, fair.
  */
@@ -726,6 +768,68 @@ export const payoutStatusConfig: StatusConfigDefMap = {
   retry_pending: {
     labelKey: "status.payout.retry_pending",
     variant: "warning",
+  },
+};
+
+/**
+ * Why a payout transfer is not paid (`PayoutTransfer.failureReason`): one
+ * entry per code of `PAYOUT_FAILURE_REASONS` (@tarodan/types). Rows written
+ * before 2026-10-23 and returned rows carry free text instead of a code;
+ * readers show that text as is. Variant: warning = the seller can fix it,
+ * danger = the team resolves it, outline = a refund or order guard.
+ */
+export const payoutFailureReasonConfig: StatusConfigDefMap = {
+  no_bank_account: {
+    labelKey: "status.payoutFailureReason.no_bank_account",
+    variant: "warning",
+  },
+  invalid_iban_format: {
+    labelKey: "status.payoutFailureReason.invalid_iban_format",
+    variant: "warning",
+  },
+  bank_details_rejected: {
+    labelKey: "status.payoutFailureReason.bank_details_rejected",
+    variant: "warning",
+  },
+  provider_rejected: {
+    labelKey: "status.payoutFailureReason.provider_rejected",
+    variant: "danger",
+  },
+  transfer_total_exceeds_remaining: {
+    labelKey: "status.payoutFailureReason.transfer_total_exceeds_remaining",
+    variant: "danger",
+  },
+  transfer_needs_manual_decision: {
+    labelKey: "status.payoutFailureReason.transfer_needs_manual_decision",
+    variant: "danger",
+  },
+  provider_unreachable: {
+    labelKey: "status.payoutFailureReason.provider_unreachable",
+    variant: "danger",
+  },
+  transfer_outcome_unknown: {
+    labelKey: "status.payoutFailureReason.transfer_outcome_unknown",
+    variant: "danger",
+  },
+  order_not_payout_eligible: {
+    labelKey: "status.payoutFailureReason.order_not_payout_eligible",
+    variant: "outline",
+  },
+  refund_pending: {
+    labelKey: "status.payoutFailureReason.refund_pending",
+    variant: "outline",
+  },
+  order_refunded: {
+    labelKey: "status.payoutFailureReason.order_refunded",
+    variant: "outline",
+  },
+  trade_refund_pending: {
+    labelKey: "status.payoutFailureReason.trade_refund_pending",
+    variant: "outline",
+  },
+  fully_refunded: {
+    labelKey: "status.payoutFailureReason.fully_refunded",
+    variant: "outline",
   },
 };
 

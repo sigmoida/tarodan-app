@@ -1,6 +1,6 @@
 /** @format */
 
-import { queryOptions, type QueryClient } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import { wishlistApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -133,23 +133,4 @@ export function withWishlistEntry(
   return present
     ? items.filter((item) => item.productId !== productId)
     : (items as WishlistEntry[]);
-}
-
-type AuthUserSlice = { user?: { id: string } | null };
-
-/**
- * Auth store aboneliği: oturum sahibi değişince (çıkış, oturum süresinin
- * dolması, aynı sekmede başka hesap) önceki kullanıcının favori listesini
- * önbellekten siler. Aksi hâlde tekil QueryClient listeyi bir sonraki
- * oturuma taşır ve yeni kullanıcı bir süre önceki kullanıcının kalplerini
- * görür. İstemci tembel alınır: abonelik QueryProvider'dan bağımsız çalışır
- * (`/logout` sayfası o sağlayıcının dışındadır).
- */
-export function forgetWishlistOnUserChange(getClient: () => QueryClient) {
-  return (state: AuthUserSlice, prev: AuthUserSlice) => {
-    const prevId = prev.user?.id;
-    if (prevId && state.user?.id !== prevId) {
-      getClient().removeQueries({ queryKey: queryKeys.wishlist.all() });
-    }
-  };
 }

@@ -21,6 +21,7 @@ const base: AdminConsentRecordRow = {
   userAgent: null,
   checkoutGroup: null,
   order: null,
+  trade: null,
   createdAt: "2026-10-01T09:00:00.000Z",
 };
 
@@ -80,6 +81,16 @@ describe("consentReference", () => {
     });
     expect(ref?.label).toBe("GRP-10001");
     expect(ref?.href).toContain("q=GRP-10001");
+  });
+
+  it("links a trade cash payment consent to the trade detail page", () => {
+    expect(
+      consentReference({
+        ...base,
+        source: "payment",
+        trade: { id: "t1", tradeNumber: "TKS-10001" },
+      }),
+    ).toEqual({ href: "/operations/trades/t1", label: "TKS-10001" });
   });
 
   it("satın alma bağı yoksa boş", () => {

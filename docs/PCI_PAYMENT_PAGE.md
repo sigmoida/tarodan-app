@@ -44,11 +44,13 @@ iş gerekçesidir.
 | Next.js satır içi hidrasyon script'leri | Satır içi (`self.__next_f`)           | RSC yükünün hidrasyonu               | Yalnız `'nonce-<istek>'` ile             |
 | Sentry SDK (hata raporlama)             | Bundle içinde, kendi origin'imiz      | Ödeme hatalarının teşhisi            | `'self'`; ingest'e `connect-src`         |
 
-**Üçüncü taraf `<script src>` YOKTUR.** Sayfada Google Tag Manager, analytics,
-chat widget, A/B testi veya reklam script'i bulunmaz. Sitenin başka yerlerinde
-yüklenen tek harici script Apple ile Giriş
-(`https://appleid.cdn-apple.com/...appleid.auth.js`, yalnız `(auth)` rotaları) —
-CSP ödeme profilinde bu origin **bilinçli olarak dışarıda bırakılmıştır**.
+**There is NO third-party `<script src>`.** The page carries no Google Tag
+Manager, analytics, chat widget, A/B testing or ad script. The only external
+script loaded elsewhere on the site is Sign in with Apple
+(`https://appleid.cdn-apple.com/...appleid.auth.js`, only on the `(auth)` routes
+and the account dashboard `/profile`, for the step-up and Connected accounts;
+`AppleSdkScript`) — the payment CSP profile **deliberately leaves this origin
+out**.
 
 ### Sentry Session Replay — ödeme sayfasında KAPALI
 
@@ -64,6 +66,17 @@ tamamen kapatıyoruz. İki katman (`src/lib/replayPolicy.mjs`):
 
 Hata raporlaması (Replay değil) ödeme sayfasında açık kalır: ödeme hatalarını
 görmek operasyonel zorunluluk.
+
+**What an error event can carry (2026-10):** the SDK is bundled first-party
+code (no extra `<script src>`), compiled in only when `NEXT_PUBLIC_SENTRY_DSN`
+is set at build time, and sends only to the DSN's ingest origin (the one
+`connect-src` entry above). Every event and transaction passes
+`scrubSentryEvent` / `scrubSentryTransaction` (`@tarodan/logger`) in
+`beforeSend`: card-like keys (`cardNumber`, `cvv`, `expiry`, ...) and any
+Luhn-valid 13-19 digit run in any string are replaced with `[REDACTED]`,
+cookies are dropped, and `sendDefaultPii` is off. The card form posts
+straight to PayTR (`form-action`), so the card fields never pass through a
+fetch the SDK instruments.
 
 ---
 
@@ -134,10 +147,20 @@ açıktır**: ödeme sayfası storefront chrome'unun (Header/Footer +
 
 ## 4. İhlal raporlaması (11.6.1)
 
-`report-uri`, Sentry DSN'inden türetilen güvenlik uç noktasına gider
+`report-uri` points to the security endpoint derived from the Sentry DSN
 (`sentryReportUri`): `https://<host>/api/<projectId>/security/?sentry_key=<key>`.
-Ayrı bir rapor altyapısı kurmadan CSP ihlalleri Sentry'ye düşer. DSN yoksa
-raporlama sessizce kapalıdır (politika yine uygulanır).
+CSP violations land in Sentry without separate reporting infrastructure.
+
+Reporting is on **only in production** (`reportUriForEnvironment`): the
+directive is emitted when the Sentry environment tag is `production`. The tag
+is `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, or, when unset, derived from the
+`NEXT_PUBLIC_APP_URL` host (`resolveSentryEnvironment`: a `staging` label ->
+`staging`, `tarodan.com.tr` and its subdomains -> `production`), and the
+endpoint carries `&sentry_environment=production` so the reports match the
+production alert rules. Staging and local violations are test noise, not a
+detection signal. Without a DSN, or outside production, reporting is off; the
+policy itself (enforced on the payment pages) is identical in every
+environment.
 
 Bu, 11.6.1'in **tespit** ayağının ilk adımıdır; periyodik envanter karşılaştırması
 ve alarm yönlendirmesi ayrı issue'da izlenmektedir.

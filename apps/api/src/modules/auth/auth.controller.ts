@@ -44,8 +44,10 @@ import {
   VerifyEmailChangeDto,
 } from "./dto";
 import { JwtAuthGuard, JwtRefreshGuard } from "./guards";
+import { RequireReauth } from "./reauth/require-reauth.decorator";
 import { Public, CurrentUser } from "./decorators";
 import { RequestUser } from "./interfaces";
+import { clientIpThrottle } from "../../common/helpers/client-ip";
 import {
   setAuthCookies,
   clearAuthCookies,
@@ -446,14 +448,19 @@ export class AuthController {
 
   /**
    * POST /auth/email/request-change
-   * Kullanıcının e-postasını değiştirmek için YENİ adrese aktivasyon kodu gönderir.
-   * Mevcut e-posta doğrulanana kadar aktif kalır.
+   * Sends a verification code to the NEW address. The current e-mail stays
+   * active until the code is verified. Step-up: a `reauthToken` that is sent
+   * is checked; without one the request passes while the setting
+   * `auth_require_reauth_for_sensitive_actions` is off (mobile versions
+   * without the step-up send none).
    */
   @Post("email/request-change")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @ApiOperation({ summary: "E-posta değişikliği kodu gönder" })
+  // Per client IP: web requests arrive from the gateway's one address.
+  @Throttle(clientIpThrottle(3))
+  @RequireReauth({ required: "setting", flow: "email_change" })
+  @ApiOperation({ summary: "Send an e-mail change code to the new address" })
   async requestEmailChange(
     @CurrentUser() user: RequestUser,
     @Body() dto: RequestEmailChangeDto,
@@ -467,12 +474,14 @@ export class AuthController {
 
   /**
    * POST /auth/email/verify-change
-   * Aktivasyon kodunu doğrular ve e-postayı yeni adresle değiştirir.
+   * Checks the code and changes the e-mail to the new address. Counted per
+   * client IP, like the request half; each code also allows only
+   * `EmailChangeService.MAX_ATTEMPTS` tries.
    */
   @Post("email/verify-change")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle(clientIpThrottle(10))
   @ApiOperation({ summary: "E-posta değişikliği kodunu doğrula" })
   async verifyEmailChange(
     @CurrentUser() user: RequestUser,

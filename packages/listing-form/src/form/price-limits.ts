@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { isTlAmountRefused, parseTlAmount } from "@tarodan/shared";
 import { saleDataToPayload } from "./sale-data";
 import type { SaleData } from "./cards/DiscountCard";
 
@@ -110,15 +111,17 @@ export const priceLimitMessages = (locale: string) => {
       t("server.product.priceAboveMaximum", { maxPrice }),
     salePriceBelowMinimum: (minPrice: number) =>
       t("listing.salePriceBelowMinimum", { minPrice }),
+    amountFormatRefused: t("validation.amountFormatRefused"),
   };
 };
 
 export type PriceLimitMessages = ReturnType<typeof priceLimitMessages>;
 
 /**
- * Teklif giriş alanının tavanı: ilan fiyatının hemen altındaki tam tutar.
- * Teklif ekranı (`OfferModal`) alanın `max`'ını ve "teklif imkânsız" kararını
- * AYNI yerden alır.
+ * The offer ceiling used for the "no offer possible" decision: the whole
+ * amount just below the listing price. The web offer field (`OfferModal`) is
+ * a text field without a `max` attribute; its schema refuses an amount at or
+ * above the price.
  */
 export function maxOfferAmount(effectivePrice: number): number {
   return Math.max(0, Math.round(effectivePrice) - 1);
@@ -157,13 +160,12 @@ export function priceLimitsRefine(
   msg: PriceLimitMessages,
 ) {
   return (val: { price: string }, ctx: z.RefinementCtx) => {
-    if (val.price.trim() === "") return;
+    // Text that is not a price is reported by the field itself
+    // (`baseListingFields`); there is no amount to hold against a limit.
+    const parsed = parseTlAmount(val.price);
+    if (parsed.status !== "ok") return;
     const { limits, storedPrices } = getRules();
-    const violation = checkListingPrice(
-      Number(val.price),
-      limits,
-      storedPrices,
-    );
+    const violation = checkListingPrice(parsed.amount, limits, storedPrices);
     if (!violation) return;
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -177,16 +179,27 @@ export function priceLimitsRefine(
 }
 
 /**
- * İndirim bölümündeki fiyat alt sınırın altındaysa hata iletisi (yoksa null).
- * Yalnız UYGULANACAK indirim denetlenir (`saleDataToPayload` ile aynı karar):
- * form alanı olmadığı için şemaya girmez, ekran ve gönderim bunu kullanır.
+ * The discount section error that blocks the submit, or null. Its fields are
+ * not form fields, so the schema does not see them; the screen and the submit
+ * use this instead.
+ *
+ * Text that is not an amount comes first: `saleDataToPayload` would read it as
+ * "no discount" and silently clear the sale. Then the price limits, checked
+ * only for a discount that will apply (the same decision as
+ * `saleDataToPayload`).
  */
-export function salePriceLimitMessage(
+export function saleDataError(
   saleData: SaleData,
   formPrice: number,
   rules: ListingPriceRules,
   msg: PriceLimitMessages,
 ): string | null {
+  if (
+    isTlAmountRefused(saleData.salePrice) ||
+    isTlAmountRefused(saleData.originalPrice)
+  ) {
+    return msg.amountFormatRefused;
+  }
   const { salePrice } = saleDataToPayload(saleData, formPrice);
   if (salePrice == null) return null;
   const violation = checkListingPrice(

@@ -29,6 +29,26 @@ describe("normalizeErrorMessage", () => {
     expect(surat).toContain("'sync-surat-tracking'");
   });
 
+  it("collapses alphanumeric references so one parcel is not one issue", () => {
+    const a = normalizeErrorMessage(
+      "Surat tracking API request failed for PKG-WQMTZDB5TT: fetch failed",
+    );
+    const b = normalizeErrorMessage(
+      "Surat tracking API request failed for PKG-K7X9M2QF3N: fetch failed",
+    );
+
+    expect(a).toBe(b);
+    expect(a).toBe(
+      "Surat tracking API request failed for <code>: fetch failed",
+    );
+  });
+
+  it("collapses a GIB invoice number whatever its prefix", () => {
+    expect(normalizeErrorMessage("no=TRD2026000000473 failed")).toBe(
+      "no=<code> failed",
+    );
+  });
+
   it("collapses durations regardless of the exact number", () => {
     const a = normalizeErrorMessage("query took (34ms) to finish");
     const b = normalizeErrorMessage("query took (47ms) to finish");
@@ -45,6 +65,12 @@ describe("normalizeErrorMessage", () => {
     expect(message).toBe(
       "Surat tracking API request failed for https://api.surat.com.tr/track?<query>",
     );
+  });
+
+  it("strips the query string from a relative request path too", () => {
+    expect(
+      normalizeErrorMessage("GET /api/products?search=ali&page=2 -> 500"),
+    ).toBe("GET /api/products?<query> -> 500");
   });
 
   it("masks emails", () => {

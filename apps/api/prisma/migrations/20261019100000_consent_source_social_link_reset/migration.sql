@@ -1,0 +1,17 @@
+-- Consent source `social_link_reset`.
+--
+-- When a Google or Apple sign-in matches an account whose e-mail was never
+-- verified, the account is taken over by the provider user (who proved the
+-- inbox). The consents the unverified registrant gave are withdrawn with this
+-- source, so the re-consent gate asks the new owner. consent_records stays
+-- append-only: the registrant's rows are kept, the withdrawal is a new row.
+--
+-- LIVE DATA SAFETY: additive only. One new enum value; no table, column or row
+-- changes. NO BACKFILL. Rollback: leaving an unused value is harmless
+-- (PostgreSQL cannot drop an enum value); if the code is rolled back the value
+-- is simply no longer written.
+--
+-- Added after `account_deletion` to keep the catalogue order. The new value is
+-- not used inside this migration, so it is safe in the migration transaction
+-- (PostgreSQL 12+).
+ALTER TYPE "ConsentSource" ADD VALUE IF NOT EXISTS 'social_link_reset' AFTER 'account_deletion';

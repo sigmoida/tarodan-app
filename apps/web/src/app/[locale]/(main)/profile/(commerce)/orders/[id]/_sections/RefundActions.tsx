@@ -5,20 +5,21 @@
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import { useTimingPolicy, useTimingValues } from "@/hooks/useTimingPolicy";
 import { isOrderCancellable } from "../../_lib/types";
 import {
   hasShipped,
-  isMembershipOrder,
   isPastRefundWindow,
   type OrderDetail,
 } from "../_lib/types";
 
 /**
- * İptal / İade — sadece alıcı. Kargo öncesi "Siparişi İptal Et" (tek KALEM,
- * anında geri ödeme), kargo sonrası "İade Talep Et". Üyelik/dijital siparişler
- * hariç. Grubun tamamı iptal edilebilirken tekil iptal GRUP bölümünde de
- * sunulur; karışık sepette (bir kalem kargoda) yalnız bu blok kalır.
+ * Cancel / refund, buyer only. Before shipping "Cancel order" (one LINE,
+ * refunded at once), after shipping "Request refund". Never for a digital
+ * order (membership, boost). While the whole group is cancellable the single
+ * cancel is also offered in the GROUP section; in a mixed cart (one line
+ * shipped) only this block remains.
  */
 export default function RefundActions({
   order,
@@ -40,7 +41,7 @@ export default function RefundActions({
     !order.payment ||
     order.payment.status !== "completed" ||
     !order.isBuyer ||
-    isMembershipOrder(order) ||
+    isDigitalOrder(order) ||
     order.status === "cancelled" ||
     order.status === "refunded" ||
     order.activeRefundRequest

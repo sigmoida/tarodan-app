@@ -5,6 +5,7 @@
     "logout": "Logout",
     "save": "Save",
     "cancel": "Cancel",
+    "loadMore": "Show more",
     "delete": "Delete",
     "edit": "Edit",
     "search": "Search",
@@ -133,6 +134,14 @@
       "remove": "Remove"
     }
   },
+  "boost": {
+    "offer": {
+      "title": "{count, plural, one {Your listing is live!} other {# of your listings are live!}}",
+      "intro": "Featured listings appear at the top of search and categories.",
+      "notNow": "Not now",
+      "onceHint": "This suggestion is shown once per listing. You can feature your listings later from My listings."
+    }
+  },
   "nav": {
     "home": "Home",
     "listings": "Listings",
@@ -148,6 +157,7 @@
     "favorites": "Favorites",
     "cart": "Cart",
     "myListings": "My Listings",
+    "myBoosts": "My Boosts",
     "myOrders": "My Orders",
     "settings": "Settings",
     "help": "Help",
@@ -274,7 +284,6 @@
     "appleScriptFailed": "Apple sign-in could not be loaded",
     "emailNotRegistered": "This email address is not registered.",
     "useDifferentEmail": "Use a different email",
-    "googleOnlyAccount": "This account was created with Google. Sign in with Google, or set a password.",
     "setPassword": "Set a password",
     "setPasswordEmailSent": "A link to set your password was sent to your email.",
     "or": "or",
@@ -349,7 +358,14 @@
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
     "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
     "kvkkAgreeRich": "I have read and accept the <kvkk>KVKK Privacy Notice</kvkk>.",
-    "mustAcceptKvkk": "You must accept the KVKK privacy notice"
+    "mustAcceptKvkk": "You must accept the KVKK privacy notice",
+    "reauth": {
+      "title": "Confirm it's you",
+      "body": "Before we continue, we need to confirm this account is yours.",
+      "withPassword": "Confirm with your password",
+      "withProvider": "Confirm with {provider}"
+    },
+    "noPasswordAccount": "This account has no password. Sign in with the method connected to it, or set a password."
   },
   "brands": {
     "title": "Brands",
@@ -752,8 +768,16 @@
       "ruleCoverText": "The cover should show the product straight on and uncluttered; keep other angles, measurements and packaging for the supporting images."
     },
     "boostedBadge": "Featured",
+    "boostedBadgeHint": "The seller paid to feature this listing",
+    "boostEndsAt": "Ends: {date}",
     "boostListing": "Feature",
     "extendBoost": "Extend",
+    "cardAction": {
+      "addToCartAria": "Add {title} to cart",
+      "removeFromCartAria": "Remove {title} from cart",
+      "boostAria": "Feature {title}",
+      "extendAria": "Extend the feature period of {title}"
+    },
     "estimatedNet": "Estimated net earnings: {amount}",
     "relist": "Relist",
     "deactivateListing": "Deactivate",
@@ -911,7 +935,7 @@
     "selectBillingAddress": "Select billing address",
     "enterBillingAddress": "Enter billing address",
     "billingSameAsShippingLabel": "Same as shipping address",
-    "addAnotherAddressForBilling": "Add another address in Profile → My addresses to use a different billing address, or select same as shipping above.",
+    "addAnotherAddressForBilling": "Add another address in Profile > My addresses to use a different billing address, or select same as shipping above.",
     "paymentMethod": "Payment Method",
     "orderSummary": "Order Summary",
     "quantityLabel": "Qty: {count}",
@@ -984,11 +1008,9 @@
     "selectShippingAddress": "Please select your delivery address",
     "invalidAddressAddNew": "Selected address is invalid, please add a new address",
     "enterShippingAddress": "Please enter your delivery address",
-    "payWithPaytr": "Pay with PayTR",
     "discountLabel": "Discount",
     "platformServiceFeeWithRate": "Platform Service Fee ({rate}%)",
     "securePaymentCreditCard": "Secure payment with credit card",
-    "paytrRedirectNotice": "Click 'Continue' to proceed. Your card details will be entered securely on the PayTR payment page.",
     "addressTitlePlaceholder": "Address Title (e.g. Home, Work)",
     "guestShoppingNotice": "You are shopping without logging in. Enter your email to track your order.",
     "pleaseFillIn": "Please fill in: {fields}",
@@ -1028,9 +1050,9 @@
       "buyer_shipping": "Shipping discount"
     },
     "cardHolderPlaceholder": "Full name",
-    "saveCardPaytr": "Save my card with PayTR for future payments",
+    "saveCardPaytr": "Securely save my card for future payments",
     "saveCardForRenewal": "Save my card for automatic renewal",
-    "saveCardForRenewalHint": "Your card is stored securely by PayTR and your membership renews automatically at the end of each period. You can turn auto-renewal off at any time.",
+    "saveCardForRenewalHint": "Your card is stored securely by our payment provider and your membership renews automatically at the end of each period. You can turn auto-renewal off at any time.",
     "saveCardForRenewalOffHint": "If you do not save your card, auto-renewal stays off and you will need to purchase your membership again when the period ends.",
     "payWithSavedCard": "Pay With Saved Card",
     "loadingCards": "Loading cards…",
@@ -1200,7 +1222,7 @@
     "shipStatusReturned": "Returned",
     "shipmentPreparingBuyer": "The seller is preparing your package. Tracking details will appear here once it's handed over to Sürat.",
     "offerAcceptedCompletePayment": "Your offer has been accepted. Complete the payment to finalize the purchase.",
-    "securePaymentNotice": "You'll enter your card on our secure payment page (3D Secure). Your card details are never stored on our servers — they're processed via PayTR over 256-bit SSL.",
+    "securePaymentNotice": "You'll enter your card on our secure payment page (3D Secure). Your card details are never stored on our servers; they're processed by our secure payment provider over 256-bit SSL.",
     "expiredReactivate": "This order expired before payment. You can reactivate it to complete payment.",
     "paymentRefunded": "The payment has been refunded.",
     "refundToOriginalMethod": "If a payment was made, the refund will be processed to your original payment method.",
@@ -1284,7 +1306,10 @@
     "preparingDeadlineSeller": "You need to ship this order by this date.",
     "preparingDeadlineBuyer": "The seller has to ship this order by this date at the latest.",
     "preparingExtendedSeller": "Your shipping deadline passed and was extended once. This is the final deadline; if the order is not shipped by then, it is cancelled automatically and the buyer refunded in full.",
-    "preparingExtendedBuyer": "The seller could not ship on time and was given one extension. If the order is not shipped by this date, it is cancelled automatically and your payment refunded in full. You can cancel the order any time before it ships."
+    "preparingExtendedBuyer": "The seller could not ship on time and was given one extension. If the order is not shipped by this date, it is cancelled automatically and your payment refunded in full. You can cancel the order any time before it ships.",
+    "review": {
+      "hiddenNote": "This review is not shown publicly."
+    }
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1342,7 +1367,7 @@
       "subtitle": "The system has assigned each party a Sürat Kargo tracking number. Use the number below to drop off your item at the nearest Sürat branch.",
       "yourShipment": "Your shipment",
       "handIn": "Take this number to a Sürat Kargo branch and hand in your item.",
-      "counterpartyDelivered": "✓ The other party's shipment has also reached the warehouse.",
+      "counterpartyDelivered": "The other party's shipment has also reached the warehouse.",
       "counterpartyInTransit": "The other party's shipment is on the way.",
       "counterpartyCancelled": "The other party's shipment was cancelled; our team will step in.",
       "counterpartyFailed": "There was an issue with the other party's shipment; our team is reviewing.",
@@ -1434,7 +1459,7 @@
     "timeExpired": "Time Expired!",
     "dayShort": "d",
     "rejectTradeTitle": "Reject Trade",
-    "profileAddressesLink": "Profile → Addresses",
+    "profileAddressesLink": "Profile > Addresses",
     "myTradesDesc": "Manage your active and past trade offers.",
     "targetNotFoundDesc": "The product you wanted to trade for could not be found or is no longer available.",
     "sendFailed": "Failed to send trade offer",
@@ -1458,7 +1483,7 @@
     "cancelLockedTooltip": "An item already reached the warehouse — cancel is no longer available. Open a dispute if needed.",
     "itemReachedWarehouse": "An item reached the warehouse.",
     "shipInfoDesc": "Select the address you will ship from and the carrier.",
-    "noSavedAddresses": "No saved addresses. Add one in <link>Profile → Addresses</link>.",
+    "noSavedAddresses": "No saved addresses. Add one in <link>Profile > Addresses</link>.",
     "submitShipInfo": "Submit Shipping Info",
     "warehouseBannerTitle": "Your items are at the Tarodan warehouse",
     "warehouseBannerDesc": "Our team is reviewing the items. You will be notified once the review is complete.",
@@ -1474,6 +1499,8 @@
     "noProductsAvailable": "No products available",
     "goToMyListings": "Go to My Listings",
     "cashBalanceHint": "You can add cash to balance the trade value.",
+    "cashHelper": "Use a comma for kuruş, for example 1250,50",
+    "cashFormatRefused": "This amount was not accepted. Do not use thousands separators; use a comma for kuruş, for example 1250,50",
     "whoPaysCash": "Who will pay the cash difference?",
     "theyWillPay": "They will pay",
     "totalWithCommission": "Total with commission:",
@@ -1626,7 +1653,7 @@
     "blockedContent": "Your message was blocked due to inappropriate content",
     "selectConversation": "Select a conversation to start messaging",
     "searchConversations": "Search conversations",
-    "photoLabel": "📷 Photo",
+    "photoLabel": "Photo",
     "youPrefix": "You: ",
     "selectConversationTitle": "Select a conversation",
     "chooseThread": "Choose a thread from the list",
@@ -1721,7 +1748,7 @@
       "uyelikYukseltme": "Üyelik Yükseltme",
       "guvenliOdemeIleUyeliginiziYukseltin": "Güvenli ödeme ile üyeliğinizi yükseltin",
       "guvenliOdeme": "Güvenli Ödeme",
-      "onayladiktanSonraGuvenliOdemeSayfamizdaKart": "Onayladıktan sonra güvenli ödeme sayfamızda kart bilgilerinizi girip 3D Secure ile ödersiniz. Kart bilgileriniz saklanmaz; PayTR altyapısıyla işlenir.",
+      "onayladiktanSonraGuvenliOdemeSayfamizdaKart": "After you confirm, you enter your card details on our secure payment page and pay with 3D Secure. Your card details are not stored; they are processed by our secure payment provider.",
       "kullanimKosullarini": "Kullanım koşullarını",
       "gizlilikPolitikasini": "gizlilik politikasını",
       "yillik": "yıllık",
@@ -2056,7 +2083,7 @@
       "showcaseHint": "Shown in the home showcase and at the top of search",
       "searchHint": "Shown at the top of search",
       "activeBoostInfo": "This listing already has an active boost: ~{days} days left. Your selected duration is added on top of the remaining time.",
-      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days → total ~{total} days",
+      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days; total ~{total} days",
       "daysValue": "{days} days",
       "campaign": "Campaign",
       "unavailable": "Boosting is currently unavailable.",
@@ -2064,10 +2091,24 @@
       "pricingLoadError": "Failed to load prices",
       "paymentStartFailed": "Failed to start payment",
       "initiateFailed": "Failed to start boost",
-      "autoRenewLabel": "Get an auto-renew reminder when it expires (Premium)",
+      "autoRenewLabel": "Remind me 24 hours before it ends (Premium). You are not charged automatically.",
       "redirecting": "Redirecting",
       "extendAndPay": "Extend and Pay",
-      "featureAndPay": "Feature and Pay"
+      "featureAndPay": "Feature and Pay",
+      "reminderUpgrade": "Upgrade to Premium",
+      "preInfo": {
+        "title": "Pre-contract information",
+        "provider": "Service provider: {company}",
+        "service": "Service: featuring \"{listing}\" for {days} days with the {package} package",
+        "price": "Total price (VAT included): <amount>{price}</amount>",
+        "start": "The service starts as soon as your payment is confirmed.",
+        "noCancel": "A boost cannot be cancelled once it has started."
+      },
+      "consent": {
+        "contract": "I have read and accept the <preInfo>Pre-contract Information Form</preInfo> and the <contract>Distance Service Contract</contract>.",
+        "waiver": "I agree that the service starts immediately with my approval and that I therefore have no right of withdrawal.",
+        "required": "Please accept both statements to continue."
+      }
     },
     "bank": {
       "title": "Bank Account / IBAN",
@@ -2105,10 +2146,6 @@
       "changePassword": "Change Password",
       "currentPassword": "Current Password",
       "newPasswordRepeat": "New Password (Repeat)",
-      "ruleMin8": "At least 8 characters",
-      "ruleUppercase": "Uppercase letter",
-      "ruleLowercase": "Lowercase letter",
-      "ruleDigit": "Digit",
       "phoneVerification": "Phone Verification",
       "phoneVerified": "Your phone is verified",
       "phoneVerifyPrompt": "Verify your phone by SMS",
@@ -2120,11 +2157,16 @@
       "twoFactorOn": "Your account is protected with TOTP",
       "twoFactorOff": "Add an app-based extra layer of security",
       "manage": "Manage",
-      "setUp": "Set up"
+      "setUp": "Set up",
+      "setPasswordTitle": "Set a Password",
+      "setPasswordIntro": "You can currently sign in only with Google or Apple. Set a password to sign in with your email address too.",
+      "setPasswordAction": "Set Password",
+      "setPasswordSuccess": "Your password has been set.",
+      "passwordFirstFor2fa": "You need to set a password before you can turn on two-factor authentication."
     },
     "changePhotoAction": "Change photo",
     "verifiedBadge": "Verified",
-    "ratingSummary": "★ {rating} · {count} reviews",
+    "ratingSummary": "{rating} · {count} reviews",
     "manageMembership": "Manage Membership",
     "metricListings": "Listings",
     "metricOrders": "Orders",
@@ -2293,7 +2335,7 @@
       "otomatikYenilemeVeHizliOdemeIcin": "Otomatik yenileme ve hızlı ödeme için kayıtlı kartların. Yeni kart, ödeme sırasında \"kartımı kaydet\" ile eklenir.",
       "kayitliKartinYok": "Kayıtlı kartın yok.",
       "birOdemeYaparkenKartimiKaydetSecenegini": "Bir ödeme yaparken \"kartımı kaydet\" seçeneğini işaretleyerek kart ekleyebilirsin.",
-      "kartlarinPayTRGuvenliKasasindaSaklanirNumara": "Kartların PayTR güvenli kasasında saklanır; numara/CVV bizde tutulmaz.",
+      "kartlarinPayTRGuvenliKasasindaSaklanirNumara": "Your cards are stored securely by our payment provider; we never keep the number or CVV.",
       "kartiSil": "Kartı sil",
       "kartLast4KartiniSilmekIstedigineEmin": "{Kart} •••• {last4} kartını silmek istediğine emin misin? Bu kartla otomatik yenileme yapılamaz hale gelir.",
       "vazgec": "Vazgeç"
@@ -2312,19 +2354,6 @@
       "henuzKimseyiTakipEtmiyorsunuz": "Henüz kimseyi takip etmiyorsunuz",
       "saticilariTakipEderekYeniIlanlarindanHaberdar": "Satıcıları takip ederek yeni ilanlarından haberdar olun",
       "ilanlariKesfet": "İlanları Keşfet"
-    },
-    "savedSearches": {
-      "failedToLoadSavedSearches": "Failed to load saved searches:",
-      "aramayiSil": "Aramayı sil",
-      "buAramayiSilmekIstediginizdenEminMisiniz": "Bu aramayı silmek istediğinizden emin misiniz?",
-      "aramaSilindi": "Arama silindi",
-      "bildirimlerAcildi": "Bildirimler açıldı",
-      "bildirimlerKapatildi": "Bildirimler kapatıldı"
-    },
-    "savedSearchCard": {
-      "tumIlanlar": "Tüm ilanlar",
-      "bildirimleriKapat": "Bildirimleri kapat",
-      "bildirimleriAc": "Bildirimleri aç"
     },
     "bankHooks": {
       "bankaHesabiKaydedildi": "Banka hesabı kaydedildi",
@@ -2385,6 +2414,67 @@
       "failedItem": "{title}: {reason}",
       "empty": "You have no expired listings.",
       "emptyDescription": "Your expired listings are listed here."
+    },
+    "connectedAccounts": {
+      "title": "Connected Accounts",
+      "description": "Manage which accounts you can use to sign in to Tarodan.",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connectedAs": "Connected as {email}",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect {provider}?",
+      "disconnectConfirm": "You will no longer be able to sign in to this account with {provider}.",
+      "relinkNote": "If you later choose \"Continue with {provider}\" with the same verified email address, this sign-in method is connected to your account again automatically and we send you a notice by email.",
+      "lastMethodHint": "Your account must keep a password or a connected Google account. Set a password first.",
+      "connectSuccess": "{provider} account connected.",
+      "disconnectSuccess": "{provider} disconnected."
+    },
+    "boosts": {
+      "title": "My Boosts",
+      "sections": {
+        "current": "Active",
+        "history": "History"
+      },
+      "empty": {
+        "title": "No boosts yet",
+        "description": "You can feature your listings from My listings.",
+        "action": "Go to My listings"
+      },
+      "status": {
+        "active": "Active",
+        "paused": "Paused",
+        "expired": "Ended",
+        "cancelled": "Cancelled",
+        "refunded": "Refunded"
+      },
+      "remaining": "{days} d {hours} h left",
+      "remainingHours": "{hours} h left",
+      "pausedHint": "Paused because the listing is not live. It resumes when the listing is live again.",
+      "extended": "+{days} days added",
+      "purchasedAt": "Purchased: {date}",
+      "period": "{start} – {end}",
+      "source": {
+        "adminGrant": "Gift from Tarodan"
+      },
+      "performance": {
+        "title": "Performance (since the boost started)",
+        "views": "Views",
+        "likes": "Favourites",
+        "clicks": "Clicks",
+        "pending": "Measurement starts when the boost starts."
+      },
+      "best": "Best performing",
+      "reminder": {
+        "label": "Remind me 24 hours before it ends",
+        "hint": "This is only a reminder. You are not charged automatically.",
+        "premiumOnly": "Reminders are for Premium members.",
+        "saved": "Reminder setting saved"
+      },
+      "loadFailed": "Boosts could not be loaded",
+      "refundedAmount": "Refunded: {amount}",
+      "invoice": "Invoice",
+      "support": "Something wrong? Contact Support."
     }
   },
   "review": {
@@ -2536,13 +2626,30 @@
     "savedLimitReached": "You have reached your saved-search limit ({limit} searches).",
     "premiumMoreSearches": "Save more searches with Premium",
     "savedTitle": "My Saved Searches",
-    "savedDescription": "Manage your saved searches and change notification preferences here.",
+    "savedDescription": "Run your saved searches again or delete them here.",
     "savedEmptyTitle": "No Saved Searches",
-    "savedEmptyDescription": "While browsing listings, save a search with the \"Save this search\" button on the results page; manage it here and get notified about new results.",
+    "savedEmptyDescription": "While browsing listings, save a search with the \"Save this search\" button on the results page, then run it again from here.",
     "countOfLimit": "{count} / {limit} searches",
     "searchListings": "Search Listings",
     "runThisSearch": "Run This Search",
     "priceLabel": "Price:"
+  },
+  "savedSearch": {
+    "save": "Save this search",
+    "saveTitle": "Save search",
+    "nameLabel": "Search name",
+    "saved": "Search saved",
+    "saveFailed": "Could not save the search",
+    "nothingToSave": "Search or pick a filter to save",
+    "signInToSave": "Sign in to save your search",
+    "untitled": "Saved search",
+    "savedOn": "Saved on {date}",
+    "limitTitle": "Saved search limit",
+    "deleteTitle": "Delete search",
+    "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+    "deleted": "Search deleted",
+    "deleteFailed": "Could not delete the search",
+    "loadFailed": "Could not load your saved searches"
   },
   "error": {
     "pageNotFound": "Page Not Found",
@@ -2587,6 +2694,8 @@
     "minAge18": "You must be at least 18 years old to register.",
     "enterAmount": "Enter an amount",
     "enterValidAmount": "Enter a valid amount",
+    "amountFormatRefused": "This amount was not accepted. Do not use thousands separators; use a comma for kuruş, for example 1250,50",
+    "amountAboveMax": "The amount cannot exceed {max, number} TL.",
     "max500Chars": "Max 500 characters",
     "enterOrderNumber": "Enter order number",
     "offerBelowPrice": "Offer must be lower than the price",
@@ -2862,7 +2971,6 @@
     "retried": "Payment retried",
     "retryFailed": "Failed to retry payment",
     "noHistory": "No payment history yet",
-    "provider": "Provider",
     "startDate": "Start Date",
     "endDate": "End Date",
     "retry": "Retry",
@@ -2905,7 +3013,22 @@
     "invoiceByEmail": "Your invoice is emailed to you once it is issued; you can also download it from Orders.",
     "individualSellerNoInvoice": "This is an individual seller, so no product invoice is issued. Tarodan's service fee invoice is sent to you by email.",
     "sellerInvoicePending": "The seller has not uploaded the product invoice yet. You will be notified by email once they do.",
-    "downloading": "Downloading..."
+    "downloading": "Downloading...",
+    "boost": {
+      "success": {
+        "title": "Your boost has started",
+        "description": "\"{listing}\" is featured until {date}.",
+        "pending": "Payment received. Your boost will start within a few minutes."
+      },
+      "toBoosts": "My Boosts",
+      "toListings": "My Listings",
+      "fail": {
+        "title": "The boost payment was not completed",
+        "description": "The payment could not be completed. You can try again.",
+        "retry": "Try again"
+      },
+      "cancelled": "The boost payment was cancelled."
+    }
   },
   "bankAccount": {
     "savedBadge": "Saved",
@@ -2929,8 +3052,6 @@
     "report": "Report",
     "noActiveListings": "This seller has no active listings yet.",
     "viewProfile": "View Profile",
-    "premiumBadge": "Premium",
-    "trust": "Trust",
     "noReviewsDesc": "This seller has no reviews yet.",
     "totalReviews": "reviews",
     "noCollections": "No collections yet",
@@ -3050,6 +3171,30 @@
       "newDiscount": "New Discount",
       "emptyFiltered": "No discounts match this filter",
       "emptyDescription": "Create discounts and campaigns for your customers"
+    },
+    "trustScore": {
+      "badge": "{rating}",
+      "badgeNew": "New seller",
+      "a11yLabel": "Trust score {rating} out of 5, {level}",
+      "a11yLabelNew": "Trust score: New seller",
+      "levels": {
+        "excellent": "Excellent",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "developing": "Developing",
+        "new": "New seller"
+      },
+      "info": {
+        "title": "How is the trust score calculated?",
+        "intro": "The trust score is calculated from the seller's real activity on Tarodan, on a scale from 0 to 5:",
+        "ratings": "Ratings from buyers and trade partners (each person counts once)",
+        "reliability": "Completing orders without cancellations or returns caused by the seller",
+        "onTime": "Handing orders to the carrier on time",
+        "volume": "Number of completed sales and trades",
+        "tenure": "Account age on Tarodan",
+        "newSeller": "Sellers without at least {count} completed transactions with {counterparties} different buyers are shown as \"New seller\".",
+        "updated": "The score is updated every day."
+      }
     }
   },
   "sellerDashboard": {
@@ -3206,7 +3351,7 @@
       "takasIslemleriniNasilYapiyoruz": "Takas işlemlerini nasıl yapıyoruz?",
       "heyecanVericiBirDigerDetayIse": "Heyecan verici bir diğer detay ise: koleksiyonlar arası takas da yapılabiliyor! Takas sürecinde her iki taraf da model araçlarını Tarodan deposuna gönderiyor. Uzman ekibimiz depoda gerekli kontrolleri sağlıyor; ürünler ilanla tamamen eşleşiyorsa takas işlemini güvenle başlatıyoruz. Eğer beklenmeyen kusurlu veya yanlış bir ürünle karşılaşırsak hemen taraflara bilgi veriyor, onayınızla süreci düzenliyor veya ürünleri güvenle sizlere iade ediyoruz. Böylece garaj değiştirmek tamamen güvence altında ilerliyor!",
       "siparisiminVeyaTakasiminDurumunuNasilTakip": "Siparişimin veya takasımın durumunu nasıl takip edebilirim?",
-      "tarodanUygulamasiniActiktanSonraSiparislerinizIcin": "Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takaslarınız için Hesabım → Takaslarım adımlarını izleyerek yeni göz bebeğinizin yolda olup olmadığını ya da takas sürecini anlık olarak takip edebilirsiniz.",
+      "tarodanUygulamasiniActiktanSonraSiparislerinizIcin": "Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım > Siparişlerim, takaslarınız için Hesabım > Takaslarım adımlarını izleyerek yeni göz bebeğinizin yolda olup olmadığını ya da takas sürecini anlık olarak takip edebilirsiniz.",
       "tekSepetteBirdenFazlaModelAlabilir": "Tek sepette birden fazla model alabilir miyim?",
       "evetSepetinizdekiTumGuzellikleriVeTakas": "Evet, sepetinizdeki tüm güzellikleri ve takas ürünlerini tek seferde ödeyerek kargoyla kapınıza gelmesini sağlayabilirsiniz.",
       "odenecekTutariModelFiyatindanNedenDaha": "Ödenecek tutarı model fiyatından neden daha yüksek görüyorum?",
@@ -3220,7 +3365,7 @@
       "siparisimNeZamanKargolanir": "Siparişim ne zaman kargolanır?",
       "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği {preparingDeadlineDays} iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
       "kargomuNasilTakipEdebilirim": "Kargomu nasıl takip edebilirim?",
-      "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım → Siparişlerim veya Hesabım → Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
+      "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım > Siparişlerim veya Hesabım > Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
       "siparisNeZamanTamamlanir": "Sipariş ne zaman tamamlanır?",
       "kargonuzKapiyaGeldiBittiSandinizDegil": "Kargonuz kapıya geldi, bitti sandınız değil mi? Aslında süreç, kargonuzu teslim alıp modeli inceledikten ve sistem üzerinden “Siparişi Onayla” butonuna bastıktan sonra resmi olarak tamamlanır. Göz bebeğinizin kutusundan sağ salim çıktığından emin olunca süreci tamamlayabilirsiniz.",
       "odememSaticiyaNeZamanGecer": "Ödemem satıcıya ne zaman geçer?",
@@ -3251,7 +3396,7 @@
       "uyelikPlanlariArasindakiFarklarNelerdir": "Üyelik planları arasındaki farklar nelerdir?",
       "tarodandaKoleksiyonunuzuSergilemekAlisverisYapmakVe": "Tarodan’da koleksiyonunuzu sergilemek, alışveriş yapmak ve takas sistemini kullanmak temel üyelik yapımızla tamamen sorunsuz bir şekilde ilerler. Farklı plan seçeneklerimiz; ilan öne çıkarma (roketleme) hakları, mağaza ayrıcalıkları ve gelişmiş sergileme özellikleri gibi detaylarda koleksiyonerlere esneklik sunar. İhtiyacınıza en uygun planı profilinizden inceleyerek seçebilirsiniz.",
       "siparisimiNasilTakipEderim": "Siparişimi nasıl takip ederim?",
-      "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takas işlemleriniz için ise Hesabım → Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
+      "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım > Siparişlerim, takas işlemleriniz için ise Hesabım > Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
       "iadeVeDegisimPolitikasiNedir": "İade ve değişim politikası nedir?",
       "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre {returnWindowDays} gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
     },
@@ -3436,7 +3581,7 @@
       "siparisinKesinlesmesiOdemeninTamVeEksiksiz": "Siparişin kesinleşmesi, ödemenin tam ve eksiksiz yapılmasına bağlıdır. Ürünün Alıcı'ya veya Alıcı'nın gösterdiği üçüncü kişiye teslimi anında hasar ve ziya sorumluluğu Alıcı'ya geçer. Satıcı'nın, Alıcı'nın açık talimatı veya Platform'un operasyonel süreçleri dışında gerçekleştirdiği erken sevkiyat veya hatalı lojistik organizasyonundan doğan ek masraflardan bizzat Satıcı sorumludur.",
       "caymaHakki14GunKapsamSure": "Cayma Hakkı (14 Gün) – Kapsam, Süre ve Usul",
       "aliciTeslimdenItibaren14OnDort": "Alıcı, teslimden itibaren 14 (on dört) gün içinde herhangi bir gerekçe göstermeksizin ve cezai şart ödemeksizin cayma hakkına sahiptir. Cayma bildiriminin bu süre içinde Satıcı'ya ve/veya Platform üzerinden sağlanan cayma kanallarına yöneltilmesi yeterlidir.",
-      "aliciCaymaBildiriminiHesabimSiparislerimIade": "Alıcı, cayma bildirimini Hesabım → Siparişlerim → İade/Cayma menüsünden veya Satıcı'nın e-posta/KEP adresi üzerinden iletebilir.",
+      "aliciCaymaBildiriminiHesabimSiparislerimIade": "Alıcı, cayma bildirimini Hesabım > Siparişlerim > İade/Cayma menüsünden veya Satıcı'nın e-posta/KEP adresi üzerinden iletebilir.",
       "aliciNinUrunuIadeIcinGondermesi": "Alıcı'nın ürünü iade için göndermesi gereken usul ve iade adresi, iade talebi oluşturulduğunda Platform arayüzünde gösterilir.",
       "caymaHalindeIadeKargoBedelininKim": "Cayma halinde iade kargo bedelinin kim tarafından karşılanacağı ve iade yöntemleri ürün sayfasında ve iade akışında ayrıca belirtilir.",
       "caymaHakkiIstisnalariHijyenSaglikNedeniyle": "Cayma hakkı istisnaları: hijyen/sağlık nedeniyle iadesi uygun olmayan ürünler, hızlı bozulan gıdalar, tüketicinin istekleri doğrultusunda kişiselleştirilmiş ürünler vb. mevzuatta yer alan istisnalar saklıdır. Siparişe konu ürün cayma kapsamı dışındaysa, ürün sayfasında ve sipariş öncesi ekranda ayrıca belirtilir.",
@@ -3452,7 +3597,7 @@
       "uyusmazliklardaTuketiciParasalSinirlarDahilindeTuketici": "Uyuşmazlıklarda tüketici; parasal sınırlar dahilinde Tüketici Hakem Heyeti'ne, diğer hallerde dava şartı arabuluculuk sonrası Tüketici Mahkemesi'ne başvurabilir.",
       "onBilgilendirmeOnayiVeKaliciVeri": "Ön Bilgilendirme Onayı ve Kalıcı Veri Saklayıcısı",
       "aliciSiparisiOnaylamadanOnceBuOn": "Alıcı, siparişi onaylamadan önce bu Ön Bilgilendirme'yi okuduğunu ve anladığını, sipariş onayının ödeme yükümlülüğü doğurduğunu kabul eder.",
-      "onBilgilendirmeVeMesafeliSatisSozlesmesi": "Ön Bilgilendirme ve Mesafeli Satış Sözleşmesi'ne Hesabım → Siparişlerim alanından erişilebilir; ayrıca kayıtlı e-posta adresinize bağlantı olarak gönderilebilir.",
+      "onBilgilendirmeVeMesafeliSatisSozlesmesi": "Ön Bilgilendirme ve Mesafeli Satış Sözleşmesi'ne Hesabım > Siparişlerim alanından erişilebilir; ayrıca kayıtlı e-posta adresinize bağlantı olarak gönderilebilir.",
       "onayKutucuguMetniOnBilgilendirmeFormu": "Onay kutucuğu metni: “Ön Bilgilendirme Formu'nu okudum, siparişi onayladığım takdirde ödeme yükümlülüğü altına gireceğimi anladım.”",
       "bMesafeliSatisSozlesmesi": "B) Mesafeli Satış Sözleşmesi",
       "taraflarTanimlarVeSozlesmeninKurulmasi": "Taraflar, Tanımlar ve Sözleşmenin Kurulması",
@@ -3508,12 +3653,12 @@
       "aliciNinKisiselVerileriUyelikSiparis": "Alıcı'nın kişisel verileri; üyelik/sipariş/teslimat/ödeme/iade süreçlerinin yürütülmesi ve mevzuattan doğan yükümlülüklerin yerine getirilmesi amacıyla işlenir. Detaylar Platform'daki KVKK Aydınlatma Metni'nde açıklanmıştır.",
       "saticiAliciVerileriniYalnizcaSiparisinIfasi": "Satıcı; Alıcı verilerini yalnızca siparişin ifası/teslimat ve yasal yükümlülükler kapsamında kullanabilir; reklam/pazarlama gibi amaçlarla ayrıca kullanamaz.",
       "yururlukVeErisim": "Yürürlük ve Erişim",
-      "buSozlesmeSiparisinAliciTarafindanElektronik": "Bu Sözleşme, siparişin Alıcı tarafından elektronik ortamda onaylanması ile yürürlüğe girer. Sözleşme metnine Alıcı, Hesabım → Siparişlerim alanından erişebilir; ayrıca e-posta ile kendisine gönderilebilir.",
+      "buSozlesmeSiparisinAliciTarafindanElektronik": "Bu Sözleşme, siparişin Alıcı tarafından elektronik ortamda onaylanması ile yürürlüğe girer. Sözleşme metnine Alıcı, Hesabım > Siparişlerim alanından erişebilir; ayrıca e-posta ile kendisine gönderilebilir.",
       "onayKutucuguMetniMesafeliSatisSozlesmesi": "Onay kutucuğu metni: “Mesafeli Satış Sözleşmesi'ni okudum ve kabul ediyorum.”",
       "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
       "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
       "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
-      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım → Siparişlerim alanından erişebilirsiniz."
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz."
     },
     "terms": {
       "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
@@ -3600,7 +3745,7 @@
       "neZamanIadeTalebiOlusturabilirim": "Ne zaman iade talebi oluşturabilirim?",
       "kargonuzuTeslimAldiginizAndanItibarenYasal": "Kargonuzu teslim aldığınız andan itibaren, yasal mevzuat ve platform kuralları çerçevesinde belirlenen 14 günlük süre içinde sistem üzerinden kolayca iade talebi oluşturabilirsiniz. Göz bebeğinizi kutusundan çıkarıp inceledikten sonra herhangi bir uyumsuzluk fark ederseniz vakit kaybetmeden talep açabilirsiniz.",
       "iadeTalebiNasilOlusturulur": "İade talebi nasıl oluşturulur?",
-      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini": "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyin. İlgili siparişin detayına girdikten sonra “İade Talebi Oluştur” butonuna tıklayın. Karşınıza çıkan listeden iade nedeninizi seçip, sorunu net bir şekilde gösteren güncel fotoğrafları sisteme yükleyerek talebinizi tek tıkla gönderebilirsiniz.",
+      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini": "Tarodan uygulamasını açarak Hesabım > Siparişlerim adımlarını izleyin. İlgili siparişin detayına girdikten sonra “İade Talebi Oluştur” butonuna tıklayın. Karşınıza çıkan listeden iade nedeninizi seçip, sorunu net bir şekilde gösteren güncel fotoğrafları sisteme yükleyerek talebinizi tek tıkla gönderebilirsiniz.",
       "iadeTalebiNasilDegerlendirilir": "İade talebi nasıl değerlendirilir?",
       "olusturdugunuzIadeTalebiVeBelirttiginizGerekce": "Oluşturduğunuz iade talebi ve belirttiğiniz gerekçe, Tarodan uzman destek ekibi ve depo kontrol mekanizmaları tarafından titizlikle incelenir. Gerekli görülmesi durumunda ürün merkez depomuza çağrılarak ilan bilgileriyle karşılaştırılır. Sürecin adil ve şeffaf yürütülmesi için hem alıcının hem de satıcının sunduğu kanıtlar değerlendirilerek nihai karar verilir.",
       "iadeTalebiNeKadarSuredeSonuclanir": "İade talebi ne kadar sürede sonuçlanır?",
@@ -3632,7 +3777,7 @@
       "neZamanIptalTalebiOlusturabilirim": "Ne zaman iptal talebi oluşturabilirim?",
       "siparisiniziVerdiktenSonraUrununuzHenuzKargoya": "Siparişinizi verdikten sonra, ürününüz henüz kargoya teslim edilmeden veya kargo sürecindeyken dilediğiniz an iptal talebi oluşturabilirsiniz. Ürününüz kargoya verilmeden yapılan iptallerde süreç çok daha hızlı ilerler.",
       "iptalTalebiNasilOlusturulur": "İptal talebi nasıl oluşturulur?",
-      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini2": "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyebilirsiniz. İptal etmek istediğiniz siparişin detayına girdikten sonra ilgili iptal nedenini seçerek talebinizi anında sisteme iletebilirsiniz.",
+      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini2": "Tarodan uygulamasını açarak Hesabım > Siparişlerim adımlarını izleyebilirsiniz. İptal etmek istediğiniz siparişin detayına girdikten sonra ilgili iptal nedenini seçerek talebinizi anında sisteme iletebilirsiniz.",
       "iptalTalebiNasilDegerlendirilir": "İptal talebi nasıl değerlendirilir?",
       "olusturdugunuzIptalTalebiUrununOAnki": "Oluşturduğunuz iptal talebi, ürünün o anki lojistik durumuna (kargoya verilip verilmediğine) ve seçtiğiniz iptal nedenine göre sistem tarafından otomatik olarak veya Tarodan operasyon ekibimiz tarafından titizlikle incelenerek değerlendirilir.",
       "iptalTalebiNeKadarSuredeSonuclanir": "İptal talebi ne kadar sürede sonuçlanır?",
@@ -3800,7 +3945,6 @@
         "guestCart": "Guest cart contents",
         "recentSearches": "Your recent searches and filters",
         "listingLayout": "Product list layout preference",
-        "savedSearches": "Your saved searches",
         "dismissedBanners": "Stops announcements you dismissed from reappearing",
         "youtubeEmbed": "Playback of YouTube videos embedded in listing pages",
         "googleAnalytics": "Google Analytics — visitor and session distinction",
@@ -3917,8 +4061,8 @@
       "gecerliIhlalBildirimleriSonrasindaTekrarlayanIhlal": "Geçerli ihlal bildirimleri sonrasında tekrarlayan ihlal yapan kullanıcı hesapları askıya alınabilir veya sonlandırılabilir.",
       "7Iletisim": "7. İletişim",
       "fikriMulkiyetVeIhlalBildirimleriLegal": "Fikri mülkiyet ve ihlal bildirimleri: legal@tarodan.com.tr",
-      "kullanimSartlari": "Kullanım Şartları →",
-      "saticiSozlesmesi": "Satıcı Sözleşmesi →"
+      "kullanimSartlari": "Kullanım Şartları",
+      "saticiSozlesmesi": "Satıcı Sözleşmesi"
     },
     "entity": {
       "legalName": "Legal Name",
@@ -3931,6 +4075,10 @@
     },
     "kvkkTitle": "KVKK Privacy Notice",
     "marketingConsentTitle": "Marketing Communications Consent",
+    "platformServiceSales": {
+      "title": "Pre-contract Information and Distance Service Contract"
+    },
+    "withdrawalWaiverTitle": "Withdrawal Waiver",
     "consentGate": {
       "title": "Your consent is required",
       "intro": "To continue, please read and accept the documents below.",
@@ -4210,7 +4358,7 @@
       "uygunKosullardaVeIncelemeSonucundaOdeme": "Uygun koşullarda ve inceleme sonucunda, ödeme satıcıya ulaşmadan önce iade edilebilir veya anlaşmazlık çözümüne göre alıcı lehine para iadesi yapılabilir. \"Para iade garantisi\" ifadesi, platformun belirlediği kurallar ve süreçler çerçevesinde sunulan korumayı ifade eder; her durumda otomatik iade anlamına gelmez.",
       "4AnlasmazlikCozumu": "4. Anlaşmazlık Çözümü",
       "bSaticiIleIletisimBOnce": "<b>Satıcı ile iletişim:</b>Önce sipariş/mesajlar üzerinden satıcıyla iletişime geçin.",
-      "bDestekTalebiBCozulemezseHesabim": "<b>Destek talebi:</b>Çözülemezse Hesabım → Siparişlerim → İlgili sipariş → \"Sorun bildir\" veya destek@tarodan.com.tr.",
+      "bDestekTalebiBCozulemezseHesabim": "<b>Destek talebi:</b>Çözülemezse Hesabım > Siparişlerim > İlgili sipariş > \"Sorun bildir\" veya destek@tarodan.com.tr.",
       "bIncelemeBDestekEkibimizTalebi": "<b>İnceleme:</b>Destek ekibimiz talebi ve (varsa) kanıtları inceler; gerekirse satıcıdan bilgi alır.",
       "bKararVeUygulamaBSonuc": "<b>Karar ve uygulama:</b>Sonuç (iade, kısmi iade, red) size ve gerekirse satıcıya bildirilir; ödeme süreçleri buna göre işletilir.",
       "sureBasvurularGenellikle510Is": "Süre: Başvurular genellikle 5–10 iş günü içinde incelenir; karmaşık durumlarda süre uzayabilir.",
@@ -4490,8 +4638,9 @@
         "allStatuses": "All Statuses",
         "filters": {
           "pending": "Pending",
-          "approved": "Approved",
-          "rejected": "Rejected"
+          "approved": "Visible",
+          "rejected": "Rejected",
+          "hidden": "Hidden"
         },
         "product": "Product",
         "review": "Review",
@@ -4510,20 +4659,9 @@
         "productEmpty": "No reviews found",
         "sellerEmpty": "No seller reviews found",
         "updateFailed": "Review status could not be updated",
-        "reject": "Reject",
-        "revert": "Revert",
         "actionResult": {
-          "approved": "approved",
-          "pending": "moved to pending",
-          "rejected": "rejected"
-        },
-        "confirm": {
-          "approveTitle": "Approve Review",
-          "approveDescription": "Are you sure you want to publish this review?",
-          "rejectTitle": "Reject Review",
-          "rejectDescription": "Are you sure you want to reject this review?",
-          "revertTitle": "Move Review to Pending",
-          "revertDescription": "Are you sure you want to return this review to the review queue?"
+          "approved": "shown again",
+          "hidden": "hidden"
         },
         "detail": {
           "open": "Details",
@@ -4538,8 +4676,36 @@
             "order": "Order",
             "trade": "Trade",
             "seller": "Seller"
-          }
-        }
+          },
+          "moderation": "Moderation"
+        },
+        "hide": "Hide",
+        "unhide": "Show again",
+        "status": {
+          "visible": "Visible",
+          "hidden": "Hidden",
+          "pending": "Pending",
+          "rejected": "Rejected",
+          "spam": "Spam",
+          "deleted": "Deleted"
+        },
+        "moderation": {
+          "hideTitle": "Hide review",
+          "hideDescription": "A hidden review is removed from the site and the app and no longer counts toward ratings or counters. The author can still see their own review.",
+          "unhideTitle": "Show review again",
+          "unhideDescription": "The review is public again and counts toward ratings.",
+          "hideReason": "Reason for hiding",
+          "hideReasonPlaceholder": "Say why the review is hidden (at least {min} characters)",
+          "unhideNote": "Note (optional)",
+          "unhideNotePlaceholder": "A short note for the audit log",
+          "counter": "{count}/{max}",
+          "hideSubmit": "Hide",
+          "unhideSubmit": "Show again"
+        },
+        "reasonColumn": "Reason for hiding",
+        "moderatedAtColumn": "Moderated on",
+        "moderatedByColumn": "Moderator",
+        "moderatedBy": "{name}, {date}"
       },
       "sellerApplications": {
         "title": "Corporate Seller Applications",
@@ -4797,7 +4963,14 @@
           "suspiciousActivity": "Suspicious Activity",
           "passwordReset": "Password Reset",
           "twoFactorEnabled": "2FA Enabled",
-          "accountLocked": "Account Locked"
+          "accountLocked": "Account Locked",
+          "socialLinked": "Social Account Linked",
+          "socialLinkReset": "Unverified Account Reset on Social Sign-in",
+          "socialLinkedAuto": "Linked Automatically on Social Sign-in",
+          "socialUnlinked": "Social Account Unlinked",
+          "passwordSet": "Password Set",
+          "reauthFailed": "Step-up Confirmation Failed",
+          "reauthLocked": "Step-up Confirmation Locked"
         },
         "emailStatuses": {
           "sent": "Sent",
@@ -4909,7 +5082,7 @@
         "adjustRecordAfter": "field will change:",
         "oldValue": "Old",
         "newValue": "New",
-        "prodDataWarning": "⚠ PROD — real data will change.",
+        "prodDataWarning": "PROD — real data will change.",
         "record": "Record",
         "dates": "Dates",
         "action": "Action",
@@ -4944,7 +5117,7 @@
         },
         "cronConfirmTitle": "Trigger cron",
         "cronConfirmDescription": "The \"{label}\" job will be queued and run on the worker immediately. Continue?",
-        "cronProdWarning": "⚠ PROD — the job will run on real customer data.",
+        "cronProdWarning": "PROD — the job will run on real customer data.",
         "cronResultDone": "Job completed — {summary}",
         "cronResultDoneNoSummary": "Job completed",
         "cronResultFailed": "Job failed: {reason}",
@@ -5371,9 +5544,6 @@
         "rejectionReasonLabel": "Rejection Reason:",
         "aiImageCheck": "AI Image Check",
         "aiScores": "Relevance (vehicle/model): {relevance}% · Inappropriateness: {nsfw}%",
-        "reviewStatusUpdated": "Review status updated",
-        "reviewApproved": "Approved",
-        "reviewPending": "Pending",
         "reviewsTitle": "Product Reviews",
         "noReviews": "No reviews for this product yet.",
         "verifiedBuyer": "Verified Buyer",
@@ -5863,7 +6033,7 @@
         "unlimited": "Unlimited",
         "startDate": "Start Date",
         "endDate": "End Date",
-        "flashSale": "⚡ Flash Sale",
+        "flashSale": "Flash Sale",
         "flashBadge": "Flash",
         "stackable": "Can be combined with other discounts",
         "free": "Free",
@@ -5901,7 +6071,7 @@
           "help": "Generates unique single-use codes for this discount template. Each code can be redeemed once.",
           "count": "Number of Codes",
           "prefix": "Prefix (optional)",
-          "prefixHelper": "e.g. NEWYEAR → NEWYEAR-A7K2M9PQRS",
+          "prefixHelper": "e.g. NEWYEAR gives NEWYEAR-A7K2M9PQRS",
           "generate": "Generate",
           "generated": "{count} codes generated (total {total})",
           "generateFailed": "Failed to generate codes",
@@ -6248,7 +6418,7 @@
         "audienceUserCount": "{count} users",
         "audienceMixedCount": "{tiers} tiers + {users} users",
         "tiers": "Price Tiers",
-        "tiersHelper": "Each row sets the package price for a duration and product price range",
+        "tiersHelper": "Each row sets the package price for a duration and product price range. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap (for example 1,000-5,000 and 5,000-unlimited). When the previous row has an upper limit, a new row continues the same duration from that amount.",
         "addTier": "Add Row",
         "removeTier": "Remove Row",
         "noTiers": "No tiers yet. Add one with 'Add Row'.",
@@ -6256,8 +6426,8 @@
         "duration": "Duration",
         "durationDays": "Duration (days)",
         "days": "days",
-        "minAmount": "Min. Price",
-        "maxAmount": "Max. Price",
+        "minAmount": "Lower Limit (inclusive)",
+        "maxAmount": "Upper Limit (exclusive)",
         "unlimited": "Unlimited",
         "priceRange": "Price Range",
         "price": "Price",
@@ -6326,6 +6496,46 @@
           "expired": "Expired",
           "cancelled": "Cancelled",
           "failed": "Failed"
+        },
+        "source": {
+          "purchase": "Purchase",
+          "adminGrant": "Free grant"
+        },
+        "sourceLabel": "Source",
+        "allSources": "All sources",
+        "refund": {
+          "action": "Refund and Stop",
+          "title": "Refund and stop the boost",
+          "amount": "Refund amount",
+          "amountHelper": "At most {max}. Leave empty to refund the full remaining amount.",
+          "reason": "Reason",
+          "confirm": "The amount is refunded to the card, the boost stops at once, and its invoice is cancelled or a return invoice is issued. This cannot be undone.",
+          "partialStops": "A partial refund also stops the boost; the remaining amount cannot be refunded later.",
+          "done": "Refunded and stopped"
+        },
+        "revoke": {
+          "action": "Cancel Grant",
+          "confirm": "The free boost stops at once.",
+          "done": "Grant cancelled"
+        },
+        "grant": {
+          "action": "Grant Free Boost",
+          "listing": "Listing (ID or listing code)",
+          "package": "Package (optional)",
+          "noPackage": "No package (search priority only)",
+          "days": "Days",
+          "reason": "Reason (written to the audit log)",
+          "noInvoiceHint": "A free grant has no invoice and is not revenue.",
+          "done": "Boost granted"
+        },
+        "detail": {
+          "grantedBy": "Granted by",
+          "grantReason": "Grant reason",
+          "cancelledBy": "Stopped by",
+          "cancelledAt": "Stopped at",
+          "cancelReason": "Stop reason",
+          "refundedAmount": "Refunded",
+          "showcaseEndsAt": "Showcase ends"
         }
       }
     },
@@ -6474,7 +6684,7 @@
         "commissionVat": "Commission VAT",
         "withholding": "Withholding",
         "corporateOnlyNote": "VAT and withholding apply only to corporate sellers (0 for individuals).",
-        "previewTaxNote": "VAT/withholding are example values; actual rates come from Finance -> Tax.",
+        "previewTaxNote": "VAT/withholding are example values; actual rates come from Finance > Tax.",
         "examplePackageTier": "Sample package size",
         "shippingSharesTitle": "Shipping Split",
         "shippingSharesHelper": "Enter the buyer's percentage; the seller covers the rest. Both sides update live on each row.",
@@ -6494,7 +6704,7 @@
           "title": "How it is calculated",
           "subtitle": "How an order's money is split: fees, VAT and withholding.",
           "vatRuleTitle": "VAT rule",
-          "vatRule": "VAT on every service given to the buyer is charged to the buyer; VAT on every service given to the seller is charged to the seller. The rate and on/off switch live in System → Settings (service_vat_rate, service_vat_enabled). The product price itself carries no VAT (product_vat_enabled is off).",
+          "vatRule": "VAT on every service given to the buyer is charged to the buyer; VAT on every service given to the seller is charged to the seller. The rate and on/off switch live in System > Settings (service_vat_rate, service_vat_enabled). The product price itself carries no VAT (product_vat_enabled is off).",
           "buyerTitle": "What the buyer pays",
           "buyerResult": "Buyer pays",
           "sellerTitle": "What the seller receives",
@@ -6555,7 +6765,7 @@
         "pspFee": "PayTR fee",
         "netRevenue": "Tarodan net revenue",
         "netTakeRate": "Net take rate (of item price)",
-        "pspRateNote": "The PayTR fee rate comes from System → Settings → Finance.",
+        "pspRateNote": "The PayTR fee rate comes from System > Settings > Finance.",
         "serviceVatOut": "Service VAT (to the state)",
         "tradeFeesTitle": "Trade service fees",
         "tradeFeesHelper": "Flat fees charged to the parties giving and receiving a product under this rule. Enter VAT-inclusive amounts, or 0 to disable the fee. Shipping is calculated independently.",
@@ -6605,7 +6815,7 @@
         "orderAmount": "Order Amount",
         "uploadedAt": "Uploaded At",
         "replaced": "Replaced",
-        "returnReference": "Return → {reference}",
+        "returnReference": "Return: {reference}",
         "processLinks": {
           "order": "Order",
           "offer": "Offer",
@@ -6725,7 +6935,8 @@
         "itemSummary": "Item / Transaction",
         "tradeBadge": "Trade",
         "sellerCount": "{count} sellers",
-        "tradeItemCount": "{initiatorCount} items ↔ {receiverCount} items",
+        "tradeItemCount": "{initiatorCount} items for {receiverCount} items",
+        "tradeItemPair": "{initiator} for {receiver}",
         "orderSubtitle": "Order #{number}",
         "tradeSubtitle": "Trade #{number}",
         "paymentSubtitle": "Payment #{id}",
@@ -6810,7 +7021,8 @@
           "note": "Reconciliation Note",
           "notePlaceholder": "Describe the reconciliation result and verification source",
           "confirm": "Save Reconciliation",
-          "resolved": "Refund reconciliation saved"
+          "resolved": "Refund reconciliation saved",
+          "outcomeUnknown": "The refund outcome is not confirmed yet. Do not retry; check it on the Refund Reconciliation screen."
         },
         "status": {
           "pending": "Pending",
@@ -7012,7 +7224,49 @@
         },
         "filterDue": "Due date",
         "filterAllDue": "All",
-        "filterOverdueOnly": "Overdue"
+        "filterOverdueOnly": "Overdue",
+        "resolution": {
+          "transId": "Transaction ID (PayTR)",
+          "failureReason": "Reason",
+          "paytrMessage": "PayTR message",
+          "submittedTotal": "Total sent to PayTR",
+          "breakdownTitle": "Transfer total breakdown",
+          "breakdownNet": "Net to the seller",
+          "breakdownOwnAllowed": "Order or trade share (after refunds)",
+          "breakdownOidRemaining": "Left on the payment (PayTR)",
+          "breakdownAllowedTotal": "Highest total that can be sent",
+          "breakdownMissingInput": "No {input, select, payment {payment} other {order or trade}} record was found to cap the total. This is a data problem: fix the link and retry the transfer; do not pay it outside PayTR.",
+          "manualSettlementTitle": "Marked as paid manually",
+          "manualSettlementShort": "Manual: {method}",
+          "settledAt": "Marked on",
+          "reference": "Reference",
+          "platformFunded": "Escrow added by the platform",
+          "method": {
+            "paytr_confirmed": "Confirmed in the PayTR panel",
+            "external_bank": "Paid from the company bank account"
+          },
+          "retryTitle": "Retry the transfer",
+          "retryUnknownWarning": "The PayTR outcome of this transfer is unknown: PayTR may have paid the seller already. Before retrying, check in the PayTR panel that no transfer with this transaction ID exists. If it is there, do not retry; record it with \"Mark as paid\".",
+          "retryRecomputeNote": "The transfer is queued again; the net and the total are recomputed before it is sent.",
+          "confirmProviderChecked": "I checked the PayTR panel",
+          "confirmProviderCheckedRequired": "Confirm that you checked the PayTR panel to retry.",
+          "reasonPlaceholder": "Write why you take this action",
+          "markPaid": "Mark as paid",
+          "markPaidMethod": "Method",
+          "markPaidHelp": {
+            "paytr_confirmed": "You saw the transfer with this transaction ID in the PayTR panel: the money reached the seller through PayTR. The record is marked completed; nothing else is paid.",
+            "external_bank": "This amount cannot be sent through PayTR: too little is left on the payment. The platform pays the net itself from the company bank account to the seller's IBAN. Marking it does not send any money: make the bank transfer first, then enter the bank's transaction reference. The platform covers what the order's escrow no longer holds, and the ledger records it."
+          },
+          "markPaidNet": "Net paid to the seller",
+          "markPaidReference": {
+            "paytr_confirmed": "Reference in the PayTR panel",
+            "external_bank": "Bank transaction reference (receipt no)"
+          },
+          "markPaidTypedConfirm": "Type the net amount to confirm ({amount})",
+          "markPaidTypedMismatch": "The amount you typed does not match the net.",
+          "markedPaid": "Transfer marked as paid",
+          "alreadyMarkedPaid": "The transfer was already marked as paid; nothing changed."
+        }
       },
       "tax": {
         "title": "Tax Settings",
@@ -7441,7 +7695,7 @@
           "pspFee": "PayTR fee",
           "netRevenue": "Tarodan net revenue",
           "netTakeRate": "Net take rate (of item price)",
-          "pspRateNote": "The PayTR fee rate comes from System → Settings → Finance.",
+          "pspRateNote": "The PayTR fee rate comes from System > Settings > Finance.",
           "serviceVatOut": "Service VAT (to the state)",
           "commissionRule": "Commission rule",
           "commissionRuleUnnamed": "Unnamed rule",
@@ -7547,7 +7801,7 @@
         "cash": "Cash",
         "paidBy": "Paid by",
         "disputed": "Disputed",
-        "disputedBadge": "⚠️ Disputed",
+        "disputedBadge": "Disputed",
         "resolveDispute": "Resolve Dispute",
         "filterReviewQueue": "Filter review queue",
         "reviewQueueCount": "<value>{count}</value> trades awaiting review",
@@ -8155,8 +8409,8 @@
           "cleanupTaskFailed": "WARNING: Manual cleanup task could not be created: {error}",
           "reference": "Reference",
           "step1": "1) Create shipment:",
-          "ok": "✓ success",
-          "fail": "✗ error",
+          "ok": "success",
+          "fail": "error",
           "step2": "2) Query tracking:",
           "singleEndpointHint": "Single endpoint test with a reference (OzelKargoTakipNo):",
           "refPlaceholder": "Reference (OzelKargoTakipNo)",
@@ -8879,6 +9133,20 @@
           "label": "Require distance sales consent at payment",
           "helper": "When on, a purchase without a recorded distance sales consent is rejected at payment. Older mobile builds that do not send the checkbox will be unable to pay — turn this on once the mobile release that sends it has rolled out."
         }
+      },
+      "security": {
+        "reauth": {
+          "title": "Step-up confirmation",
+          "label": "Require step-up confirmation for account deletion and email change",
+          "helper": "When on, account deletion and email change requests without a step-up confirmation are rejected. Web and mobile builds that do not send it cannot do either; turn this on only after the web release that sends it is live and the minimum supported app version on iOS and Android is at least the first mobile version that sends it. A confirmation that is sent is always checked, even while this is off."
+        }
+      },
+      "boost": {
+        "title": "Boost",
+        "enabled": "Boost sales enabled",
+        "enabledHint": "When off, sellers cannot buy boosts; running boosts continue.",
+        "offerSince": "New-listing offer start",
+        "offerSinceHint": "Sellers see a one-time boost offer for listings created after this date once they go live. Empty turns the offer off."
       }
     },
     "shippingTariffs": {
@@ -8956,6 +9224,7 @@
         "freePriceZero": "The free tier's price must be 0",
         "paidPricePositive": "A paid tier's price must be greater than 0",
         "nonNegativeInt": "Enter a whole number of 0 or more",
+        "savedSearchLimitRange": "Enter a whole number from 0 to {max}",
         "totalListingsRange": "Enter -1 (unlimited) or at least 1"
       },
       "modal": {
@@ -8975,6 +9244,8 @@
         "maxTotalListings": "Total Listings",
         "maxTotalListingsHelper": "-1 = unlimited",
         "maxImagesPerListing": "Images/Listing",
+        "maxSavedSearches": "Saved search limit",
+        "maxSavedSearchesHelper": "0 = saving searches is off",
         "featuredListingSlots": "Featured Listing Slots",
         "commissionDiscount": "Commission Discount (%)",
         "canCreateCollections": "Can Create Collections",
@@ -8988,6 +9259,8 @@
         "totalListings": "Total Listings:",
         "unlimited": "Unlimited",
         "imagesPerListing": "Images/Listing:",
+        "savedSearches": "Saved searches:",
+        "savedSearchesOff": "Off",
         "userCount": "User Count:",
         "collectionsPill": "Collections",
         "tradePill": "Trade"
@@ -9136,7 +9409,7 @@
         "viewAllTrades": "View all trades",
         "noTrades": "No trades yet",
         "counterpartyLabel": "Counterparty:",
-        "tradeOfferSummary": "{a} items ↔ {b} items",
+        "tradeOfferSummary": "{a} items for {b} items",
         "receivedRatingsTitle": "Received Ratings",
         "noReceivedRatings": "No ratings yet",
         "givenRatingsTitle": "Given Ratings",
@@ -9147,7 +9420,39 @@
         "blocksTab": "Blocks",
         "blocksGivenTitle": "Blocked by this user",
         "blocksReceivedTitle": "Blocked this user",
-        "blocksEmpty": "No block records"
+        "blocksEmpty": "No block records",
+        "trust": {
+          "title": "Trust score",
+          "score": "Score",
+          "level": "Level",
+          "notComputed": "Not computed yet",
+          "notEnoughData": "Not enough data",
+          "computedAt": "Last computed",
+          "formulaVersion": "Formula version",
+          "unavailable": "The breakdown is not available for this formula version",
+          "colComponent": "Component",
+          "colWeight": "Weight",
+          "colSubScore": "Sub-score",
+          "colDetail": "Detail",
+          "smoothed": "Smoothed average",
+          "components": {
+            "rating": "Rating",
+            "reliability": "Order reliability",
+            "onTime": "On-time shipping",
+            "volume": "Volume",
+            "tenure": "Account age"
+          },
+          "counts": {
+            "raters": "Raters",
+            "eligibleOrders": "Orders counted",
+            "failures": "Seller-caused cancellations or refunds",
+            "shipped": "Shipped",
+            "late": "Shipped late",
+            "transactions": "Completed transactions",
+            "counterparties": "Distinct counterparties",
+            "tenureDays": "Account age (days)"
+          }
+        }
       },
       "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
       "resendVerification": "Send Activation Email",
@@ -9193,7 +9498,26 @@
         "saved": "Identity details updated."
       },
       "filterIdentityAll": "All",
-      "filterIdentityIncomplete": "Identity incomplete only"
+      "filterIdentityIncomplete": "Identity incomplete only",
+      "signInMethods": {
+        "title": "Sign-in Methods",
+        "password": "Password",
+        "passwordSet": "Set",
+        "passwordNotSet": "Not set",
+        "providers": "Connected accounts",
+        "noProviders": "No connected accounts",
+        "providerEmail": "Provider email",
+        "linkedAt": "Connected on",
+        "loadError": "Sign-in methods could not be loaded",
+        "history": "Sign-in Method History",
+        "historyEmpty": "No sign-in method events for this user",
+        "historyLoadError": "The history could not be loaded",
+        "columnEvent": "Event",
+        "columnProvider": "Provider",
+        "columnSource": "Source",
+        "sourceManual": "From account settings",
+        "sourceLogin": "Automatic at sign-in"
+      }
     },
     "deletedIdentities": {
       "title": "Deleted Account Identities",
@@ -9970,7 +10294,7 @@
         "title": "Forgot Password",
         "instructions": "Enter your account's email address and we'll send you a password reset link.",
         "submit": "Send reset link",
-        "backToLogin": "← Back to login",
+        "backToLogin": "Back to login",
         "sentMessage": "If <strong>{email}</strong> is registered with us, a password reset link has been sent to that address. Check your inbox (and spam folder).",
         "pageDescription": "Reset your account password"
       },
@@ -9992,7 +10316,7 @@
       "title": "Consent Records",
       "description": "Legal consents given by users: who, which document and version, when and from where.",
       "totalCount": "{count} records",
-      "search": "Search member, email, IP, visitor ID or order no…",
+      "search": "Search member, email, IP, visitor ID, order or trade no…",
       "empty": "No consent records",
       "outdatedVersion": "outdated",
       "columns": {
@@ -10020,12 +10344,13 @@
       "sources": {
         "registration": "Registration form",
         "consentPrompt": "Re-consent prompt",
-        "checkout": "Cart checkout",
+        "checkout": "Checkout",
         "payment": "Payment page",
         "cookieBanner": "Cookie banner",
         "accountSettings": "Notification settings",
         "newsletterUnsubscribe": "Newsletter unsubscribe",
         "accountDeletion": "Account deletion",
+        "socialLinkReset": "Unverified account reset on social sign-in",
         "legacyBackfill": "Legacy import"
       },
       "subjects": {
@@ -10058,7 +10383,8 @@
         "userAgent": "Browser (user agent)",
         "cookieCategories": "Cookie categories",
         "checkoutGroup": "Cart no",
-        "order": "Order no"
+        "order": "Order no",
+        "trade": "Trade no"
       }
     },
     "gibReport": {
@@ -10562,7 +10888,7 @@
         "message": "You received an offer of {amount} TL for your product {productTitle}."
       },
       "offerAccepted": {
-        "title": "Your Offer Was Accepted! 🎉",
+        "title": "Your Offer Was Accepted!",
         "message": "Your offer for {productTitle} was accepted. Pay now!"
       },
       "offerRejected": {
@@ -10610,7 +10936,7 @@
         "message": "The offer on {productTitle} was closed because the buyer deleted their account."
       },
       "productApproved": {
-        "title": "Your Listing Is Live! 🎉",
+        "title": "Your Listing Is Live!",
         "message": "Your listing {productTitle} has been approved and published."
       },
       "productRejected": {
@@ -10618,7 +10944,7 @@
         "message": "Your listing {productTitle} was not approved. Reason: {reason}"
       },
       "productSold": {
-        "title": "Your Product Sold! 🎉",
+        "title": "Your Product Sold!",
         "message": "Your product {productTitle} sold for {amount} TL."
       },
       "paymentReceived": {
@@ -10634,7 +10960,7 @@
         "message": "You received a trade offer for your products."
       },
       "tradeAccepted": {
-        "title": "Trade Accepted! 🎉",
+        "title": "Trade Accepted!",
         "message": "Your trade offer was accepted. Please ship your package."
       },
       "tradeRejected": {
@@ -10650,7 +10976,7 @@
         "message": "Your trade package has been shipped. Tracking number: {trackingNumber}"
       },
       "tradeCompleted": {
-        "title": "Trade Completed! 🎉",
+        "title": "Trade Completed!",
         "message": "The trade was completed successfully!"
       },
       "newMessage": {
@@ -10658,7 +10984,7 @@
         "message": "{senderName}: {messagePreview}"
       },
       "priceDrop": {
-        "title": "Price Drop! 🔥",
+        "title": "Price Drop!",
         "message": "The price of {productTitle} dropped from {oldPrice} TL to {newPrice} TL!"
       },
       "userBlockedAdmin": {
@@ -10670,7 +10996,7 @@
         "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
       },
       "wishlistItemSold": {
-        "title": "You Missed It! 😢",
+        "title": "You Missed It!",
         "message": "{productTitle}, which you added to your favorites, has been sold."
       },
       "backInStock": {
@@ -10690,11 +11016,11 @@
         "message": "{userName} liked your collection."
       },
       "productLiked": {
-        "title": "Your Product Was Liked ❤️",
+        "title": "Your Product Was Liked",
         "message": "{userName} added your product {productTitle} to their favorites."
       },
       "wishlistSold": {
-        "title": "Your Favorite Product Sold 😢",
+        "title": "Your Favorite Product Sold",
         "message": "{productTitle}, which you added to your favorites, has been sold."
       },
       "reviewReceived": {
@@ -10714,7 +11040,7 @@
         "message": "Auto-renewal for your {tierName} membership has been turned off: our payment setup changed and your saved card can no longer be used for renewals. Your membership stays active until the end of the period; save your card when you renew and auto-renewal switches back on."
       },
       "membershipUpgraded": {
-        "title": "Your Membership Was Upgraded! 🎉",
+        "title": "Your Membership Was Upgraded!",
         "message": "Welcome to {tierName} membership! Your new benefits are active."
       },
       "listingExpiring": {
@@ -10726,19 +11052,19 @@
         "message": "Your listing {productTitle} has ended. Republish it."
       },
       "listingViewsMilestone": {
-        "title": "Congratulations! 🎉",
+        "title": "Congratulations!",
         "message": "Your listing {productTitle} reached {viewCount} views!"
       },
       "promotion": {
-        "title": "🎁 Special Campaign",
+        "title": "Special Campaign",
         "message": "{promotionTitle}"
       },
       "specialOffer": {
-        "title": "💎 Special Offer",
+        "title": "Special Offer",
         "message": "{offerDescription}"
       },
       "welcome": {
-        "title": "Welcome to Tarodan! 🎉",
+        "title": "Welcome to Tarodan!",
         "message": "Welcome to the diecast model car collectors' platform."
       },
       "passwordReset": {
@@ -10750,15 +11076,19 @@
         "message": "Click the link to verify your email."
       },
       "systemAnnouncement": {
-        "title": "📢 Announcement",
+        "title": "Announcement",
         "message": "{announcement}"
       },
       "boostExpired": {
-        "title": "🚀 Boost period ended",
-        "message": "The boost for \"{productTitle}\" has ended. You can boost your listing again anytime."
+        "title": "Boost period ended",
+        "message": "The feature period for \"{productTitle}\" has ended."
+      },
+      "boostEndingSoon": {
+        "title": "Feature period ending soon",
+        "message": "The feature period for \"{productTitle}\" ends within 24 hours."
       },
       "boostActivated": {
-        "title": "🚀 Boost Active",
+        "title": "Boost Active",
         "message": "The boost for \"{productTitle}\" has started. Your listing now ranks at the top of lists."
       },
       "tradeAutoCancelled": {
@@ -10878,7 +11208,7 @@
         "message": "Refund request {refundNumber} was approved automatically because it was not answered within 48 hours."
       },
       "sellerApplicationApproved": {
-        "title": "Your Business Application Was Approved! 🎉",
+        "title": "Your Business Application Was Approved!",
         "message": "Your business account application has been approved. You can now list products as a seller."
       },
       "sellerApplicationRejected": {
@@ -10944,6 +11274,17 @@
       "tradeDisputeResolved": {
         "title": "Trade Dispute Resolved",
         "message": "The Tarodan team resolved the trade dispute and the trade has been completed."
+      },
+      "boostGranted": {
+        "title": "Feature added",
+        "message": "Tarodan featured \"{productTitle}\" for {days, plural, one {# day} other {# days}} at no cost."
+      },
+      "boostCancelled": {
+        "title": "Feature stopped",
+        "message": "Tarodan stopped the feature for \"{productTitle}\"."
+      },
+      "boostRefunded": {
+        "message": "The feature for \"{productTitle}\" was stopped and {amount} TL was refunded. It can take a few days to reach your card, depending on your bank."
       }
     },
     "auth": {
@@ -10951,6 +11292,7 @@
       "accountDeleted": "Account has been deleted",
       "accountSuspended": "Your account has been suspended",
       "staffAccountCustomerLogin": "Staff accounts cannot sign in to the web or mobile app; use the admin panel",
+      "socialTwoFactorPasswordRequired": "Accounts with two-factor authentication must sign in with their password, not with a provider",
       "adminAccountDeactivated": "Admin account has been deactivated",
       "adminAccountNotFoundOrInactive": "Admin account not found or inactive",
       "adminAuthRequired": "Admin authorization is required",
@@ -11021,7 +11363,17 @@
       "invitationInvalid": "The invitation link is invalid or has expired.",
       "usernameInvalid": "Invalid username.",
       "usernameAlreadyTaken": "This username has already been taken.",
-      "sessionNotCreated": "The session could not be created securely"
+      "sessionNotCreated": "The session could not be created securely",
+      "reauthRequired": "Please confirm it's you to continue.",
+      "reauthFailed": "We could not confirm it's you. Please try again.",
+      "reauthMethodNotAllowed": "Confirm with your password.",
+      "reauthLocked": "Too many attempts. Please try again in a few minutes.",
+      "reauthUnavailable": "We can't confirm it's you right now. Please try again in a few minutes.",
+      "passwordAlreadySet": "This account already has a password.",
+      "providerAlreadyLinked": "This sign-in method is already connected.",
+      "providerLinkedToOtherAccount": "This Google or Apple account is connected to another Tarodan account.",
+      "providerNotLinked": "This sign-in method is not connected to your account.",
+      "lastSignInMethod": "Your account must keep a password or a connected Google account. Set a password first."
     },
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",
@@ -11051,7 +11403,9 @@
       "productNoLongerActive": "The product is no longer for sale",
       "productNotActive": "This product is not currently for sale",
       "productNotFound": "Product not found",
-      "productOutOfStock": "The product is out of stock or does not have enough available quantity"
+      "productOutOfStock": "The product is out of stock or does not have enough available quantity",
+      "offerMustBeBelowPrice": "The offer must be lower than the product price",
+      "priceChangedSinceOffer": "The offer cannot be accepted because the listing price dropped to {price} TL after it was made. A new offer can be made based on the current price."
     },
     "trade": {
       "addressNotFound": "Address not found",
@@ -11081,7 +11435,7 @@
       "membershipRequiredForCounter": "A Basic or higher membership is required to send a counter-offer. Please renew your membership.",
       "receiverCannotTrade": "The other party's membership does not allow trading; a trade offer cannot be sent for this listing right now.",
       "noShipmentToConfirm": "No shipment found to confirm",
-      "noShippingAddress": "Add a delivery address for the trade. You can add an address via Profile → My Addresses.",
+      "noShippingAddress": "Add a delivery address for the trade. You can add an address via Profile > My Addresses.",
       "notAuthorizedForAction": "You are not authorized to perform this trade action",
       "notAuthorizedToCancel": "You are not authorized to cancel this trade",
       "notAuthorizedToView": "You are not authorized to view this trade",
@@ -11098,7 +11452,8 @@
       "shipmentAlreadyConfirmed": "This shipment has already been confirmed",
       "someItemsNotOwnedOrInactive": "Some products do not belong to you or are not active",
       "tradeNotInDisputeStatus": "The trade is not in dispute status",
-      "platformCancelledReason": "Cancelled by Tarodan: {reason}"
+      "platformCancelledReason": "Cancelled by Tarodan: {reason}",
+      "invalidCashAmount": "The cash difference can have at most two decimal places and cannot exceed {max, number} TL."
     },
     "order": {
       "accountBanned": "Your account is banned. You cannot create new orders.",
@@ -11185,9 +11540,9 @@
       "cartPaymentDescriptionCount": "Cart payment ({count} items)",
       "cashPaymentRecordNotFound": "Cash payment record not found",
       "completedPaymentNotFound": "No completed payment was found",
-      "connectionError": "PayTR connection error, please try again.",
+      "connectionError": "Could not reach the payment provider, please try again.",
       "cvvRequiredForCard": "A CVV is required for this card",
-      "directApiNotAuthorized": "PayTR card payment could not be verified for this store (Direct API authorization may be required).",
+      "directApiNotAuthorized": "The card payment could not be verified for this store.",
       "groupOrderItemNotAwaitingPayment": "The \"{item}\" order in the group is not awaiting payment. Please recreate the cart.",
       "groupOrderNotAwaitingPayment": "An order in the group is not awaiting payment. Please recreate the cart.",
       "holdNotReleasable": "No releasable payment was found (it may be frozen due to an open refund)",
@@ -11201,13 +11556,13 @@
       "holdResidualNotSettleable": "This payment has no seller-fault remainder to settle (it is not held, is frozen by a refund, its order is not closed, the seller was not at fault or nothing is left)",
       "installmentInfoFetchFailed": "Installment information could not be fetched",
       "installmentInfoUnavailable": "Installment information could not be retrieved",
-      "installmentResponseInvalid": "The PayTR installment response is invalid or empty",
+      "installmentResponseInvalid": "The installment response is invalid or empty",
       "loginRequired": "You need to log in",
       "loginRequiredForOrder": "You need to log in for this order",
       "loginRequiredForPayment": "You need to log in for this payment",
       "loginRequiredForSavedCard": "You need to log in to pay with a saved card",
-      "noResponse": "PayTR did not respond (HTTP {httpStatus}).",
-      "notConfigured": "PayTR is not configured (merchant credentials are missing)",
+      "noResponse": "The payment provider did not respond (HTTP {httpStatus}).",
+      "notConfigured": "The payment provider is not configured",
       "onlyDesignatedPayerCanInitiate": "Only the designated paying party can start this payment",
       "onlyFailedPaymentsRetryable": "Only failed payments can be retried",
       "onlyPendingPaymentsCancelable": "Only pending payments can be cancelled",
@@ -11225,18 +11580,18 @@
       "paymentBelongsToGroupRestart": "This payment belongs to an order group. Please restart the payment using the order group.",
       "paymentCurrentlyProcessing": "This payment is currently being processed. Please wait a few seconds and try again.",
       "paymentNotFound": "Payment not found",
-      "paymentNotYetSynced": "The payment has just completed and PayTR has not fully synced the transaction yet. Please try again in 1-2 minutes.",
-      "paymentRejected": "PayTR rejected the payment",
+      "paymentNotYetSynced": "The payment has just completed and is not fully synced yet. Please try again in 1-2 minutes.",
+      "paymentRejected": "The payment was rejected",
       "paymentTargetRequired": "orderId, checkoutGroupId or tradeId is required.",
       "paymentWindowExpired": "The payment window has expired. Please create a new order.",
-      "paytrRefundFailed": "The PayTR refund transaction failed",
+      "paytrRefundFailed": "The refund failed",
       "productFallbackTitle": "Product",
       "productNoLongerAvailable": "The product is no longer for sale or was sold to another buyer. Please create a new order from the listings page.",
       "refundAmountExceedsLimit": "The refund amount ({amountToRefund} TL) exceeds the allowed limit ({refundCap} TL)",
-      "refundError": "PayTR refund error",
-      "refundFailed": "PayTR refund failed",
+      "refundError": "Refund error",
+      "refundFailed": "Refund failed",
       "refundInitiationFailed": "The refund could not be started (temporary error). Please try again.",
-      "refundResponseInvalid": "The PayTR refund response is invalid or empty",
+      "refundResponseInvalid": "The refund response is invalid or empty",
       "retryForbidden": "You do not have permission to retry this payment",
       "savedCardNotFound": "Saved card not found",
       "savedCardPaymentUnavailable": "Paying with a saved card is currently unavailable. Please enter your card details.",
@@ -11247,7 +11602,7 @@
       "tradeNotAcceptedOrInvalidStatus": "The trade has not been accepted yet or is not in an eligible status",
       "tradeNotFound": "Trade not found",
       "transferAlreadyStarted": "A transfer has already been started; a refund cannot be made",
-      "unexpectedResponse": "PayTR returned an unexpected response; please check your card details.",
+      "unexpectedResponse": "The payment provider returned an unexpected response; please check your card details.",
       "unknownProvider": "Unknown payment provider: {provider}",
       "viewPaymentForbidden": "You do not have permission to view this payment",
       "viewStatusForbidden": "You do not have permission to view this payment status",
@@ -11280,7 +11635,6 @@
       "imageLimitExceeded": "With your membership ({tierName}) you can upload up to {maxImages} images per listing. You sent {sentCount} images.",
       "imageNotAppropriate": "The image you uploaded is not appropriate. Please upload a suitable product image.",
       "insufficientStock": "This product is out of stock (available={available}, requested={requested})",
-      "invalidBoostDuration": "Please select a valid boost duration (3, 7, or 30 days)",
       "invalidBrandModelManufacturer": "The selected brand, model, or manufacturer is invalid. Please select again from the list.",
       "invalidCategory": "Invalid category",
       "invalidIdFormat": "Invalid product ID format",
@@ -11306,6 +11660,9 @@
       "userNotFound": "User not found",
       "viewForbidden": "You do not have permission to view this product",
       "boostPackageNotFound": "The selected package was not found or is inactive",
+      "boostConsentRequired": "The pre-contract information and the withdrawal waiver must be accepted",
+      "boostPriceChanged": "The boost price has changed. Check the new price and accept again.",
+      "boostReminderPremiumOnly": "Reminders are for Premium members only",
       "duplicateImage": "The same image was submitted more than once",
       "imageNotOwned": "One of the images does not come from an upload belonging to this account. Please upload the images again.",
       "imageKeyEmpty": "The image key cannot be empty",
@@ -11466,6 +11823,7 @@
     "commission": {
       "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",
       "sellerSalesSuspended": "This product cannot be purchased because the seller's corporate membership is not active.",
+      "categoryRequired": "Select a category to see the commission preview.",
       "pricingChanged": "Commission terms have changed. Please refresh your cart and confirm the new amount."
     },
     "admin": {
@@ -11616,7 +11974,11 @@
         "documentsNotApproved": "The account cannot be activated until every current document is approved"
       },
       "review": {
-        "notFound": "User review not found"
+        "notFound": "User review not found",
+        "reasonRequired": "Enter a reason for hiding (at least {min} characters).",
+        "reasonTooLong": "The reason can be at most {max} characters.",
+        "statusChanged": "The review's status just changed; refresh the page and try again.",
+        "deletedNotModeratable": "A review its author deleted cannot be shown again or hidden."
       },
       "tax": {
         "regionNotFound": "Tax region not found",
@@ -11638,7 +12000,9 @@
         "pauseActiveOnly": "Only an active package that is still running can be paused",
         "resumePausedOnly": "Only a paused package can be resumed",
         "extendActiveOrPausedOnly": "Only an active or paused package can be extended",
-        "extensionRange": "The extension must be between 1 and 365 days"
+        "extensionRange": "The extension must be between 1 and 365 days",
+        "slugTaken": "A package with this slug already exists",
+        "tierOverlap": "The price ranges for the {durationDays}-day duration overlap: {firstMin, number} TL - {firstMax, select, none {no upper limit} other {{firstMax, number} TL}} and {secondMin, number} TL - {secondMax, select, none {no upper limit} other {{secondMax, number} TL}}. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap."
       },
       "fileMissing": "No file was sent",
       "commission": {
@@ -11692,11 +12056,21 @@
         "refundAttemptNotFound": "Refund attempt not found",
         "resolveManualReviewOnly": "Only refund attempts awaiting manual review can be resolved",
         "cancelCompleted": "A completed payment cannot be cancelled; issue a refund instead",
-        "escrowReasonRequired": "A reason is required to release escrow"
+        "escrowReasonRequired": "A reason is required to release escrow",
+        "boostRefundUseBoostScreen": "Refund boost payments from the Boost purchases screen"
       },
       "payout": {
         "transferNotFound": "Payout transfer not found",
-        "retryStateInvalid": "A transfer in the '{status}' state cannot be retried"
+        "retryStateInvalid": "A transfer in the {status} state cannot be retried.",
+        "providerCheckRequired": "The PayTR outcome of this transfer is unknown. Before retrying, confirm in the PayTR panel that no transfer with this transaction ID exists, and give a reason.",
+        "transferStateChanged": "The transfer changed in the meantime. Reload the list and check it again.",
+        "referenceRequired": "A payment reference is required.",
+        "reasonRequired": "A reason is required for this action.",
+        "markPaidNotAllowed": "This transfer cannot be marked as paid with this method (status: {status}, reason: {reason}).",
+        "markPaidMissingInput": "This transfer is missing its payment or order link. This is a data problem: fix the link and retry the transfer; do not pay it outside PayTR.",
+        "markPaidAmountChanged": "The net to pay has changed; the current amount is {current} TL. Reload the list and check the amount.",
+        "markPaidPayoutBlocked": "This payout cannot be made right now ({reason}). Retry the transfer so the amount and conditions are recomputed.",
+        "markPaidProviderCheckRequired": "An earlier send of this transfer was never confirmed by PayTR. Before paying it from the bank, confirm in the PayTR panel that no transfer with this transaction ID exists."
       },
       "product": {
         "approvePendingOnly": "Only pending products can be approved",
@@ -11783,13 +12157,20 @@
         "aboveMax": "The duration can be at most {max}.",
         "actionNotAllowed": "This action is not defined for this duration.",
         "actionUnavailable": "This action is not available yet.",
-        "useDedicatedEndpoint": "This setting is managed on System → Durations & Rules.",
+        "useDedicatedEndpoint": "This setting is managed on System > Durations & Rules.",
         "invariant": {
           "dropoffHardNotBelowDropoff": "The hard close for a return parcel cannot be shorter than the drop-off window.",
           "listingWarningBeforeTtl": "The listing expiry warning must come before the listing lifetime ends.",
           "preparingWarningBeforeDeadline": "The seller preparation warning (hours) must be shorter than the seller preparation time (days × 24 hours)."
         },
         "conflict": "Another admin changed the durations at the same time. Reload the page and try again."
+      },
+      "boost": {
+        "refundNotAllowed": "This boost cannot be refunded",
+        "refundAmountInvalid": "The refund amount must be above 0 and at most the refundable amount ({max})",
+        "revokeGrantOnly": "Only free grants can be cancelled without a refund",
+        "grantListingNotActive": "A boost can only be granted to a live listing",
+        "stopActiveOrPausedOnly": "Only an active or paused boost can be stopped"
       }
     },
     "advertisement": {
@@ -11810,7 +12191,7 @@
       "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
       "maxLiveSlides": "At most {max} slides can be live at the same time in a placement on one platform",
       "reorderMixedPlacement": "Only slides of the same placement can be reordered together",
-      "useDedicatedEndpoint": "This setting is managed on Marketing → Hero."
+      "useDedicatedEndpoint": "This setting is managed on Marketing > Hero."
     },
     "brand": {
       "notFound": "Brand not found"
@@ -11915,6 +12296,12 @@
       "notFound": "Wishlist not found",
       "itemNotFound": "The product is not in your wishlist"
     },
+    "savedSearch": {
+      "limitReached": "You have reached your saved-search limit ({limit} searches).",
+      "alreadySaved": "This search is already saved.",
+      "emptyQuery": "Search or pick a filter before saving.",
+      "notFound": "Saved search not found."
+    },
     "dev": {
       "userMissing": "No such user: {email}"
     },
@@ -11958,7 +12345,7 @@
     "rating": {
       "rateSelf": "You cannot rate yourself",
       "orderOrTradeRequired": "An order or trade ID is required",
-      "membershipOrder": "Membership orders cannot be reviewed",
+      "membershipOrder": "Digital service orders cannot be rated",
       "deliveredOnly": "Only delivered orders can be rated",
       "orderForbidden": "You are not allowed to rate this order",
       "invalidRecipient": "Invalid recipient",
@@ -12281,7 +12668,7 @@
       },
       "tradeRefundCompleted": {
         "title": "Refund Completed",
-        "message": "Your cash difference payment was refunded via PayTR."
+        "message": "Your cash difference payment was refunded to your card."
       },
       "reservationExpired": {
         "title": "Order Timed Out",
@@ -12470,6 +12857,21 @@
       "failed": "Failed",
       "returned": "Returned",
       "retry_pending": "Will Retry"
+    },
+    "payoutFailureReason": {
+      "no_bank_account": "No bank account",
+      "invalid_iban_format": "Invalid IBAN format",
+      "bank_details_rejected": "Bank details rejected",
+      "provider_rejected": "Rejected by PayTR",
+      "transfer_total_exceeds_remaining": "Too little left on the payment",
+      "transfer_needs_manual_decision": "Needs a manual decision",
+      "provider_unreachable": "PayTR unreachable",
+      "transfer_outcome_unknown": "PayTR outcome unknown",
+      "order_not_payout_eligible": "Order not eligible for payout",
+      "refund_pending": "Refund in progress",
+      "order_refunded": "Order refunded",
+      "trade_refund_pending": "Trade refund in progress",
+      "fully_refunded": "Fully refunded"
     },
     "subscription": {
       "active": "Active",
@@ -13023,11 +13425,6 @@
         "takipBirakilamadi": "Takip bırakılamadı"
       }
     },
-    "savedSearches": {
-      "savedsearchcard": {
-        "sil": "Sil"
-      }
-    },
     "offers": {
       "types": {
         "hoursGun": "{hours} gün",
@@ -13135,8 +13532,10 @@
         "uyari": "Uyarı"
       },
       "messageticks": {
-        "okundu": "Okundu",
-        "iletildi": "İletildi"
+        "okundu": "Read",
+        "iletildi": "Delivered",
+        "incelemede": "In review",
+        "reddedildi": "Rejected"
       }
     },
     "profile": {

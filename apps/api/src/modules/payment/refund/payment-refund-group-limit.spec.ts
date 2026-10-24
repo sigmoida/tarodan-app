@@ -85,6 +85,7 @@ describe("PaymentRefundService.processRefund — grup ödemesi iade tavanı", ()
       {} as any,
       attempts as any,
       {} as any,
+      {} as any, // boostTimeline (not a boost order)
     );
     return { service, prisma, attempts };
   };

@@ -2,7 +2,9 @@ import type {
   AdminConsentRecordRow,
   AdminCorrectLegalIdentityRequest,
   AdminLegalIdentity,
+  AdminSignInMethodEventList,
   ConsentDocumentStatus,
+  SignInMethods,
 } from "@tarodan/types";
 import { api } from "./client";
 
@@ -22,6 +24,18 @@ export const usersApi = {
     id: string,
     body: AdminCorrectLegalIdentityRequest,
   ) => api.patch<AdminLegalIdentity>(`/admin/users/${id}/legal-identity`, body),
+  /** Password yes or no and the linked providers (`users` permission). */
+  getUserSignInMethods: (id: string) =>
+    api.get<SignInMethods>(`/admin/users/${id}/sign-in-methods`),
+  /** The user's sign-in method events, newest first (no IP, no user agent). */
+  getUserSignInMethodEvents: (
+    id: string,
+    params: { page: number; limit: number },
+  ) =>
+    api.get<AdminSignInMethodEventList>(
+      `/admin/users/${id}/sign-in-methods/events`,
+      { params },
+    ),
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
   banUser: (id: string, reason: string) =>
     api.post(`/admin/users/${id}/ban`, { reason }),

@@ -2,13 +2,9 @@
 
 "use client";
 
-import {
-  StarIcon,
-  ChatBubbleLeftRightIcon,
-  CheckBadgeIcon,
-} from "@heroicons/react/24/outline";
+import { StarIcon, CheckBadgeIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, Select, Spinner } from "@tarodan/ui";
-import { SectionCard } from "@/components/ui";
+import { EmptyState, SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { publicNameOf } from "@/lib/public-name";
@@ -131,17 +127,18 @@ export default function ProductReviews() {
           <Spinner size="lg" color="border-primary-500 border-t-transparent" />
         </div>
       ) : reviews.length === 0 ? (
-        <div className="text-center py-12 bg-surface rounded">
-          <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-subtle" />
-          <p className="text-lg font-medium text-heading mb-2">
-            {reviewFilterScore
+        <EmptyState
+          size="compact"
+          icon={<StarIcon className="h-6 w-6" />}
+          title={
+            reviewFilterScore
               ? t("product.noReviewsWithRating")
-              : t("product.noReviews")}
-          </p>
-          {!reviewFilterScore && (
-            <p className="text-muted">{t("product.beFirstToReview")}</p>
-          )}
-        </div>
+              : t("product.noReviews")
+          }
+          description={
+            reviewFilterScore ? undefined : t("product.beFirstToReview")
+          }
+        />
       ) : (
         <div className="space-y-6">
           {reviews.map((review: any) => (

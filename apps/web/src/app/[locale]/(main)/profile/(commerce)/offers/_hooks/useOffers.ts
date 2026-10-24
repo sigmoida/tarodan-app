@@ -31,6 +31,7 @@ export function useOffers(type: OfferTab, enabled: boolean) {
     offers: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
   };
 }
 

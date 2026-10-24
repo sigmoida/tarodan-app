@@ -5,6 +5,7 @@
 import { userApi, listingsApi, type ListingRemovalPayload } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useWebList } from "@/hooks/useWebResource";
+import { queryKeys } from "@/lib/query/keys";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Listing } from "../_lib/types";
 import { listingFilterParams } from "../_lib/status";
@@ -52,7 +53,11 @@ export function useDeleteListing() {
       return id;
     },
     {
-      invalidates: [RESOURCE, LISTING_RESOURCE],
+      invalidates: [
+        RESOURCE,
+        LISTING_RESOURCE,
+        queryKeys.tradeEligible.resource,
+      ],
       successMessage: t("profile.myListings.ilanSilindi"),
       errorMessage: t("profile.myListings.ilanSilinemedi"),
       onSuccess: () => {
@@ -71,7 +76,11 @@ export function useDeactivateListing() {
       return id;
     },
     {
-      invalidates: [RESOURCE, LISTING_RESOURCE],
+      invalidates: [
+        RESOURCE,
+        LISTING_RESOURCE,
+        queryKeys.tradeEligible.resource,
+      ],
       successMessage: t("profile.myListings.ilanPasifeAlindi"),
       errorMessage: t("profile.myListings.ilanPasifeAlinamadi"),
     },

@@ -22,6 +22,7 @@ import { RefundDecisionService } from "./refund-decision.service";
 import { RefundSchedulerService } from "./jobs/refund-scheduler.service";
 import { RefundScheduledProcessor } from "./jobs/refund-scheduled.processor";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { RefundSellerTrustStatsService } from "./stats/refund-seller-trust-stats.service";
 
 @Module({
   imports: [
@@ -56,7 +57,13 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     RefundDecisionService,
     RefundSchedulerService,
     ...scheduledProcessors(RefundScheduledProcessor),
+    RefundSellerTrustStatsService,
   ],
-  exports: [RefundService, RefundSchedulerService],
+  exports: [
+    RefundService,
+    RefundSchedulerService,
+    // Seller trust batch: seller-fault refunds (seller-trust/jobs).
+    RefundSellerTrustStatsService,
+  ],
 })
 export class RefundModule {}

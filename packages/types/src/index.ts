@@ -30,6 +30,10 @@ export * from "./admin-refund-list";
 // Trade types
 export * from "./trade";
 
+// The ceiling of an agreed amount: offer, counter-offer, trade cash (API, web,
+// mobile)
+export * from "./negotiated-amount";
+
 // Message types
 export * from "./message";
 
@@ -101,11 +105,13 @@ export interface ApiError {
   statusCode: number;
   message: string;
   error?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 // Legal consent records: document keys + current versions (API, web, admin)
 export * from "./legal-consent";
+// On/off platform settings: the one "is it on" rule (API and admin toggles)
+export * from "./platform-setting";
 
 // GIB listing/seller report: row contract + legal-name source catalog (API + admin)
 export * from "./gib-report";
@@ -121,6 +127,9 @@ export * from "./early-release";
 
 // Escrow hold releasability: why a hold cannot be released (API + admin badge)
 export * from "./hold-release";
+
+// Payout transfer failure reason codes (API stores, admin labels)
+export * from "./payout-failure";
 
 // Refund decision per-side totals (API computes, admin refund detail renders)
 export * from "./refund-totals";
@@ -174,3 +183,33 @@ export * from "./hero";
 
 // Password policy (API validators, web schemas and the live requirement list)
 export * from "./password-policy";
+
+// Sign-in methods and step-up: providers, the read model, the reauth token and
+// its error codes (API, web, mobile)
+export * from "./sign-in-methods";
+
+// Seller trust score: formula version, levels, read shapes and the formatter
+// (API, web, admin, mobile)
+export * from "./seller-trust";
+
+// Product search: the GET /products price filter bound (API, web, mobile)
+export * from "./product-search";
+
+// Saved searches: the allow-list, canonical query, default name, route params
+// and error codes (API, web, mobile)
+export * from "./saved-search";
+
+// Listing boost: the boost_enabled rule, offer settings and the options and
+// offers shapes (API, web, admin, mobile)
+export * from "./boost";
+
+// Virtual orders (membership, boost): the kinds, also the `type` query of the
+// PayTR return URLs (API, web)
+export * from "./virtual-order";
+
+// The one action a listing card shows: boost own, add others to cart (web, mobile)
+export * from "./product-card-action";
+
+// URL slugs: the catalog slug rule (Turkish transliteration) and the listing
+// URL `/listings/<slug>-<uuid>`, its build and its parse (API, web, admin, mobile)
+export * from "./slug";

@@ -3,15 +3,29 @@
 import { orderStatusConfig } from "@tarodan/ui";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
-import { timingMessageValues, type PublicTimingPolicy } from "@tarodan/types";
+import {
+  isDigitalOrder,
+  timingMessageValues,
+  type OrderKind,
+  type PublicTimingPolicy,
+} from "@tarodan/types";
 import { addCalendarDays } from "@/lib/timing-policy";
 
 export interface OrderDetail {
   id: string;
   orderNumber: string;
+  /**
+   * What the order sells: a listing or a platform service (membership,
+   * boost). Gate physical-goods UI with `isDigitalOrder`, never by reading
+   * this field or the order number directly.
+   */
+  kind?: OrderKind;
+  /** `platform_service` for a membership or boost order (fallback signal). */
+  origin?: string | null;
+  /** @deprecated True for every platform-service order; read `kind`. */
   isMembership?: boolean;
   status: string;
-  /** 'iptal' (kargo öncesi) | 'iade' (kargo sonrası). 'iptal' ise UI "İade" yerine "İptal" gösterir. */
+  /** 'iptal' (before shipping) | 'iade' (after shipping). With 'iptal' the UI says "cancel", not "refund". */
   cancellationType?: string | null;
   totalAmount: number;
   amount: number;
@@ -219,25 +233,21 @@ export function getCancelMessage(
   }
 }
 
-// Üyelik/dijital siparişler (sanal ürün + platform satıcısı, "MEM-" sipariş no) fiziksel
-// ürün gibi davranmaz: yorum/iade/teslimat adresi/kargo aksiyonları gösterilmez.
-export const isMembershipOrder = (o: OrderDetail): boolean =>
-  o.isMembership ?? o.orderNumber?.startsWith("MEM-") ?? false;
-
 export const REVIEWABLE_STATUSES = ["completed", "delivered"];
 
 // Review-once: a delivered order is reviewable until the buyer has rated the
 // product. After that the CTA is replaced by the read-only "Değerlendirmeni Gör"
-// summary (ReviewSummary) — the product is never re-rated.
+// summary (ReviewSummary) — the product is never re-rated. A digital order
+// (membership, boost) is never rated; the API refuses it too.
 export const canReview = (o: OrderDetail): boolean =>
   o.isBuyer &&
-  !isMembershipOrder(o) &&
+  !isDigitalOrder(o) &&
   REVIEWABLE_STATUSES.includes(o.status) &&
   o.hasProductRating === false;
 
 /** Whether to show the read-only submitted-review summary. */
 export const hasReviewed = (o: OrderDetail): boolean =>
-  o.isBuyer && !isMembershipOrder(o) && o.hasProductRating === true;
+  o.isBuyer && !isDigitalOrder(o) && o.hasProductRating === true;
 
 // Kargo öncesi = iptal (anında geri ödeme), kargo sonrası = iade akışı.
 // shipment yoksa veya yalnızca pending ise henüz kargolanmamış sayılır.
@@ -299,16 +309,17 @@ export const isPastRefundWindow = (
 };
 
 /**
- * Kargo SONRASI iade talep edilebilir mi: alıcı, ödemesi tamamlanmış,
- * kargolanmış/teslim edilmiş, iade penceresi içinde ve aktif iadesi olmayan
- * sipariş. Tek kalem iade butonu ile toplu iade seçimi aynı önkoşulu paylaşır.
+ * Whether a refund can be requested AFTER shipping: the buyer's paid order,
+ * shipped or delivered, inside the return window, with no active refund and
+ * not digital. The single-line refund button and the bulk refund picker share
+ * this precondition.
  */
 export const isOrderReturnable = (
   o: OrderDetail,
   policy: PublicTimingPolicy,
 ): boolean =>
   o.isBuyer &&
-  !isMembershipOrder(o) &&
+  !isDigitalOrder(o) &&
   !!o.payment &&
   o.payment.status === "completed" &&
   o.status !== "cancelled" &&

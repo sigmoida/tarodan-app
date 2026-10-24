@@ -8,6 +8,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { json, urlencoded } from "express";
 import { setupBullBoard } from "./bull-board.setup";
 import { requestIdMiddleware } from "./common/context/request-context";
+import { sentryRequestScopeMiddleware } from "./modules/sentry/sentry-request-scope.middleware";
 import { AppNestLogger } from "./common/logging/nest-logger";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "./common/validators/global-validation-pipe-options";
 import { RouteParamSafetyPipe } from "./common/pipes/route-param-safety.pipe";
@@ -53,6 +54,9 @@ async function bootstrap() {
     // Korelasyon kimliği EN ERKEN kurulur: sonraki tüm middleware/guard/servis
     // logları ve hata kayıtları aynı kimliği taşısın (AsyncLocalStorage).
     app.use(requestIdMiddleware);
+    // One Sentry isolation scope per request: tags, user and breadcrumbs set
+    // while serving it stay on its events and never reach cron events.
+    app.use(sentryRequestScopeMiddleware);
 
     // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks).
     // Limit 50mb → 1mb: JSON/urlencoded gövdeler (API çağrıları + PayTR callback)
@@ -91,6 +95,8 @@ async function bootstrap() {
         "X-Requested-With",
         "X-Payment-Capability",
         "X-CSRF-Token",
+        // Step-up token on sensitive writes (`@RequireReauth`).
+        "X-Reauth-Token",
       ],
     });
 

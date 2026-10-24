@@ -28,10 +28,12 @@ import {
   NoSymbolIcon,
   ArrowRightOnRectangleIcon,
   SparklesIcon,
+  RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { membershipNavLabel } from "@/lib/membership";
+import { MY_BOOSTS_PATH } from "@/lib/paymentKind";
 import { useLocale, useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/authStore";
 import { useProfile } from "../_context/ProfileContext";
@@ -105,6 +107,11 @@ export default function ProfileSidebar({
           icon: ShoppingBagIcon,
           label: t("nav.myListings"),
           href: "/profile/listings",
+        },
+        {
+          icon: RocketLaunchIcon,
+          label: t("nav.myBoosts"),
+          href: MY_BOOSTS_PATH,
         },
         { icon: TagIcon, label: t("order.myOrders"), href: "/profile/orders" },
         {

@@ -4,16 +4,18 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
+import { tlAmountValue } from "@tarodan/shared";
+import { listingPath } from "@tarodan/types";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import { usePriceLimits } from "@/hooks/usePublicSettings";
 import {
   toEditListingValues,
   buildListingUpdatePayload,
   createEmptySaleData,
   priceLimitMessages,
-  saleDataToPayload,
-  salePriceLimitMessage,
+  saleDataError,
   type ListingPriceRules,
   type SaleData,
 } from "@tarodan/listing-form";
@@ -208,11 +210,11 @@ export function useEditListingForm({
         ]
       : [],
   };
-  // İndirimli fiyat da alt sınırın altına inemez; form alanı olmadığı için
-  // şemada değil burada denetlenir (ekran satır içi gösterir, gönderim durur).
-  const salePriceError = salePriceLimitMessage(
+  // Refused discount text and a sale price below the floor block the submit
+  // (not form fields, so checked here; the card shows them inline).
+  const salePriceError = saleDataError(
     saleData,
-    Number(form.watch("price")),
+    tlAmountValue(form.watch("price")),
     priceRulesRef.current,
     PRICE_MESSAGES,
   );
@@ -223,12 +225,13 @@ export function useEditListingForm({
     onMutate: () => setIsLoading(true),
     onSuccess: () => {
       toast.success(t("product.listingUpdated"));
-      queryClient.invalidateQueries({ queryKey: queryKeys.product.detail(id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.listings.all() });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.profileListings.all(),
-      });
-      router.push(`/listings/${id}`);
+      void invalidateListingQueries(queryClient, id);
+      // The bare UUID, not the new title's slug: the server page decides the
+      // canonical URL from its cached product, and the on-demand revalidation
+      // of that cache is fire-and-forget. Pushing the new slug before it lands
+      // would be redirected straight back to the old one; the bare UUID goes
+      // to whatever the server holds and moves on once the cache refreshes.
+      router.push(listingPath({ id }));
     },
     onError: (error: any) =>
       toast.error(error.response?.data?.message || t("product.updateFailed")),

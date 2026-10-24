@@ -1,8 +1,8 @@
-// `Product` is the canonical `@/types/product` shape — the home rails feed it
-// straight into the shared `ProductCard`. Import it from there, not here.
+// `Product` is the canonical `@/types/product` shape; the rail seeds
+// (`HomeRailSeed`, `./rails`) use it. Import it from there, not here.
 
 import type { HeroSlideDto, TrustBadgeDto } from "@tarodan/types";
-import type { Product } from "@/types/product";
+import type { HomeRail, HomeRailSeed } from "./rails";
 
 export interface BrandMarqueeItem {
   id: string;
@@ -75,11 +75,7 @@ export interface FeaturedBusiness {
   }>;
 }
 
-export interface HomePageData {
-  featured: Product[];
-  discounted: Product[];
-  trade: Product[];
-  popular: Product[];
+export interface HomePageData extends Record<HomeRail, HomeRailSeed> {
   topCollections: FeaturedCollector[];
   featuredCollector: FeaturedCollector | null;
   featuredBusiness: FeaturedBusiness | null;

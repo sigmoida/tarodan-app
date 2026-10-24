@@ -6,7 +6,8 @@ import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { yearlyDiscountSchema, YEARLY_DISCOUNT_MAX } from "../_lib/schema";
+import { amountInputValue, amountOrZero } from "@/lib/schemas/amount";
+import { yearlyDiscountSchema } from "../_lib/schema";
 
 /**
  * Yearly discount % editor. Seeded from the server value via RHF's `values`
@@ -22,7 +23,7 @@ export function YearlyDiscountForm({
 }) {
   const t = useTranslations();
   const form = useZodForm(yearlyDiscountSchema(t), {
-    values: { discount: String(value) },
+    values: { discount: amountInputValue(value) },
   });
 
   const save = useAdminMutation(
@@ -59,15 +60,15 @@ export function YearlyDiscountForm({
     >
       <Form
         form={form}
-        onSubmit={(v) => save.mutate(Number(v.discount))}
+        onSubmit={(v) => save.mutate(amountOrZero(v.discount))}
         className="flex items-end gap-4"
       >
+        {/* Text, not type="number" (see `@/lib/schemas/amount`). */}
         <FormInput
           name="discount"
-          type="number"
-          step="0.1"
-          min="0"
-          max={YEARLY_DISCOUNT_MAX}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           label={t("admin.tiers.yearlyDiscount.label")}
           placeholder="10"
           className="w-48"

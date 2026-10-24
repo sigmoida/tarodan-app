@@ -1,9 +1,10 @@
 "use client";
 
+import { NoSymbolIcon } from "@heroicons/react/24/outline";
 import { Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useBlockUser } from "@/hooks/useBlockUser";
@@ -37,7 +38,8 @@ export default function BlockedUsersPage() {
           <Spinner size="xl" />
         </div>
       ) : blocked.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={<NoSymbolIcon className="h-7 w-7" />}
           title={t("profile.blockedPage.empty")}
           description={t("profile.blockedPage.emptyDesc")}
         />

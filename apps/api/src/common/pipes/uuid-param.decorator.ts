@@ -1,23 +1,29 @@
 import { BadRequestException, Param, ParseUUIDPipe } from "@nestjs/common";
+import { type MessageKey } from "@tarodan/i18n";
 import { i18nMessage } from "../../modules/i18n";
 
 /**
- * UUID yol parametresi — biçimsiz id 400 (`server.common.invalidId`).
+ * UUID route param: a malformed id is a 400 carrying a catalog key
+ * (`server.common.invalidId` unless the route passes its own).
  *
- * `@Param("id", ParseUUIDPipe)` ile aynı denetim (her UUID sürümü kabul;
- * deterministik seed id'leri v4 olmayabilir), mesaj ise katalogdan gelir.
- * Yalnız kimliği HER ZAMAN `@default(uuid())` olan varlıklarda kullanılır;
- * seed'le metin id alan satırlar (vergi kuralı, içerik filtresi …) ya da
- * slug/numara da kabul eden uçlar bunu KULLANMAZ.
+ * The same check as `@Param("id", ParseUUIDPipe)` (any UUID version: seeded
+ * deterministic ids are not always v4), with the message from the catalog.
+ * Only for entities whose id is ALWAYS `@default(uuid())`; rows seeded with
+ * text ids (tax rule, content filter, ...) and routes that also take a slug or
+ * a number do NOT use it.
  */
-export function UuidParam(name: string): ParameterDecorator {
-  return Param(name, uuidParamPipe());
+export function UuidParam(
+  name: string,
+  i18nKey?: MessageKey,
+): ParameterDecorator {
+  return Param(name, uuidParamPipe(i18nKey));
 }
 
-/** `UuidParam`'ın borusu — testler ve özel bileşimler için. */
-export function uuidParamPipe(): ParseUUIDPipe {
+/** The pipe behind `UuidParam`, for tests and custom compositions. */
+export function uuidParamPipe(
+  i18nKey: MessageKey = "server.common.invalidId",
+): ParseUUIDPipe {
   return new ParseUUIDPipe({
-    exceptionFactory: () =>
-      new BadRequestException(i18nMessage("server.common.invalidId")),
+    exceptionFactory: () => new BadRequestException(i18nMessage(i18nKey)),
   });
 }

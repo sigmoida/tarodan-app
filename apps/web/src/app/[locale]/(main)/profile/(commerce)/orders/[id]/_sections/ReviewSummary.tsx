@@ -25,6 +25,13 @@ function Stars({ score }: { score: number }) {
   );
 }
 
+/** Shown while an admin has taken the review off the public pages; the author
+ *  still sees the content. */
+function HiddenNote() {
+  const t = useTranslations();
+  return <p className="text-sm text-muted">{t("order.review.hiddenNote")}</p>;
+}
+
 /** Read-only "Değerlendirmeni Gör" — the buyer's submitted product + seller
  *  review, shown once the order has been reviewed (in place of the write CTA). */
 export default function ReviewSummary({ order }: { order: OrderDetail }) {
@@ -49,6 +56,7 @@ export default function ReviewSummary({ order }: { order: OrderDetail }) {
             </span>
             <Stars score={product.score} />
           </div>
+          {product.hidden && <HiddenNote />}
           {product.title && (
             <p className="font-medium text-heading">{product.title}</p>
           )}
@@ -78,6 +86,7 @@ export default function ReviewSummary({ order }: { order: OrderDetail }) {
             </span>
             <Stars score={seller.score} />
           </div>
+          {seller.hidden && <HiddenNote />}
           {seller.comment && (
             <p className="whitespace-pre-line text-sm text-body">
               {seller.comment}

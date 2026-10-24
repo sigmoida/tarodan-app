@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import {
+  MembershipTier,
   MembershipTierType,
+  Prisma,
   SubscriptionStatus,
   ProductStatus,
   OrderStatus,
@@ -12,7 +14,34 @@ import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { i18nMessage } from "../i18n";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
-import { isPremiumEntitled } from "./helpers/membership.util";
+import {
+  isPremiumEntitled,
+  type BusinessEntitlementOwner,
+  type PremiumCheckMembership,
+} from "./helpers/membership.util";
+
+/**
+ * The tier columns the tier response reads; a full `MembershipTier` row fits.
+ * Prices may arrive as a Prisma `Decimal` (a row) or a number (a fixture).
+ */
+export type MembershipTierRow = Pick<
+  MembershipTier,
+  | "id"
+  | "type"
+  | "name"
+  | "description"
+  | "maxFreeListings"
+  | "maxTotalListings"
+  | "maxImagesPerListing"
+  | "canCreateCollections"
+  | "canTrade"
+  | "isActive"
+  | "maxSavedSearches"
+> & {
+  monthlyPrice: Prisma.Decimal | number;
+  yearlyPrice: Prisma.Decimal | number;
+  isAdFree?: boolean | null;
+};
 
 /**
  * MembershipCommonService — üyelik alt-servislerinin paylaştığı çekirdek okuma/
@@ -168,21 +197,10 @@ export class MembershipCommonService {
       }
     }
 
-    let effectiveTier = { ...membership.tier };
-    if (
-      membership.tier.type !== MembershipTierType.free &&
-      !isPremiumEntitled(membership, entitlementOwner)
-    ) {
-      const freeTier = await this.prisma.membershipTier.findUnique({
-        where: { type: MembershipTierType.free },
-      });
-      if (!freeTier) {
-        throw new NotFoundException(
-          i18nMessage("server.membership.freeTierNotFound"),
-        );
-      }
-      effectiveTier = { ...freeTier };
-    }
+    const effectiveTier = await this.effectiveTierOf(
+      membership,
+      entitlementOwner,
+    );
 
     const pendingIntent = await this.prisma.membershipPayment.findFirst({
       where: {
@@ -274,24 +292,80 @@ export class MembershipCommonService {
     };
   }
 
-  mapTierToDto(tier: any): MembershipTierResponseDto {
+  /**
+   * The tier whose features apply: the subscribed tier while it is entitled
+   * (`isPremiumEntitled`), else the free tier. The one rule for every gate.
+   */
+  private async effectiveTierOf(
+    membership: PremiumCheckMembership & { tier: MembershipTier },
+    owner: BusinessEntitlementOwner | null,
+  ): Promise<MembershipTier> {
+    if (
+      membership.tier.type === MembershipTierType.free ||
+      isPremiumEntitled(membership, owner)
+    ) {
+      return { ...membership.tier };
+    }
+    return this.freeTier();
+  }
+
+  private async freeTier(): Promise<MembershipTier> {
+    const freeTier = await this.prisma.membershipTier.findUnique({
+      where: { type: MembershipTierType.free },
+    });
+    if (!freeTier) {
+      throw new NotFoundException(
+        i18nMessage("server.membership.freeTierNotFound"),
+      );
+    }
+    return freeTier;
+  }
+
+  /**
+   * The effective tier without the read side effects of `getUserMembership`
+   * (no free-membership create, no past-due self-heal with its provider
+   * call, no usage counts), for a gate that needs one tier value on a write
+   * path. No membership row means the free tier, as `getUserMembership`
+   * would create; a past-due membership stays on free until it heals there.
+   */
+  async getEffectiveTier(userId: string): Promise<MembershipTier> {
+    const [owner, membership] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { businessStatus: true, companyName: true, taxId: true },
+      }),
+      this.prisma.userMembership.findUnique({
+        where: { userId },
+        include: { tier: true },
+      }),
+    ]);
+    if (!owner) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    return membership
+      ? this.effectiveTierOf(membership, owner)
+      : this.freeTier();
+  }
+
+  mapTierToDto(tier: MembershipTierRow): MembershipTierResponseDto {
     return {
       id: tier.id,
       type: tier.type,
       name: tier.name,
       description: tier.description || undefined,
-      monthlyPrice: parseFloat(tier.monthlyPrice),
-      yearlyPrice: parseFloat(tier.yearlyPrice),
+      monthlyPrice: Number(tier.monthlyPrice),
+      yearlyPrice: Number(tier.yearlyPrice),
       maxFreeListings: tier.maxFreeListings,
       maxTotalListings: tier.maxTotalListings,
       maxImagesPerListing: tier.maxImagesPerListing,
       canCreateCollections: tier.canCreateCollections,
       canTrade: tier.canTrade,
-      // Reklamsızlık admin'in katman formundaki kutusundan gelir (tek kaynak
-      // MembershipTier.isAdFree); web BannerSlot ve mobil buna uyar.
-      // featuredListingSlots DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı
-      // — vaat edilmez, dönülmez.
+      // Ad-free comes from the box on the admin tier form (single source
+      // MembershipTier.isAdFree); web BannerSlot and mobile follow it.
+      // featuredListingSlots is RETIRED: paid boost packages took over
+      // featuring, so it is neither promised nor returned.
       isAdFree: tier.isAdFree === true,
+      maxSavedSearches: tier.maxSavedSearches,
       isActive: tier.isActive,
     };
   }

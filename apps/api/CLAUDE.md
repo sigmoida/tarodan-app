@@ -155,9 +155,45 @@ shares a process with HTTP.
 - Queue consumers live in `src/workers/`; `*-scheduled.processor.ts` jobs run in
   the worker role. `BullRootModule` loads everywhere (web still enqueues).
 - Every scheduled job is idempotent and re-runnable, registers in
-  `src/workers/cron-catalog.ts` (monitoring and Sentry check-ins), uses a bounded,
+  `src/workers/cron-catalog.ts` (admin jobs page, test tools), uses a bounded,
   **ordered** candidate query, and claims its work so two instances cannot
   double-process. Cron keys are bound to Bull and Sentry: renaming one is an ops step.
+- **Sentry cron monitors** come from a catalog entry's `monitor` (today only
+  `payout-process`; the plan includes one). Only those jobs check in, only
+  on `APP_ENV=production`, one check-in pair per attempt (Bull retries
+  included, Bull Board retries not), with the schedule and time zone of the
+  Bull repeatable. Check-ins and the tracker's bookkeeping never await, throw
+  into or change the job.
+
+## Logging and Sentry
+
+`error` is an alarm and reaches Sentry; `warn` is "watch this" and does not.
+(tarodan-ops: `docs/observability.md`.)
+
+- An `error` log line reaches Sentry **once per repeat-report key per ~20h**,
+  shared through Redis by every process (`common/logging/error-report-key.ts`,
+  `modules/sentry/sentry-report-throttle.ts`); the console logs every
+  occurrence. The key keeps the entity and drops counters and durations, so
+  **name the entity in the message** (UUID, reference code, `id=...`): another
+  entity, or another reason, is reported at once. The message of an `Error`
+  passed to `logger.error(text, err)` counts too (a localized exception by its
+  catalog key). A count-only or truncated summary ("3 unresolved attempts",
+  "+2 more") is one key whatever the count, so a new entity in it waits for
+  the window: log the new entity on its own line. Values in a URL query
+  string are not identifiers. HTTP 5xx captured by `SentryInterceptor` are
+  never throttled, even when the service logged the same error object first.
+- **A failed cron run is an alarm on a state change** (`CronTrackerService`):
+  the first failure, or one that differs from the previous run's (compared by
+  the repeat-report key), logs at `error`; the same failure on the next runs
+  logs at `warn` until the ~20h window has passed, then it is raised again.
+  The first success after a failure logs the recovery. Every run still fails
+  (Bull retry) and, on a monitored job, sends its "error" check-in.
+- **One failure, one alarm in crons.** A per-record failure logs at `warn`
+  and its id goes into the run summary, which is the alarm. A step that
+  throws logs its own `error`; a summary made only of those is
+  `CronStepFailuresError(..., alreadyReported = true)` and the cron tracker
+  logs it at `warn`. A cron that rethrows to the tracker does not also log
+  the same failure at `error`: the tracker reports it with its stack.
 
 ## Configuration
 

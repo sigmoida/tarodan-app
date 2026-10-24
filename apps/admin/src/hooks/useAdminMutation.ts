@@ -3,6 +3,7 @@
 import {
   useMutation,
   useQueryClient,
+  type QueryClient,
   type QueryKey,
   type UseMutationOptions,
 } from "@tanstack/react-query";
@@ -21,8 +22,11 @@ export interface UseAdminMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
-  /** Show the shared error toast on failure. Disable when the caller renders the error inline. */
-  showErrorToast?: boolean;
+  /**
+   * Show the shared error toast on failure. Disable when the caller renders
+   * the error inline; a function decides per error (false = inline).
+   */
+  showErrorToast?: boolean | ((error: unknown) => boolean);
   onSuccess?: (data: TData, vars: TVars) => void;
   /** Immediately patch matching resource caches and restore them if the request fails. */
   optimistic?: {
@@ -39,6 +43,22 @@ export interface UseAdminMutationOptions<TData, TVars> {
 interface AdminMutationContext {
   snapshots: Array<[QueryKey, unknown]>;
   userContext?: unknown;
+}
+
+/**
+ * Refreshes every query of each resource (all lists + details) and its count
+ * queries (`<resource>-count`: tab badges, header summaries).
+ */
+export function invalidateAdminResources(
+  queryClient: QueryClient,
+  resources: readonly string[],
+) {
+  resources.forEach((resource) => {
+    void queryClient.invalidateQueries({ queryKey: adminKeys.all(resource) });
+    void queryClient.invalidateQueries({
+      queryKey: adminKeys.countAll(resource),
+    });
+  });
 }
 
 /** Patch an entity wherever it appears in a cached API payload. */
@@ -121,13 +141,7 @@ export function useAdminMutation<TData, TVars = void>(
       return { snapshots, userContext };
     },
     onSuccess: (data, vars) => {
-      invalidates.forEach((resource) => {
-        queryClient.invalidateQueries({ queryKey: adminKeys.all(resource) });
-        // Sayaçlar ayrı kökte (`<resource>-count`); rozetler de tazelensin.
-        queryClient.invalidateQueries({
-          queryKey: adminKeys.countAll(resource),
-        });
-      });
+      invalidateAdminResources(queryClient, invalidates);
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, vars);
     },
@@ -135,7 +149,11 @@ export function useAdminMutation<TData, TVars = void>(
       context?.snapshots.forEach(([queryKey, cached]) => {
         queryClient.setQueryData(queryKey, cached);
       });
-      if (showErrorToast) toast.error(extractErrorMessage(error, errorMessage));
+      const toastIt =
+        typeof showErrorToast === "function"
+          ? showErrorToast(error)
+          : showErrorToast;
+      if (toastIt) toast.error(extractErrorMessage(error, errorMessage));
     },
     onSettled: (data, error, vars, context, mutationContext) =>
       mutation?.onSettled?.(

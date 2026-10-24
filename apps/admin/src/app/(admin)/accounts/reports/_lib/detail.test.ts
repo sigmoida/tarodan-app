@@ -21,17 +21,17 @@ describe("review reports", () => {
     expect(reportTypeLabels(t).review).toBe("admin.reports.type.review");
   });
 
-  it("review target opens the matching reviews tab", () => {
+  it("review target opens the matching tab on that review", () => {
     expect(
       targetHref(
         report({ target: { id: "rev-1", reviewKind: "seller", score: 1 } }),
       ),
-    ).toBe("/accounts/reviews?tab=seller");
+    ).toBe("/accounts/reviews?tab=seller&id=rev-1");
     expect(
       targetHref(
         report({ target: { id: "rev-1", reviewKind: "product", score: 1 } }),
       ),
-    ).toBe("/accounts/reviews?tab=product");
+    ).toBe("/accounts/reviews?tab=product&id=rev-1");
   });
 
   it("deleted review has no target link", () => {

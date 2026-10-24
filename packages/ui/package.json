@@ -15,11 +15,13 @@
     "./button": "./src/components/Button.tsx",
     "./badge": "./src/components/Badge.tsx",
     "./product-badge": "./src/components/ProductBadge.tsx",
-    "./section-card": "./src/components/SectionCard.tsx"
+    "./section-card": "./src/components/SectionCard.tsx",
+    "./empty-state": "./src/components/EmptyState.tsx"
   },
   "scripts": {
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
@@ -46,10 +48,12 @@
     "@tarodan/tsconfig": "workspace:*",
     "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.18",
+    "jsdom": "^25.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.89.0",
     "typescript": "^5.3.2",
+    "vitest": "^3.2.7",
     "zod": "3.25.76"
   },
   "peerDependencies": {

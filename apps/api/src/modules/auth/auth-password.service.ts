@@ -1,21 +1,36 @@
-import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
+import {
+  SIGN_IN_METHOD_EVENT_FLOWS,
+  SIGN_IN_METHOD_EVENTS,
+  SIGN_IN_METHODS_ERROR_CODES,
+} from "@tarodan/types";
 import { PrismaService } from "../../prisma";
+import { getRequestClientInfo } from "../../common/context/request-context";
 import { NotificationService } from "../notification/notification.service";
 import { SecurityService } from "../security/security.service";
 import { i18nMessage } from "../i18n";
 import { DUMMY_BCRYPT_HASH } from "./utils/timing-pad";
 
+/** bcrypt cost of a new password (reset and set use the same). */
+const PASSWORD_HASH_ROUNDS = 12;
+
 /**
- * Şifre sıfırlama: tek kullanımlık token'ın üretimi, gönderimi ve tüketimi.
- * AuthService'ten birebir taşındı.
+ * Password writes of the auth module: the reset (one-time token: issue, send,
+ * consume) and setting a first password while signed in (`setPassword`).
+ * Changing an existing password stays in `SecurityService.changePassword`.
  *
- * İki uç tek serviste duruyor çünkü aradaki sözleşme yazılı değil, ima
- * edilmiş: token'ın nasıl üretildiği, ne kadar yaşadığı ve tüketildiğinde ne
- * olduğu. Üreten ve tüketen ayrı yerlerde yaşarsa süresi geçmiş ya da bir kez
- * kullanılmış bir token'ın hâlâ kabul edilmesi kimsenin fark etmeyeceği bir
- * sapma olur.
+ * Both ends of the reset live in one service because the contract between
+ * them is implied, not written: how the token is made, how long it lives and
+ * what consuming it does. If issuer and consumer lived apart, an expired or
+ * already used token still being accepted would be a drift nobody notices.
  */
 @Injectable()
 export class AuthPasswordService {
@@ -129,7 +144,7 @@ export class AuthPasswordService {
     }
 
     // Hash new password
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await bcrypt.hash(newPassword, PASSWORD_HASH_ROUNDS);
 
     // Update user password
     await this.prisma.user.update({
@@ -152,5 +167,57 @@ export class AuthPasswordService {
 
     // #224: başarı mesajı AuthController.resetPassword() tarafından locale'e göre
     // kuruluyor (server.auth.passwordResetSuccess).
+  }
+
+  /**
+   * Sets the first password of a signed-in account that has none (a Google
+   * or Apple account). The route requires a step-up (`@RequireReauth`).
+   *
+   * The decision ("no password yet?") and the write run in one transaction
+   * under the user row lock, so two concurrent calls set it once and the
+   * second answers 409. The bcrypt hash is computed before the transaction:
+   * nothing slow runs while the row is locked.
+   *
+   * Sessions stay: the owner just proved it is them, and a password change
+   * does not end other sessions either. The notice mail goes out after
+   * commit and never fails the request.
+   */
+  async setPassword(userId: string, newPassword: string): Promise<void> {
+    const passwordHash = await bcrypt.hash(newPassword, PASSWORD_HASH_ROUNDS);
+    const { ipAddress, userAgent } = getRequestClientInfo();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true, deletedAt: true },
+      });
+      if (!user || user.deletedAt) {
+        throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+      }
+      if (user.passwordHash) {
+        throw new ConflictException({
+          ...i18nMessage("server.auth.passwordAlreadySet"),
+          errorCode: SIGN_IN_METHODS_ERROR_CODES.passwordAlreadySet,
+        });
+      }
+      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+      await tx.securityLog.create({
+        data: {
+          eventType: SIGN_IN_METHOD_EVENTS.passwordSet,
+          severity: "low",
+          userId,
+          ipAddress,
+          userAgent,
+          details: { flow: SIGN_IN_METHOD_EVENT_FLOWS.passwordSet },
+        },
+      });
+    });
+
+    // Fire and forget: the notifier queues the mail and never throws.
+    void this.notificationService.sendAccountSecurityNotice(
+      userId,
+      "passwordSet",
+    );
   }
 }

@@ -3,12 +3,14 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { parseTlAmount } from "@tarodan/shared";
 import { MAX_LISTING_COLORS } from "./constants";
 
 /**
  * Shared building blocks for the new/edit listing form schemas. Numeric fields
  * (`price`, `quantity`, `year`, `bundleSize`) are bound to text/`<select>` inputs
- * as strings and coerced to numbers at submit time.
+ * as strings and coerced to numbers at submit time. `price` is a TL amount read
+ * by the shared `parseTlAmount` ("1.000" is refused, never read as 1).
  */
 
 export const listingFieldMessages = (locale: string) => {
@@ -19,6 +21,7 @@ export const listingFieldMessages = (locale: string) => {
   return {
     required: t("auth.fillRequiredFields"),
     validPrice: t("common.invalidPrice"),
+    amountFormatRefused: t("validation.amountFormatRefused"),
     setSize: t("product.setMinPieces"),
     photo: t("product.addThreePhotos"),
     descriptionLength: t("product.descriptionLength"),
@@ -74,7 +77,18 @@ export function baseListingFields(msg: ListingFieldMessages) {
     price: z
       .string()
       .min(1, msg.required)
-      .refine((v) => !isNaN(Number(v)) && Number(v) >= 1, msg.validPrice),
+      .superRefine((v, ctx) => {
+        if (v === "") return; // `min(1)` already reports it as required.
+        const parsed = parseTlAmount(v);
+        if (parsed.status === "ok" && parsed.amount >= 1) return;
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            parsed.status === "refused"
+              ? msg.amountFormatRefused
+              : msg.validPrice,
+        });
+      }),
   };
 }
 

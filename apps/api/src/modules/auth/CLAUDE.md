@@ -20,10 +20,15 @@ work (Opus) and need tests.
   JwtAuth -> BannedUser. **Default closed**: every route needs a token unless
   it is `@Public()` (which still attempts optional auth).
 - Decorators (`decorators/`): `@Public`, `@AdminRoute`, `@CurrentUser`,
-  `@Roles`, `@RequirePermission`, `@BypassPermissionMatrix`.
+  `@Roles`, `@RequirePermission`, `@RequireAllPermissions`,
+  `@BypassPermissionMatrix`.
 - Admin routes pair `@AdminRoute` with an admin guard (`AdminJwtAuthGuard` +
   `RolesGuard`). `RolesGuard.PERMISSION_MAP` maps `/api/admin/<segment>` to a
   permission and **fails closed** for unmapped segments (`super_admin` passes).
+  The map and `@RequirePermission(key)` accept any one key;
+  `@RequireAllPermissions(a, b)` needs every key (an action of two screens:
+  the boost refund needs `ads` and `payments`). Both decorators replace the
+  map; `@BypassPermissionMatrix` never skips an all-of rule.
   Contract specs: `admin-guard-pairing`, `permission-map-coverage`,
   `roles-guard-url-normalization`. Add a new admin segment to the map.
 - Services own ownership checks ("is this your order?"); access is the
@@ -52,21 +57,122 @@ Sensitive routes add a strict `@Throttle` on top of the global limit (login 5/mi
 is the pattern; forgot-password 3/min; refresh 60/min).
 `guards/critical-route-throttles.spec.ts` pins them; keep it green and add new
 sensitive routes to it. Known gap (hub backlog): the throttler counts by
-`req.ip`, so web BFF traffic shares one bucket.
+`req.ip`, so web BFF traffic shares one bucket. A new strict limit on a route
+the web calls takes `@Throttle(clientIpThrottle(n))`
+(`common/helpers/client-ip.ts`, the real client IP the gateway forwards), as
+the step-up, sign-in method, account deletion and e-mail change routes do;
+the spec pins it with `perClientIp`.
 
 ## 2FA and social login
 
 - 2FA lives in `modules/security/` (TOTP secret encrypted at rest, backup codes
   hashed and consumed by CAS). Social login never bypasses 2FA
   (`TWO_FACTOR_PASSWORD_REQUIRED`).
-- Google and Apple auto-link by verified e-mail, never to a deleted account.
+- `social/social-identity.service.ts` owns every OAuthAccount write for Google
+  and Apple: an existing link wins; else the e-mail is matched
+  case-insensitively (never a deleted row). A verified match is linked and
+  keeps its password and sessions. An unverified match is **taken over** in one
+  transaction: password, refresh and push tokens, pending reset/verify/change
+  and phone codes, 2FA, phone, birth date, legal identity and marketing opt-in
+  are cleared, the consents withdrawn (`social_link_reset`), then linked and
+  verified (SecurityLog `social_link_reset`, Sentry warning). A legacy link to
+  a still-unverified account only loses the password. The e-mail match is
+  `lower(email) = lower($1)`, never Prisma `mode: "insensitive"` (an unescaped
+  ILIKE). Staff and banned matches get nothing written. A lost P2002 race
+  resolves to the winner's link or is retried once. **At most one link per
+  provider** (one Google, one Apple): every writer checks it under the user
+  row lock. A sign-in whose verified e-mail matches an account that already
+  has another identity of the provider opens it (or takes it over) without a
+  second link, writes no `social_linked_auto` row and sends no notice (a
+  Sentry breadcrumb only). SecurityLog: an
+  auto-link is `social_linked_auto`, a take-over or heal `social_link_reset`
+  (`details.source: "login"`).
 - Apple refresh tokens are stored encrypted (`APPLE_TOKEN_ENCRYPTION_KEY`);
-  account deletion enqueues revocation in the deletion transaction (outbox).
+  account deletion and an Apple unlink enqueue revocation in their
+  transaction (outbox).
   Permanent failures go to the DLQ; redrive with
   `maintenance/redrive-apple-token-revocations.ts` (dry run, then `--apply`;
   `docs/OPERATIONS.md`).
 - Admin session timeout is the platform setting `admin_session_timeout_minutes`
   (`security/helpers/admin-session-timeout.ts`).
+
+## Sign-in methods and step-up
+
+- `sign-in-methods/` (`@Controller("auth")`): `GET /auth/sign-in-methods`
+  (`hasPassword` and the linked providers), `POST /auth/reauth` and the
+  writes. Shapes, providers and `errorCode` values come from
+  `packages/types/src/sign-in-methods.ts`; never re-type them.
+- `reauth/`: the step-up. `POST /auth/reauth` takes the password, or, only for
+  an account without one, a sign-in of a linked provider at most 5 minutes
+  old (`iat`); it answers an **opaque** token stored in Redis by its SHA-256,
+  bound to the user, for 5 minutes, reusable within that time. Not a JWT:
+  `JwtStrategy` checks no token type. 5 failed proofs in 15 minutes lock the
+  step-up (`429 REAUTH_LOCKED`, SecurityLog `reauth_failed`/`reauth_locked`,
+  Sentry warning). Attempts are counted before the proof is checked, so
+  parallel requests cannot pass the limit. Redis down fails closed (no proof
+  checked and no token issued: 503; none accepted: 403).
+- A sensitive write takes `@RequireReauth()` (`ReauthGuard`, after the
+  global JWT guard; one guard, one rule in `reauth/reauth-policy.ts`). The
+  token is the body field `reauthToken`; only when the body has none
+  (`undefined`, or no body as on `DELETE`) the `X-Reauth-Token` header.
+  Anything present counts as sent and is checked (an empty string or `null`
+  is refused). Declare `reauthToken` in the DTO when the route has a body.
+  **No step-up problem is a 401**: clients treat 401 as an expired session.
+  Missing or expired token: `403 REAUTH_REQUIRED`; wrong proof:
+  `403 REAUTH_FAILED`.
+- Two policies. `@RequireReauth()`: a token is always required (the sign-in
+  method writes). `@RequireReauth({ required: "setting", flow })`: a token
+  that is sent is always checked, and a request without one is refused only
+  while the platform setting `auth_require_reauth_for_sensitive_actions`
+  (`REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING`, admin Settings >
+  Security, off by default) is on. It covers `DELETE /users/me` and
+  `POST /auth/email/request-change`, which mobile versions without the
+  step-up and web before its step-up release call without a token.
+  **Switch the setting on only after the web release that sends the token is
+  live and `min_supported_app_version_ios` and `_android` are at least the
+  first mobile version that sends it** (the rule lives on the setting
+  constant; the version in tarodan-ops `compat.md`). The setting is
+  read uncached on each such request without a token, so switching it on
+  applies at once; a failed read fails the request. The guard sets the
+  route's `auth.flow` tag (`account_delete`, `email_change`) before it
+  checks, so refusals are traceable. A guard refusal writes no SecurityLog
+  row; failed proofs are logged by `POST /auth/reauth`.
+- Writes decide and write in one transaction under the user row lock
+  (`SELECT ... FOR UPDATE`), log a SecurityLog row, send the T5 account
+  security notice after commit and keep the sessions. `setPassword` lives in
+  `auth-password.service.ts` (409 `passwordAlreadySet` when one exists);
+  changing a password stays in `security/`.
+- The step-up and every write set the Sentry tag `auth.flow` (`reauth`,
+  `password_set`, `provider_link`, `provider_unlink`); a 404/409 refusal is
+  a breadcrumb, not an error. Add new step-up routes to
+  `guards/critical-route-throttles.spec.ts` and
+  `sign-in-methods.controller.spec.ts`. Never log the token or its hash.
+- Link and unlink (`POST /auth/social/{google,apple}/link`,
+  `POST /auth/social/:provider/unlink`) are `SocialIdentityService`'s
+  `linkToUser`/`unlinkFromUser`, the only OAuthAccount writers besides
+  sign-in. A link keys on the provider `sub`; the provider e-mail may differ; an
+  account with an unverified e-mail gets `403 EMAIL_NOT_VERIFIED`.
+  A provider token the provider services refuse (their 401) answers
+  `400 PROVIDER_TOKEN_INVALID`. 409 `PROVIDER_ALREADY_LINKED` (this account
+  has the provider) or `PROVIDER_LINKED_TO_OTHER_ACCOUNT` (never says
+  which; also a lost P2002 race). Unlink keeps the **last-method rule**
+  `canUnlinkProvider` (`@tarodan/types`): a password or a Google link must
+  remain, Apple alone does not count; refused as `409 LAST_SIGN_IN_METHOD`,
+  `404 PROVIDER_NOT_LINKED` for a provider that is not there. An Apple link
+  stores the mobile `authorizationCode` after commit, as login does; a
+  token that lands after an unlink is stored revoke-requested.
+  SecurityLog `social_linked` / `social_unlinked` with `details.source:
+"manual"`. A later sign-in may link an unlinked provider again through
+  the verified e-mail rule (with the notice mail), by design.
+- SecurityLog event names, `details.source` and `details.flow` values come
+  from `SIGN_IN_METHOD_EVENTS`, `SIGN_IN_METHOD_EVENT_SOURCES` and
+  `SIGN_IN_METHOD_EVENT_FLOWS` (`@tarodan/types`); admin labels key on the
+  same constants. Every row carries the user id. A new sign-in method event
+  is added there, or the admin user history
+  (`GET /admin/users/:id/sign-in-methods/events`, `admin/users/sign-in-methods/`)
+  will not list it. That history allow-lists `provider`, `source`, `method`
+  and `flow` by key and value and never reads the IP, user agent or e-mail
+  columns; anything else in `details` stays internal.
 
 ## Registration
 
@@ -95,6 +201,10 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
 - `consent_records` is append-only (DB trigger). Withdrawals are new rows.
 - The `distance_sales_consent_required` setting stays **off** until the mobile
   version in production sends `distanceSalesAccepted`.
+- A boost purchase records `platform_service_sales` and `withdrawal_waiver`
+  with its order (`PlatformServiceConsentService`), closed and without a
+  setting; the card form checks them again. A text legal has not signed off
+  has a `-draft` version, never on an account-required document.
 
 ## Blocking and reports (`modules/user-block/`, `docs/USER_BLOCKING.md`)
 
@@ -109,7 +219,8 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
 `UserProfileService.deleteAccount` (`modules/user/profile/`) blocks on open
 money, archives identity into `DeletedUserIdentity` (admin-only, undeletable)
 before anonymising, frees the national id, and revokes Apple tokens and push
-tokens in the same transaction.
+tokens in the same transaction. `DELETE /users/me` takes the setting-gated
+step-up (see "Sign-in methods and step-up"); the admin deletion path does not.
 
 ## Contract
 

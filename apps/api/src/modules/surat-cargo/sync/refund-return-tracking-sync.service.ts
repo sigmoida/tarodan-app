@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { ModuleRef } from "@nestjs/core";
 import {
   RefundRequestStatus,
@@ -43,6 +44,7 @@ export class RefundReturnTrackingSyncService {
     synced: number;
     pending: number;
     failed: number;
+    failures: string[];
   }> {
     const activeReturns = await this.prisma.refundRequest.findMany({
       where: {
@@ -56,20 +58,23 @@ export class RefundReturnTrackingSyncService {
     let synced = 0;
     let pending = 0;
     let failed = 0;
+    // Same contract as the trade sync: warn per return, ids into the cron
+    // run summary, which is the one alarm.
+    const failures: string[] = [];
     for (const rr of activeReturns) {
       try {
         const result = await this.syncRefundReturnTrackingState(rr.id);
         if (result === "synced") synced++;
         else if (result === "pending") pending++;
         else failed++;
-      } catch (error: any) {
-        this.logger.error(
-          `Failed to sync refund return ${rr.id}: ${error.message}`,
-        );
+      } catch (error: unknown) {
+        const reason = errorMessage(error);
+        this.logger.warn(`Failed to sync refund return ${rr.id}: ${reason}`);
+        failures.push(`${rr.id} (${reason})`);
         failed++;
       }
     }
-    return { synced, pending, failed };
+    return { synced, pending, failed, failures };
   }
 
   async syncRefundReturnTracking(refundRequestId: string): Promise<boolean> {

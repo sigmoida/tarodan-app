@@ -10,7 +10,6 @@ import {
   collectionSharePath,
   copyText,
   favoritesSharePath,
-  listingSharePath,
   openShareWindow,
   resolveShareUrl,
   shouldFallbackToMenu,
@@ -61,10 +60,6 @@ describe("buildShareTargets", () => {
 });
 
 describe("kanonik paylaşım yolları", () => {
-  it("ilan: /listings/:id, locale öneki ve query yok", () => {
-    expect(listingSharePath("abc")).toBe("/listings/abc");
-  });
-
   it("koleksiyon: id ya da slug", () => {
     expect(collectionSharePath("my-slug")).toBe("/collections/my-slug");
   });

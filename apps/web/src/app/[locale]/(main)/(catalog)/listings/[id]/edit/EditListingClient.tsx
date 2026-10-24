@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "@/i18n/navigation";
-import { useParams } from "next/navigation";
+import { listingPath } from "@tarodan/types";
 import { Button, Spinner } from "@tarodan/ui";
 import { Form } from "@tarodan/ui/form";
 import { PageShell } from "@/components/layout/PageShell";
@@ -28,6 +28,7 @@ import {
   ManufacturerAttributesCard,
 } from "@tarodan/listing-form";
 import { useEditListingForm } from "./_hooks/useEditListingForm";
+import { useListingIdParam } from "../_hooks/useListingIdParam";
 import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
 import { withSelectedReference } from "@tarodan/listing-form";
@@ -37,11 +38,10 @@ import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
 const TERMINAL_STATUSES = ["sold", "reserved", "inactive", "deleted"];
 
 export default function EditListingClient() {
-  const params = useParams();
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations();
-  const id = params.id as string;
+  const id = useListingIdParam();
   const { isAuthenticated, isLoading: authLoading, limits } = useAuthStore();
 
   const {
@@ -251,7 +251,7 @@ export default function EditListingClient() {
   return (
     <PageShell>
       <PageHeader
-        backHref={`/listings/${id}`}
+        backHref={listingPath({ id, title: record?.title })}
         backLabel={t("product.backToListing")}
         title={t("product.editListing")}
         description={t("product.editListingDescription")}

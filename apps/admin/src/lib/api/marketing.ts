@@ -1,8 +1,11 @@
 import type { HeroHomeVisibilityDto } from "@tarodan/types";
 import { api } from "./client";
 import type {
+  BoostPurchaseListParams,
   BroadcastEmailPreviewPayload,
+  GrantBoostRequest,
   NotificationBroadcastPayload,
+  RefundBoostRequest,
 } from "./marketing.types";
 
 /** Marketing domain: static pages, email templates, ads, and notifications. */
@@ -95,6 +98,30 @@ export const marketingApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+
+  // Listing boosts: purchases and free grants (`/admin/ad-packages/purchases`)
+  getBoostPurchases: (params: BoostPurchaseListParams) =>
+    api.get("/admin/ad-packages/purchases", { params }),
+  getBoostPurchase: (id: string) =>
+    api.get(`/admin/ad-packages/purchases/${id}`),
+  pauseBoostPurchase: (id: string) =>
+    api.post(`/admin/ad-packages/purchases/${id}/pause`),
+  resumeBoostPurchase: (id: string) =>
+    api.post(`/admin/ad-packages/purchases/${id}/resume`),
+  extendBoostPurchase: (id: string, days: number) =>
+    api.post(`/admin/ad-packages/purchases/${id}/extend`, { days }),
+  /** A free boost on a live listing: no order, payment or invoice. */
+  grantBoost: (data: GrantBoostRequest) =>
+    api.post("/admin/ad-packages/purchases/grant", data),
+  /**
+   * Refund a paid boost and stop it. The server derives the idempotency key
+   * per attempt, so the client sends none. Needs `ads` and `payments`.
+   */
+  refundBoost: (id: string, data: RefundBoostRequest) =>
+    api.post(`/admin/ad-packages/purchases/${id}/refund`, data),
+  /** Stop a free grant early, without money. */
+  revokeBoostGrant: (id: string, data: { reason: string }) =>
+    api.post(`/admin/ad-packages/purchases/${id}/revoke`, data),
 
   // Güven rozetleri
   getTrustBadges: () => api.get("/admin/trust-badges"),

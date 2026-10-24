@@ -11,6 +11,7 @@ describe("listing form catalog details", () => {
   const messages = {
     required: "required",
     validPrice: "invalid price",
+    amountFormatRefused: "amount refused",
     setSize: "invalid set size",
     photo: "photo required",
     descriptionLength: "invalid description",
@@ -64,6 +65,37 @@ describe("listing form catalog details", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  const priceIssues = (price: string) => {
+    const result = schema.safeParse({ ...validValues, price });
+    return result.success
+      ? []
+      : result.error.issues
+          .filter((issue) => issue.path[0] === "price")
+          .map((issue) => issue.message);
+  };
+
+  it.each(["1000", "1250,50", "1250.50", "1", " 7 "])(
+    "accepts the price %j",
+    (price) => {
+      expect(priceIssues(price)).toEqual([]);
+    },
+  );
+
+  it.each(["1.000", "1.250,50", "12,345", "abc", "-5", "1e3"])(
+    "refuses the price %j with the shared refusal copy",
+    (price) => {
+      expect(priceIssues(price)).toEqual(["amount refused"]);
+    },
+  );
+
+  it.each(["0", "0,50", "  "])("keeps the 1 TL minimum for %j", (price) => {
+    expect(priceIssues(price)).toEqual(["invalid price"]);
+  });
+
+  it("requires a price", () => {
+    expect(priceIssues("")).toEqual(["required"]);
   });
 
   it("still limits the optional model code to 100 characters", () => {

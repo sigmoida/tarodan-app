@@ -37,7 +37,19 @@ vi.mock("@/stores/authStore", () => ({
     selector({ user: { id: "me" } }),
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "tr",
   useTranslations: () => (key: string) => key,
+}));
+// The price-row action has its own suite (ProductCardAction.test.tsx); here
+// it only has to stay out of the card's link and out of the heart's way.
+vi.mock("@/hooks/useCartToggle", () => ({
+  useCartToggle: () => ({ inCart: false, isPending: false, toggle: vi.fn() }),
+}));
+vi.mock("@/components/boost/useBoostOffers", () => ({
+  useBoostEnabled: () => true,
+}));
+vi.mock("@/components/boost/useBoostLauncher", () => ({
+  useBoostLauncher: () => ({ open: vi.fn(), dialog: null }),
 }));
 vi.mock("@/components/OptimizedImage", () => ({
   default: ({ alt }: { alt: string }) => <span data-img>{alt}</span>,
@@ -99,7 +111,9 @@ afterEach(() => {
 });
 
 const heart = () =>
-  container.querySelector<HTMLButtonElement>("button[aria-pressed]");
+  container.querySelector<HTMLButtonElement>(
+    'button[aria-label="product.favorite"]',
+  );
 
 describe.each(["grid", "list"] as const)("ProductCard (%s)", (layout) => {
   it("kalp linkin dışında; tıklaması kartı açmaz, sayacı artırmaz", () => {
@@ -116,7 +130,9 @@ describe.each(["grid", "list"] as const)("ProductCard (%s)", (layout) => {
 
     // Kartın kendisi hâlâ ilana gider (ve tıklamayı sayar).
     act(() => link.click());
-    expect(h.linkClick).toHaveBeenCalledWith("/listings/p1");
+    expect(h.linkClick).toHaveBeenCalledWith(
+      "/listings/hot-wheels-67-camaro-p1",
+    );
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -198,13 +214,14 @@ describe("ProductCard rozet düzeni", () => {
     );
     expect(visual).toHaveLength(2);
     expect(visual[0].textContent).toBe("%38");
-    expect(visual[1].textContent).toBe("product.sponsored");
-    // Görsel rozetler aria-hidden; okuyucu tek özet metni okur.
+    expect(visual[1].textContent).toBe("product.boostedBadge");
+    expect(visual[1].getAttribute("title")).toBe("product.boostedBadgeHint");
+    // Görsel rozetler aria-hidden; okuyucu tek özet metni (linkin içinde) okur.
     expect(visual.every((c) => c.getAttribute("aria-hidden") === "true")).toBe(
       true,
     );
-    expect(stack.querySelector(".sr-only")!.textContent).toBe(
-      "%38 product.discount, product.sponsored",
+    expect(container.querySelector("a .sr-only")!.textContent).toBe(
+      " %38 product.discount, product.boostedBadgeHint",
     );
     // Sağ üstte ayrı indirim rozeti kalmadı (görsel + okuyucu metni).
     expect(container.textContent?.match(/%38/g)).toHaveLength(2);
@@ -244,12 +261,13 @@ describe("ProductCard rozet düzeni", () => {
     expect(container.querySelector("[data-end]")).not.toBeNull();
   });
 
-  it("grid: rozet metinleri kartın linkinin içindedir (erişilebilir ad)", () => {
+  it("grid: the badge text is part of the title link's name, the badges are not inside it", () => {
     act(() => root.render(<ProductCard product={rich} />));
     const link = container.querySelector("a")!;
-    expect(link.contains(badges())).toBe(true);
+    expect(link.contains(badges())).toBe(false);
     expect(link.textContent).toContain("%38");
-    expect(link.textContent).toContain("product.sponsored");
+    expect(link.textContent).toContain("product.boostedBadgeHint");
+    expect(container.textContent).not.toContain("product.sponsored");
   });
 
   it("grid: yüzde 1'in altındaysa indirim rozeti çizilmez", () => {
@@ -287,7 +305,7 @@ describe("ProductCard rozet düzeni", () => {
     // 500 → 250 = %50
     expect(container.textContent).toContain("%50");
     expect(container.querySelector("a")!.textContent).toContain(
-      "%50 product.discount, faq.trade",
+      "%50 product.discount, product.boostedBadgeHint, faq.trade",
     );
     // Görünen indirim rozeti okuyucudan gizlidir.
     const saleBadge = Array.from(
@@ -331,9 +349,16 @@ describe("ProductCard rozet düzeni", () => {
     expect(trade.textContent).toBe("");
     expect(heart()!.className).toContain("top-1.5");
     expect(heart()!.className).toContain("right-1.5");
-    // Rozet yığını yok; indirim fiyatın yanında kalır.
+    // Rozet yığını yok; indirim fiyatın yanında kalır, "Öne Çıkan" başlığın
+    // üstünde (ipucuyla), "Sponsorlu" hiç yok.
     expect(badges()).toBeNull();
     expect(container.textContent).toContain("%38");
+    const boosted = container.querySelector<HTMLElement>(
+      '[title="product.boostedBadgeHint"]',
+    )!;
+    expect(boosted.textContent).toBe("product.boostedBadge");
+    expect(boosted.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector("a")!.contains(boosted)).toBe(false);
     expect(container.textContent).not.toContain("product.sponsored");
   });
 });

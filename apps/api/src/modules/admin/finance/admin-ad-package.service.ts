@@ -4,14 +4,16 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import {
+  AdPackage,
   AdPackageAudienceMode,
+  AdPackageTier,
+  BoostSource,
   BoostStatus,
   MembershipTierType,
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
-import { isPremiumEntitled } from "../../membership/helpers/membership.util";
-import { computeRelevanceScore } from "../../product/helpers/relevance-score";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 import {
   CreateAdPackageDto,
   UpdateAdPackageDto,
@@ -19,6 +21,115 @@ import {
 } from "../dto/ad-package.dto";
 import { paginate } from "../../../common/list";
 import { i18nMessage } from "../../i18n";
+import { boostRefundableAmount } from "./boost/boost-refund-policy";
+import {
+  boostTierBandIsEmpty,
+  findBoostTierOverlaps,
+} from "../../product/helpers/boost-tier-band";
+
+const isBoostStatus = (value: string): value is BoostStatus =>
+  (Object.values(BoostStatus) as string[]).includes(value);
+const isBoostSource = (value: string): value is BoostSource =>
+  (Object.values(BoostSource) as string[]).includes(value);
+
+/** The staff user who granted or stopped a boost, by name only. */
+const STAFF_SELECT = {
+  id: true,
+  displayName: true,
+} satisfies Prisma.UserSelect;
+
+/** A package as the admin reads it: the row plus whichever relations it loaded. */
+type PackageRow = AdPackage & {
+  tiers?: AdPackageTier[];
+  targetTiers?: Array<{ tierType: MembershipTierType }>;
+  targetUsers?: Array<{
+    user: {
+      id: string;
+      adminCode: string | null;
+      username: string | null;
+      displayName: string;
+      email: string;
+    };
+  }>;
+};
+
+/**
+ * What a package response loads: tiers in display order and the audience. The
+ * target users are read for their public admin identity only (the create and
+ * update paths used to load whole user rows).
+ */
+const PACKAGE_INCLUDE = {
+  tiers: { orderBy: [{ durationDays: "asc" }, { minAmount: "asc" }] },
+  targetTiers: true,
+  targetUsers: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          adminCode: true,
+          username: true,
+          displayName: true,
+          email: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AdPackageInclude;
+
+/** The engagement counters a purchase's before/after metrics read. */
+type MetricsRow = {
+  baselineViewCount: number | null;
+  baselineLikeCount: number | null;
+  baselineClickCount: number | null;
+  finalViewCount: number | null;
+  finalLikeCount: number | null;
+  finalClickCount: number | null;
+  product: { viewCount: number; likeCount: number; clickCount: number } | null;
+};
+
+/** What the purchase list and detail load for each boost. */
+const PURCHASE_INCLUDE = {
+  user: {
+    select: {
+      id: true,
+      adminCode: true,
+      username: true,
+      displayName: true,
+      email: true,
+      avatarUrl: true,
+    },
+  },
+  package: { select: { id: true, name: true } },
+  product: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      viewCount: true,
+      likeCount: true,
+      clickCount: true,
+    },
+  },
+  grantedBy: { select: STAFF_SELECT },
+  cancelledBy: { select: STAFF_SELECT },
+} satisfies Prisma.ProductBoostInclude;
+
+/** The boost order and its payment (a boost row has no relation to them). */
+const PURCHASE_ORDER_SELECT = {
+  id: true,
+  orderNumber: true,
+  payment: {
+    select: { id: true, status: true, amount: true, metadata: true },
+  },
+} satisfies Prisma.OrderSelect;
+
+type PurchaseOrder = Prisma.OrderGetPayload<{
+  select: typeof PURCHASE_ORDER_SELECT;
+}>;
+
+type PurchaseRow = Prisma.ProductBoostGetPayload<{
+  include: typeof PURCHASE_INCLUDE;
+}>;
 
 /**
  * Admin management of the dynamic ad/boost packages (Ekonomik / Vitrin / …) and
@@ -27,7 +138,10 @@ import { i18nMessage } from "../../i18n";
  */
 @Injectable()
 export class AdminAdPackageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly boostTimeline: BoostTimelineService,
+  ) {}
 
   private normalizeAudienceTargets(
     audienceMode: AdPackageAudienceMode,
@@ -77,6 +191,39 @@ export class AdminAdPackageService {
     };
   }
 
+  /**
+   * Refuses tier rows the lookups could not price unambiguously, before any
+   * write: a band whose upper bound is not above its lower bound, and two
+   * active rows of one duration whose bands overlap (half-open,
+   * `boost-tier-band.ts`). Bands may touch (1000-5000 and 5000-none). The
+   * 400 names the rows (`tierIndexes`, their positions in `tiers`) so the
+   * admin form can mark them.
+   */
+  private assertTiersPriceable(tiers: AdPackageTierDto[]): void {
+    const empty = tiers.findIndex((tier) => boostTierBandIsEmpty(tier));
+    if (empty !== -1) {
+      throw new BadRequestException({
+        ...i18nMessage("server.admin.commission.maxAboveMin"),
+        tierIndexes: [empty],
+      });
+    }
+    const [overlap] = findBoostTierOverlaps(tiers);
+    if (overlap) {
+      const first = tiers[overlap.first];
+      const second = tiers[overlap.second];
+      throw new BadRequestException({
+        ...i18nMessage("server.admin.adPackage.tierOverlap", {
+          durationDays: first.durationDays,
+          firstMin: first.minAmount,
+          firstMax: first.maxAmount ?? "none",
+          secondMin: second.minAmount,
+          secondMax: second.maxAmount ?? "none",
+        }),
+        tierIndexes: [overlap.first, overlap.second],
+      });
+    }
+  }
+
   private tierData(t: AdPackageTierDto) {
     return {
       durationDays: t.durationDays,
@@ -93,7 +240,7 @@ export class AdminAdPackageService {
     };
   }
 
-  private serialize(pkg: any) {
+  private serialize(pkg: PackageRow) {
     return {
       id: pkg.id,
       name: pkg.name,
@@ -102,8 +249,8 @@ export class AdminAdPackageService {
       isActive: pkg.isActive,
       sortOrder: pkg.sortOrder,
       audienceMode: pkg.audienceMode,
-      targetTierTypes: (pkg.targetTiers ?? []).map((t: any) => t.tierType),
-      targetUsers: (pkg.targetUsers ?? []).map((target: any) => ({
+      targetTierTypes: (pkg.targetTiers ?? []).map((t) => t.tierType),
+      targetUsers: (pkg.targetUsers ?? []).map((target) => ({
         id: target.user.id,
         adminCode: target.user.adminCode,
         username: target.user.username,
@@ -111,7 +258,7 @@ export class AdminAdPackageService {
         email: target.user.email,
       })),
       createdAt: pkg.createdAt,
-      tiers: (pkg.tiers ?? []).map((t: any) => ({
+      tiers: (pkg.tiers ?? []).map((t) => ({
         id: t.id,
         durationDays: t.durationDays,
         minAmount: Number(t.minAmount),
@@ -125,7 +272,7 @@ export class AdminAdPackageService {
     };
   }
 
-  private purchaseMetrics(boost: any) {
+  private purchaseMetrics(boost: MetricsRow) {
     const current = {
       views: boost.finalViewCount ?? boost.product?.viewCount ?? 0,
       likes: boost.finalLikeCount ?? boost.product?.likeCount ?? 0,
@@ -154,7 +301,26 @@ export class AdminAdPackageService {
     return { before, current, gain, performanceScore };
   }
 
-  private serializePurchase(boost: any, bestScore?: number) {
+  /** The orders of these boosts, in one query (no N+1 on the list). */
+  private async purchaseOrders(
+    boosts: Array<{ orderId: string | null }>,
+  ): Promise<Map<string, PurchaseOrder>> {
+    const ids = [
+      ...new Set(boosts.flatMap((b) => (b.orderId ? [b.orderId] : []))),
+    ];
+    if (ids.length === 0) return new Map();
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+      select: PURCHASE_ORDER_SELECT,
+    });
+    return new Map(orders.map((order) => [order.id, order]));
+  }
+
+  private serializePurchase(
+    boost: PurchaseRow,
+    order: PurchaseOrder | undefined,
+    bestScore?: number,
+  ) {
     const now = Date.now();
     const metrics = this.purchaseMetrics(boost);
     const remainingSeconds =
@@ -196,6 +362,27 @@ export class AdminAdPackageService {
       pausedAt: boost.pausedAt,
       purchasedAt: boost.purchasedAt,
       remainingSeconds,
+      showcaseEndsAt: boost.showcaseEndsAt,
+      /** `purchase` or a free `admin_grant` (no order, payment or invoice). */
+      source: boost.source,
+      grantedBy: boost.grantedBy
+        ? { id: boost.grantedBy.id, name: boost.grantedBy.displayName }
+        : null,
+      grantReason: boost.grantReason,
+      cancelledAt: boost.cancelledAt,
+      cancelledBy: boost.cancelledBy
+        ? { id: boost.cancelledBy.id, name: boost.cancelledBy.displayName }
+        : null,
+      cancelReason: boost.cancelReason,
+      refundedAmount: Number(boost.refundedAmount ?? 0),
+      /** The most "refund and stop" may return now; 0 when it is not allowed. */
+      refundableAmount: boostRefundableAmount({
+        ...boost,
+        payment: order?.payment ?? null,
+      }).toNumber(),
+      orderId: boost.orderId,
+      orderNumber: order?.orderNumber ?? null,
+      paymentId: order?.payment?.id ?? null,
       metrics,
       isBestForBuyer:
         bestScore != null &&
@@ -209,33 +396,20 @@ export class AdminAdPackageService {
   async listPackages() {
     const packages = await this.prisma.adPackage.findMany({
       orderBy: { sortOrder: "asc" },
-      include: {
-        tiers: { orderBy: [{ durationDays: "asc" }, { minAmount: "asc" }] },
-        targetTiers: true,
-        targetUsers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                adminCode: true,
-                username: true,
-                displayName: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
+      include: PACKAGE_INCLUDE,
     });
     return { data: packages.map((p) => this.serialize(p)) };
   }
 
   async createPackage(dto: CreateAdPackageDto) {
+    this.assertTiersPriceable(dto.tiers ?? []);
     const existing = await this.prisma.adPackage.findUnique({
       where: { slug: dto.slug },
     });
     if (existing) {
-      throw new BadRequestException("Bu slug ile bir paket zaten var");
+      throw new BadRequestException(
+        i18nMessage("server.admin.adPackage.slugTaken"),
+      );
     }
     const audienceMode = dto.audienceMode ?? AdPackageAudienceMode.everyone;
     const targets = this.normalizeAudienceTargets(
@@ -265,11 +439,7 @@ export class AdminAdPackageService {
           ? { create: dto.tiers.map((t) => this.tierData(t)) }
           : undefined,
       },
-      include: {
-        tiers: true,
-        targetTiers: true,
-        targetUsers: { include: { user: true } },
-      },
+      include: PACKAGE_INCLUDE,
     });
     return this.serialize(pkg);
   }
@@ -283,13 +453,16 @@ export class AdminAdPackageService {
       throw new NotFoundException(
         i18nMessage("server.admin.adPackage.notFound"),
       );
+    if (dto.tiers) this.assertTiersPriceable(dto.tiers);
 
     if (dto.slug && dto.slug !== pkg.slug) {
       const clash = await this.prisma.adPackage.findUnique({
         where: { slug: dto.slug },
       });
       if (clash)
-        throw new BadRequestException("Bu slug ile bir paket zaten var");
+        throw new BadRequestException(
+          i18nMessage("server.admin.adPackage.slugTaken"),
+        );
     }
     const audienceMode = dto.audienceMode ?? pkg.audienceMode;
     const targets = this.normalizeAudienceTargets(
@@ -310,7 +483,7 @@ export class AdminAdPackageService {
           audienceMode,
         },
       });
-      // "satır ekle/çıkar": verilirse kademe satırları toptan değiştirilir.
+      // "Add or remove rows": when given, the tier rows are replaced wholesale.
       if (dto.tiers) {
         await tx.adPackageTier.deleteMany({ where: { packageId: id } });
         if (dto.tiers.length) {
@@ -342,13 +515,9 @@ export class AdminAdPackageService {
           })),
         });
       }
-      return tx.adPackage.findUnique({
+      return tx.adPackage.findUniqueOrThrow({
         where: { id },
-        include: {
-          tiers: { orderBy: [{ durationDays: "asc" }, { minAmount: "asc" }] },
-          targetTiers: true,
-          targetUsers: { include: { user: true } },
-        },
+        include: PACKAGE_INCLUDE,
       });
     });
     return this.serialize(updated);
@@ -360,23 +529,26 @@ export class AdminAdPackageService {
       throw new NotFoundException(
         i18nMessage("server.admin.adPackage.notFound"),
       );
-    // Cascade deletes tiers; ProductBoost.packageId → SetNull (geçmiş korunur).
+    // Cascade deletes tiers; ProductBoost.packageId → SetNull (history kept).
     await this.prisma.adPackage.delete({ where: { id } });
     return { success: true };
   }
 
-  /** Boost satın alma takibi: kim, hangi ürün, hangi paket, ne zaman, ne kadar. */
+  /** Boost purchase tracking: who bought which package for which listing, when, for how much. */
   async listPurchases(query: {
     page?: number;
     limit?: number;
     packageId?: string;
     status?: string;
+    source?: string;
     search?: string;
   }) {
-    const { page = 1, limit = 20, packageId, status, search } = query;
+    const { page = 1, limit = 20, packageId, status, source, search } = query;
     const where: Prisma.ProductBoostWhereInput = {};
     if (packageId) where.packageId = packageId;
-    if (status) where.status = status as any;
+    // An unknown status filters nothing (it used to reach Prisma and 500).
+    if (status && isBoostStatus(status)) where.status = status;
+    if (source && isBoostSource(source)) where.source = source;
     const term = search?.trim();
     if (term) {
       where.OR = [
@@ -392,65 +564,27 @@ export class AdminAdPackageService {
       {
         where,
         orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              adminCode: true,
-              username: true,
-              displayName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-          package: { select: { id: true, name: true } },
-          product: {
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              viewCount: true,
-              likeCount: true,
-              clickCount: true,
-            },
-          },
-        },
+        include: PURCHASE_INCLUDE,
       },
       { page, limit },
     );
 
+    const orders = await this.purchaseOrders(result.data);
     return {
       ...result,
-      data: result.data.map((boost) => this.serializePurchase(boost)),
+      data: result.data.map((boost) =>
+        this.serializePurchase(
+          boost,
+          boost.orderId ? orders.get(boost.orderId) : undefined,
+        ),
+      ),
     };
   }
 
   async getPurchase(id: string) {
     const boost = await this.prisma.productBoost.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            adminCode: true,
-            username: true,
-            displayName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
-        package: { select: { id: true, name: true } },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            viewCount: true,
-            likeCount: true,
-            clickCount: true,
-          },
-        },
-      },
+      include: PURCHASE_INCLUDE,
     });
     if (!boost)
       throw new NotFoundException(
@@ -474,184 +608,29 @@ export class AdminAdPackageService {
         Math.max(best, this.purchaseMetrics(item).performanceScore ?? -1),
       -1,
     );
-    return this.serializePurchase(boost, bestScore);
+    const orders = await this.purchaseOrders([boost]);
+    return this.serializePurchase(
+      boost,
+      boost.orderId ? orders.get(boost.orderId) : undefined,
+      bestScore,
+    );
   }
 
+  /** Pause, resume and extend change the listing timeline: its owner does it. */
   async pausePurchase(id: string) {
-    const boost = await this.prisma.productBoost.findUnique({ where: { id } });
-    if (
-      !boost ||
-      boost.status !== BoostStatus.active ||
-      !boost.endsAt ||
-      boost.endsAt <= new Date()
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.pauseActiveOnly"),
-      );
-    }
-    const now = new Date();
-    await this.prisma.productBoost.update({
-      where: { id },
-      data: {
-        status: BoostStatus.paused,
-        pausedAt: now,
-        pausedRemainingSeconds: Math.max(
-          1,
-          Math.ceil((boost.endsAt.getTime() - now.getTime()) / 1000),
-        ),
-      },
-    });
-    await this.refreshProductPromotion(boost.productId);
+    await this.prisma.$transaction((tx) => this.boostTimeline.pause(tx, id));
     return this.getPurchase(id);
   }
 
   async resumePurchase(id: string) {
-    const boost = await this.prisma.productBoost.findUnique({ where: { id } });
-    if (!boost || boost.status !== BoostStatus.paused) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.resumePausedOnly"),
-      );
-    }
-    const now = new Date();
-    const lastActive = await this.prisma.productBoost.findFirst({
-      where: {
-        productId: boost.productId,
-        id: { not: id },
-        status: BoostStatus.active,
-        endsAt: { gt: now },
-      },
-      orderBy: { endsAt: "desc" },
-      select: { endsAt: true },
-    });
-    const base =
-      lastActive?.endsAt && lastActive.endsAt > now ? lastActive.endsAt : now;
-    const endsAt = new Date(
-      base.getTime() + (boost.pausedRemainingSeconds ?? 0) * 1000,
-    );
-    await this.prisma.productBoost.update({
-      where: { id },
-      data: {
-        status: BoostStatus.active,
-        endsAt,
-        pausedAt: null,
-        pausedRemainingSeconds: null,
-      },
-    });
-    await this.refreshProductPromotion(boost.productId);
+    await this.prisma.$transaction((tx) => this.boostTimeline.resume(tx, id));
     return this.getPurchase(id);
   }
 
   async extendPurchase(id: string, days: number) {
-    const boost = await this.prisma.productBoost.findUnique({ where: { id } });
-    if (
-      !boost ||
-      (boost.status !== BoostStatus.active &&
-        boost.status !== BoostStatus.paused)
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.extendActiveOrPausedOnly"),
-      );
-    }
-    if (days < 1 || days > 365) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.extensionRange"),
-      );
-    }
-
-    if (boost.status === BoostStatus.paused) {
-      await this.prisma.productBoost.update({
-        where: { id },
-        data: {
-          pausedRemainingSeconds:
-            (boost.pausedRemainingSeconds ?? 0) + days * 24 * 60 * 60,
-          extendedDays: { increment: days },
-        },
-      });
-    } else {
-      const base =
-        boost.endsAt && boost.endsAt > new Date() ? boost.endsAt : new Date();
-      await this.prisma.productBoost.update({
-        where: { id },
-        data: {
-          endsAt: new Date(base.getTime() + days * 24 * 60 * 60 * 1000),
-          extendedDays: { increment: days },
-        },
-      });
-    }
-    await this.refreshProductPromotion(boost.productId);
+    await this.prisma.$transaction((tx) =>
+      this.boostTimeline.extend(tx, id, days),
+    );
     return this.getPurchase(id);
-  }
-
-  private async refreshProductPromotion(productId: string) {
-    const now = new Date();
-    const [product, activeBoosts] = await Promise.all([
-      this.prisma.product.findUnique({
-        where: { id: productId },
-        select: {
-          sellerId: true,
-          qualityScore: true,
-          popularityScore: true,
-          seller: {
-            select: {
-              businessStatus: true,
-              companyName: true,
-              taxId: true,
-              membership: {
-                select: {
-                  status: true,
-                  currentPeriodEnd: true,
-                  tier: { select: { type: true, isActive: true } },
-                },
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.productBoost.findMany({
-        where: {
-          productId,
-          status: BoostStatus.active,
-          endsAt: { gt: now },
-        },
-        select: {
-          endsAt: true,
-          purchasedAt: true,
-          showcaseOnHome: true,
-        },
-        orderBy: { endsAt: "desc" },
-      }),
-    ]);
-    if (!product) return;
-
-    const promotedUntil = activeBoosts[0]?.endsAt ?? null;
-    const latestPurchase = activeBoosts.reduce<Date | null>(
-      (latest, item) =>
-        item.purchasedAt && (!latest || item.purchasedAt > latest)
-          ? item.purchasedAt
-          : latest,
-      null,
-    );
-    const homeShowcaseUntil =
-      activeBoosts.find((item) => item.showcaseOnHome)?.endsAt ?? null;
-    const premium = isPremiumEntitled(
-      product.seller.membership,
-      product.seller,
-    );
-    const rankTier = promotedUntil ? 2 : premium ? 1 : 0;
-
-    await this.prisma.product.update({
-      where: { id: productId },
-      data: {
-        boostedUntil: promotedUntil,
-        boostedAt: promotedUntil ? latestPurchase : null,
-        homeShowcaseUntil,
-        rankTier,
-        relevanceScore: computeRelevanceScore({
-          rankTier,
-          qualityScore: product.qualityScore ?? 0,
-          popularityScore: product.popularityScore,
-        }),
-      },
-    });
   }
 }

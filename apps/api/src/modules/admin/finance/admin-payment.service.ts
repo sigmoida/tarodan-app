@@ -25,13 +25,13 @@ import {
   Prisma,
   PaymentStatus,
   RefundAttemptStatus,
-  RefundRequestStatus,
   TradeStatus,
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
 import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
 import { i18nMessage } from "../../i18n";
+import { assertNotBoostOrderRefund } from "./boost/boost-refund-policy";
 
 /**
  * Ödeme yönetimi (liste, detay, istatistik, manuel iade, zorla iptal) —
@@ -842,6 +842,10 @@ export class AdminPaymentService {
         i18nMessage("server.payment.paymentNotFound"),
       );
     }
+
+    // A boost payment is refunded only by "refund and stop" on the boost
+    // screen (decision D16).
+    await assertNotBoostOrderRefund(this.prisma, payment.order);
 
     if (payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(

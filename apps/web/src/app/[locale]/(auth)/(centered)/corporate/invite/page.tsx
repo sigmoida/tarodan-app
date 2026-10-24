@@ -11,7 +11,7 @@ import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { webKeys } from "@/lib/query/keys";
 import { AuthCard } from "../../../_components/AuthCard";
-import { PasswordChecklist } from "../../../_components/PasswordChecklist";
+import { PasswordChecklist } from "@/components/auth/PasswordChecklist";
 import { isPasswordValid } from "@tarodan/types";
 
 export default function CorporateInvitationPage() {

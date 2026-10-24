@@ -76,7 +76,9 @@ export function isActiveState(state: UatRefreshState): boolean {
  *    `UAT_REFRESH_QUEUED_TIMEOUT_MINUTES` — iş, Staging Reset ile paylaşılan
  *    concurrency grubunda ve runner kuyruğunda bekleyebilir.
  */
-export function timeoutAt(row: UatRefreshRunRow): Date | null {
+export function timeoutAt(
+  row: Pick<UatRefreshRunRow, "state" | "startedAt" | "requestedAt">,
+): Date | null {
   if (row.state === "running") {
     const from = row.startedAt ?? row.requestedAt;
     return new Date(from.getTime() + UAT_REFRESH_TIMEOUT_MINUTES * MINUTE_MS);
@@ -88,6 +90,59 @@ export function timeoutAt(row: UatRefreshRunRow): Date | null {
     );
   }
   return null;
+}
+
+/** The `uat_refresh_runs` fields the production-copy cutoff reads. */
+export type ProductionCopyRun = Pick<
+  UatRefreshRunRow,
+  | "state"
+  | "dryRun"
+  | "requestedAt"
+  | "startedAt"
+  | "finishedAt"
+  | "sourceSnapshotAt"
+>;
+
+/**
+ * Up to which instant a run's rows on staging are copies of production, or
+ * `null` when the run copied nothing. Fail safe: when the dump time is not
+ * known, the latest instant it can have been is used.
+ *
+ *  - `sourceSnapshotAt` (the production dump) when reported. A failed run
+ *    reports it too once it got as far as the dump; it may have swapped the
+ *    database before failing, so it counts.
+ *  - an unfinished run without it (`running`, or `queued` when its "running"
+ *    report was lost: the workflow's reports are best effort): now, capped
+ *    at the run's hard timeout (a run that never reported back cannot have
+ *    dumped later than that).
+ *  - `succeeded` without it (older workflow): its finish time.
+ *  - dry runs, and failed runs without a snapshot (failed before the dump):
+ *    nothing was copied.
+ */
+function copyCutoffOf(run: ProductionCopyRun, now: Date): Date | null {
+  if (run.dryRun) return null;
+  if (run.sourceSnapshotAt) return run.sourceSnapshotAt;
+  if (isActiveState(run.state)) {
+    const limit = timeoutAt(run);
+    return limit && limit.getTime() < now.getTime() ? limit : now;
+  }
+  if (run.state === "succeeded") return run.finishedAt ?? now;
+  return null;
+}
+
+/** The latest production-copy cutoff over all recorded refresh runs. */
+export function productionCopyCutoff(
+  runs: readonly ProductionCopyRun[],
+  now: Date,
+): Date | null {
+  let latest: Date | null = null;
+  for (const run of runs) {
+    const cutoff = copyCutoffOf(run, now);
+    if (cutoff && (!latest || cutoff.getTime() > latest.getTime())) {
+      latest = cutoff;
+    }
+  }
+  return latest;
 }
 
 /**

@@ -7,6 +7,7 @@ import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Alert, Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import { useUpdateOrderStatus } from "../_hooks/useOrderDetail";
 import type { OrderDetail } from "../_lib/types";
 
@@ -15,14 +16,16 @@ export default function SellerActions({
   showCargoRef = true,
 }: {
   order: OrderDetail;
-  /** Kargo referans kartı PAKET başına bir kez gösterilir (R6) — paketin ilk
-   * siparişi dışında false geçilir; "Hazırlanıyor" aksiyonu sipariş başınadır. */
+  /** The cargo reference card shows once per PACKAGE (R6): false for every
+   * order but the package's first; the "preparing" action is per order. */
   showCargoRef?: boolean;
 }) {
   const t = useTranslations();
   const updateStatus = useUpdateOrderStatus(order.id);
 
-  if (!order.isSeller) return null;
+  // A digital order (membership, boost) is fulfilled by the platform; there is
+  // nothing to prepare or ship.
+  if (!order.isSeller || isDigitalOrder(order)) return null;
 
   if (order.status === "paid") {
     return (

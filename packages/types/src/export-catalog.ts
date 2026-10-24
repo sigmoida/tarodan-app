@@ -192,6 +192,7 @@ const consents = defineExportCatalog("consents", [
   },
   { key: "checkoutGroup", labelKey: `${CONSENT}.checkoutGroup`, type: "text" },
   { key: "order", labelKey: `${CONSENT}.order`, type: "text" },
+  { key: "trade", labelKey: `${CONSENT}.trade`, type: "text" },
 ]);
 
 const DELETED = "admin.deletedIdentities";

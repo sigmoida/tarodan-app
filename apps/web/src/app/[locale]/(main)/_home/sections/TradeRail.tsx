@@ -1,19 +1,15 @@
 import { getTranslations } from "next-intl/server";
-import type { Product } from "@/types/product";
-import HomeSection from "./HomeSection";
-import ProductRail from "./ProductRail";
+import type { HomeRailSeed } from "../lib/rails";
+import HomeRailSection from "./HomeRailSection";
 
-export default async function TradeRail({ items }: { items: Product[] }) {
+export default async function TradeRail({ items }: { items: HomeRailSeed }) {
   const t = await getTranslations();
-  if (items.length === 0) return null;
-
   return (
-    <HomeSection
+    <HomeRailSection
+      rail="trade"
+      items={items}
       title={t("nav.tradeShowcase")}
       viewAllHref="/takas"
-      viewAllLabel={t("home.viewAll")}
-    >
-      <ProductRail items={items} isLoading={false} />
-    </HomeSection>
+    />
   );
 }

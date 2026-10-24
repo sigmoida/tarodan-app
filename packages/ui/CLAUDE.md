@@ -59,6 +59,7 @@ table).
 ```bash
 pnpm --filter @tarodan/ui typecheck
 pnpm --filter @tarodan/ui lint
+pnpm --filter @tarodan/ui test          # jsdom component tests (src/**/*.test.tsx)
 pnpm --filter @tarodan/web typecheck     # every consumer
 pnpm --filter @tarodan/admin typecheck
 ```

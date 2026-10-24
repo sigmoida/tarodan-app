@@ -4,10 +4,10 @@ import { AppleTokenService } from "./apple-token.service";
 import { AppleTokenCipher } from "./apple-token-cipher";
 
 /**
- * Sign in with Apple token yaşam döngüsü — yaprak modül. Girişte token'ı
- * saklayan AuthModule ve hesap silmede iptali kuyruğa yazan UserModule ikisi
- * de bunu içe aktarır (UserModule'ün koca AuthModule'e bağlanmasına gerek
- * kalmaz). Prisma ve Outbox global; döngü yok.
+ * Sign in with Apple token lifecycle, a leaf module. AuthModule (stores the
+ * token at sign-in) and UserModule (enqueues the revocation in the account
+ * deletion transaction) both import it directly. Prisma and the outbox are
+ * global; no cycle.
  */
 @Module({
   imports: [ConfigModule],

@@ -2,9 +2,10 @@
 
 "use client";
 
+import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { useTranslations } from "next-intl";
 
 /**
@@ -29,7 +30,8 @@ export default function BusinessError({ error }: { error: string }) {
   const companyNameHint = needsCompanyName(error);
 
   return (
-    <EmptyStateCard
+    <EmptyState
+      icon={<ExclamationCircleIcon className="h-7 w-7" />}
       title={error}
       action={
         companyNameHint ? (

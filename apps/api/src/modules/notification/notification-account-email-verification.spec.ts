@@ -55,6 +55,7 @@ describe("NotificationAccountService.sendEmailVerification", () => {
       prisma as never,
       configService as never,
       smtpProvider as never,
+      { add: jest.fn() } as never,
     );
 
     await expect(
@@ -106,6 +107,7 @@ describe("NotificationAccountService.sendGuestCheckoutVerificationCode", () => {
       {} as never,
       {} as never,
       {} as never,
+      { add: jest.fn() } as never,
     );
 
     await expect(

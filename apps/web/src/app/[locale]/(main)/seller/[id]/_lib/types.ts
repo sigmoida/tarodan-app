@@ -1,5 +1,7 @@
 /** @format */
 
+import type { SellerTrustView } from "@tarodan/types";
+
 export interface UserRating {
   id: string;
   score: number;
@@ -43,9 +45,8 @@ export interface Seller {
   bio?: string;
   createdAt: string;
   isVerified: boolean;
-  isPremium?: boolean;
-  trustScore?: number;
-  trustLevel?: string;
+  /** Null for non-premium sellers; absent on older API responses. */
+  trust?: SellerTrustView | null;
   sellerType?: string;
   followersCount?: number;
   storeViewCount?: number;

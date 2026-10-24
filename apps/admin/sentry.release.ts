@@ -1,33 +1,49 @@
 /**
- * Sentry ortak yapılandırma değerleri — client/server/edge dosyalarının tek
- * kaynağı (üçü birbirinden kaymasın diye).
+ * Shared Sentry runtime values: the single source for the client, server and
+ * edge configs, so the three cannot drift.
  *
- * NEXT_PUBLIC_ öneki zorunlu: değerler tarayıcı paketine BUILD ZAMANINDA
- * gömülür, runtime env yeterli olmaz (Coolify'da build env olarak verilmeli).
+ * The `NEXT_PUBLIC_` prefix is required: the values are inlined into the
+ * bundles AT BUILD TIME, so they must be Coolify build variables; a runtime
+ * env alone is not enough. `NEXT_PUBLIC_SENTRY_RELEASE` is resolved by
+ * `sentry.build.js` (explicit value, else Coolify's `SOURCE_COMMIT`).
  */
 
+import { sentrySampling } from "@tarodan/logger";
+
+import { resolveSentryEnvironment } from "./src/lib/sentryEnvironment";
+
 /**
- * Dağıtım sürümü. Olmadan "bu hata hangi deploy'la geldi" cevapsız kalır ve
- * Sentry'nin regresyon takibi (çözülen issue yeni sürümde tekrar açılırsa
- * uyarma) çalışmaz. Docker imajında `.git` yok, Sentry kendi tahmin edemez.
+ * DSN for the server and edge runtimes. A runtime `SENTRY_DSN` wins over the
+ * build-time public one, so the server side can be repointed without a
+ * rebuild. Undefined means no Sentry at all (see `src/instrumentation.ts`).
+ */
+export const sentryServerDsn =
+  process.env.SENTRY_DSN?.trim() ||
+  process.env.NEXT_PUBLIC_SENTRY_DSN?.trim() ||
+  undefined;
+
+/**
+ * The deploy release. Without it "which deploy brought this error" has no
+ * answer and Sentry's regression tracking does not work. The Docker image has
+ * no `.git`, so the SDK cannot guess it.
  */
 export const sentryRelease =
   process.env.NEXT_PUBLIC_SENTRY_RELEASE?.trim() || undefined;
 
 /**
- * Ortam etiketi. `NODE_ENV`'e bağlanamaz: Dockerfile onu staging'de de
- * `production` yazar, dolayısıyla staging ile gerçek prod Sentry'de ayırt
- * edilemez ve staging test hataları prod alarmlarına karışırdı.
+ * The environment tag (`production`, `staging`): the explicit build variable,
+ * else derived from the app URL host (see `resolveSentryEnvironment`). Never
+ * from `NODE_ENV` (tarodan-ops: docs/observability.md).
  */
-export const sentryEnvironment =
-  process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT?.trim() ||
-  process.env.NODE_ENV ||
-  "development";
+export const sentryEnvironment = resolveSentryEnvironment(
+  process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+  process.env.NEXT_PUBLIC_APP_URL,
+);
 
 /**
- * Örnekleme oranı ETİKETE değil gerçek çalışma kipine bakar: staging de bir
- * production build'idir; etiketi yüzünden tam örneklemeye geçilirse iz kotası
- * hızla tükenir.
+ * Trace sample rate by Sentry environment (production 0.2, staging 0.02,
+ * development 0), from the shared table in `@tarodan/logger`. Keyed on the
+ * resolved tag, never `NODE_ENV`: staging is a production build too.
  */
 export const sentryTracesSampleRate =
-  process.env.NODE_ENV === "production" ? 0.2 : 1.0;
+  sentrySampling(sentryEnvironment).tracesSampleRate;

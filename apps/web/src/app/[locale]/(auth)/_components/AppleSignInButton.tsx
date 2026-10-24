@@ -1,80 +1,58 @@
 "use client";
-import { useCallback, useState } from "react";
-import Script from "next/script";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { Button } from "@tarodan/ui";
 import { useAuthStore } from "@/stores/authStore";
-import { AppleIcon } from "./AppleIcon";
-
-const SERVICES_ID = process.env.NEXT_PUBLIC_APPLE_SERVICES_ID;
-const REDIRECT_URI = process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI;
-const APPLE_JS =
-  "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
-
-declare global {
-  interface Window {
-    AppleID?: any;
-  }
-}
+import { AppleIcon } from "@/components/auth/AppleIcon";
+import { AppleSdkScript } from "@/components/auth/AppleSdkScript";
+import {
+  AppleCredentialError,
+  useAppleCredential,
+} from "@/components/auth/useAppleCredential";
 
 /**
- * Apple giriş butonu — GoogleSignInButton'ın simetriği, aynı `@tarodan/ui`
- * Button'ı kullanır (Apple'ın hazır butonu yerine) ki ikisi yan yana aynı
- * ölçüde dursun.
- *
- * Popup akışı: Apple'ın JS SDK'sı bir `id_token` döndürür, BFF onu API'ye
- * iletir, API JWKS ile doğrular. Redirect yok, bu yüzden callback route'u da
- * yok — ancak Apple `redirectURI`'yi konsolda kayıtlı Return URL'lerle
- * karşılaştırdığı için değer birebir eşleşmeli.
+ * The Apple sign-in button: the twin of GoogleSignInButton on the same
+ * `@tarodan/ui` Button (instead of Apple's ready-made one), so both sit side by
+ * side at the same size. The credential step is the shared
+ * `useAppleCredential` popup; this button only signs in with it.
  */
 export function AppleSignInButton({ onSuccess }: { onSuccess?: () => void }) {
   const t = useTranslations();
   const loginWithApple = useAuthStore((s) => s.loginWithApple);
+  const { isAvailable, requestCredential } = useAppleCredential();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleClick = useCallback(async () => {
-    if (typeof window === "undefined" || !window.AppleID) {
-      toast.error(t("auth.appleScriptFailed"));
-      return;
-    }
+  // No Services ID or return URL (local development): show no button.
+  if (!isAvailable) return null;
+
+  const handleClick = async () => {
     setIsLoading(true);
     try {
-      window.AppleID.auth.init({
-        clientId: SERVICES_ID,
-        redirectURI: REDIRECT_URI,
-        scope: "name email",
-        usePopup: true,
-      });
-      const data = await window.AppleID.auth.signIn();
-      const idToken = data?.authorization?.id_token;
-      if (!idToken) {
-        toast.error(t("auth.appleSignInFailed"));
+      const credential = await requestCredential();
+      if (!credential) return; // popup closed
+      await loginWithApple(credential.identityToken, credential.fullName);
+      onSuccess?.();
+    } catch (e) {
+      if (e instanceof AppleCredentialError) {
+        toast.error(
+          e.reason === "script"
+            ? t("auth.appleScriptFailed")
+            : t("auth.appleSignInFailed"),
+        );
         return;
       }
-      // Apple adı YALNIZCA ilk yetkilendirmede döndürür; sonraki girişlerde
-      // gelmez, o yüzden opsiyonel.
-      const name = data?.user?.name;
-      const fullName = name
-        ? [name.firstName, name.lastName].filter(Boolean).join(" ") || undefined
-        : undefined;
-      await loginWithApple(idToken, fullName);
-      onSuccess?.();
-    } catch (e: any) {
-      // Kullanıcı popup'ı kapattı → sessiz geç.
-      if (e?.error === "popup_closed_by_user") return;
-      toast.error(e?.message || t("auth.appleSignInFailed"));
+      toast.error(
+        (e as { message?: string })?.message || t("auth.appleSignInFailed"),
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [loginWithApple, onSuccess, t]);
-
-  // Servis ID / redirect yoksa butonu hiç gösterme (geliştirmede patlamasın).
-  if (!SERVICES_ID || !REDIRECT_URI) return null;
+  };
 
   return (
     <>
-      <Script src={APPLE_JS} strategy="afterInteractive" />
+      <AppleSdkScript />
       <Button
         type="button"
         variant="outline"

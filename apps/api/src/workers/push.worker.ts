@@ -375,9 +375,6 @@ export class PushWorker {
       );
     }
 
-    // Get icon based on notification type
-    const icon = this.getNotificationIcon(notificationType);
-
     // Mükerrer in-app bildirimi engelle: aynı kullanıcı + tip + ilgili varlık
     // (teklif/takas/ürün/sipariş) için son 60 dk içinde zaten bir bildirim varsa
     // tekrar oluşturma. (payment-scheduler sweep'i iptal edilmiş teklif/takasları
@@ -421,7 +418,6 @@ export class PushWorker {
         body,
         data: {
           ...data,
-          icon,
           link,
         },
         status: "sent",
@@ -429,40 +425,6 @@ export class PushWorker {
       },
     });
     return "created";
-  }
-
-  /**
-   * Get icon emoji for notification type
-   */
-  private getNotificationIcon(type: string): string {
-    const icons: Record<string, string> = {
-      order_created: "📦",
-      payment_confirmed: "💳",
-      payment_received: "💰",
-      order_shipped: "🚚",
-      order_delivered: "✅",
-      order_completed: "🎉",
-      offer_received: "💵",
-      offer_accepted: "✅",
-      offer_rejected: "❌",
-      trade_received: "🔄",
-      trade_accepted: "✅",
-      trade_completed: "🎉",
-      new_message: "💬",
-      review_received: "⭐",
-      price_drop: "📉",
-      new_follower: "👤",
-      collection_liked: "❤️",
-      product_approved: "✅",
-      product_sold: "💰",
-      membership_expiring: "⏰",
-      membership_renewal_card_required: "💳",
-      listing_expiring: "⏰",
-      listing_views_milestone: "👀",
-      welcome: "🎉",
-      promotion: "🎁",
-    };
-    return icons[type] || "🔔";
   }
 
   @Process("send-bulk")

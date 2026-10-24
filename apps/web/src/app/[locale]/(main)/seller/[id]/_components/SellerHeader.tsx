@@ -9,13 +9,16 @@ import {
   StarIcon,
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
+import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import UserActionsMenu from "@/components/UserActionsMenu";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
+import { formatRating } from "@/lib/format";
 import { publicNameOf } from "@/lib/public-name";
+import SellerTrustBadge from "./SellerTrustBadge";
 
 interface SellerHeaderProps {
   seller: Seller;
@@ -27,7 +30,7 @@ interface SellerHeaderProps {
   onMessage: () => void;
   onFollow: () => void;
   onReport: () => void;
-  /** Giriş kapısı (engelleme için); false dönerse modal çağıranda açılır. */
+  /** Auth gate (used for blocking); on false the caller opens the modal. */
   onRequireAuth: () => boolean;
 }
 
@@ -46,6 +49,7 @@ export default function SellerHeader({
   onRequireAuth,
 }: SellerHeaderProps) {
   const t = useTranslations();
+  const locale = useLocale();
   const stats = seller.stats;
   const totalRatings = stats?.totalRatings ?? 0;
   const averageRating = stats?.averageRating ?? 0;
@@ -68,26 +72,29 @@ export default function SellerHeader({
               <h1 className="truncate text-xl font-bold text-heading">
                 {publicNameOf(seller)}
               </h1>
-              {seller.isPremium && (
-                <Badge variant="default" size="sm">
-                  Premium
-                </Badge>
-              )}
               {seller.isVerified && (
-                <Badge variant="success" size="sm">
-                  ✓ {t("seller.verified")}
+                <Badge
+                  variant="success"
+                  size="sm"
+                  icon={<CheckBadgeIcon className="size-3.5" aria-hidden />}
+                >
+                  {t("seller.verified")}
                 </Badge>
               )}
-              {seller.isPremium && typeof seller.trustScore === "number" && (
-                <Badge variant="warning" size="sm">
-                  {t("seller.trust")} {seller.trustScore}/100
-                </Badge>
-              )}
+              <SellerTrustBadge trust={seller.trust} />
             </div>
             <p className="mt-1 text-xs text-subtle">
               {membershipDuration}
-              {hasRatings &&
-                ` · ★ ${averageRating.toFixed(1)} (${totalRatings})`}
+              {hasRatings && (
+                <>
+                  {" · "}
+                  <StarIcon
+                    className="mb-0.5 inline size-3.5 text-warning-500"
+                    aria-hidden
+                  />{" "}
+                  {`${formatRating(averageRating, locale)} (${totalRatings})`}
+                </>
+              )}
               {` · ${followersCount} ${t("profile.followers")}`}
             </p>
           </div>
@@ -143,7 +150,7 @@ export default function SellerHeader({
         <MetricCard
           icon={StarIcon}
           label={t("profile.rating")}
-          value={hasRatings ? averageRating.toFixed(1) : "—"}
+          value={hasRatings ? formatRating(averageRating, locale) : "—"}
           accent="text-warning-600"
         />
       </div>

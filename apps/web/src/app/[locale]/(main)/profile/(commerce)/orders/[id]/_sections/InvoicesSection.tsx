@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import {
   useDownloadElogoInvoice,
   useDownloadSellerInvoice,
@@ -20,20 +21,28 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
   const t = useTranslations();
   const orderId = order.id;
 
+  // The seller's product invoice is a marketplace concept: a digital order
+  // (membership, boost) is invoiced by the platform through e-Arsiv only, so
+  // its seller-invoice card is neither fetched nor shown.
+  const sellerInvoiceApplies = !isDigitalOrder(order);
   const elogoQuery = useElogoInvoices(orderId, order);
-  const sellerInvoiceQuery = useSellerInvoice(orderId, order);
+  const sellerInvoiceQuery = useSellerInvoice(
+    orderId,
+    sellerInvoiceApplies ? order : null,
+  );
   const downloadElogo = useDownloadElogoInvoice();
   const uploadSeller = useUploadSellerInvoice(orderId);
   const downloadSeller = useDownloadSellerInvoice(orderId);
   const sellerInvoiceInputRef = useRef<HTMLInputElement>(null);
 
-  // Ödeme öncesi / iptal edilmiş siparişte fatura kartları gösterilmez.
+  // No invoice cards before payment or on a cancelled order.
   const invoiceVisible =
     order.status !== "pending_payment" && order.status !== "cancelled";
   const elogoInvoices = invoiceVisible ? (elogoQuery.data ?? []) : [];
-  const sellerInvoice = invoiceVisible
-    ? (sellerInvoiceQuery.data ?? null)
-    : null;
+  const sellerInvoice =
+    invoiceVisible && sellerInvoiceApplies
+      ? (sellerInvoiceQuery.data ?? null)
+      : null;
 
   // Kurumsal satıcı: siparişe fatura PDF yükle/değiştir (yükleme öncesi doğrulama).
   const handleSellerInvoiceFile = (e: React.ChangeEvent<HTMLInputElement>) => {

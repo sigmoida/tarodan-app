@@ -1,41 +1,40 @@
 /**
- * İlan Kalite Skoru (Listing Quality Score)
+ * Listing quality score. Orders boosted and premium listings within their own
+ * rank tier. Components:
+ *  - photo count (more photos rank higher), capped at 8: 0..40
+ *  - description completeness (length thresholds give 0 / 0.5 / 1): 0..20
+ *  - the seller's stored trust rating (0..5, ADR 0014): 0..20
  *
- * Belge gereği boost'lu ve premium ilanların kendi kademeleri içinde sıralanmasında
- * kullanılır. Bileşenler:
- *  - Fotoğraf sayısı (çok foto → yukarı), 8 ile sınırlı
- *  - Açıklama doluluğu (uzunluk eşiklerine göre 0 / 0.5 / 1)
- *  - Satıcı güven puanı (0..5 → 0..20)
- *  - Doğrulanmış satıcı bonusu
+ * There is no verified-seller bonus any more (decision D8): `is_verified` is
+ * set only by seeds, so it rewarded the seeded accounts and no behaviour.
  *
- * Saf (pure) fonksiyon: hem yazma yollarında (create/update) hem gece scheduler'ında
- * aynı hesaplamanın kullanılması için tek kaynak.
+ * Pure: the write paths (create/update) and the nightly scheduler call the
+ * same function.
  */
 export interface QualityScoreInput {
-  /** Ürüne ait fotoğraf sayısı */
+  /** Number of images on the listing. */
   photoCount: number;
-  /** Ürün açıklaması (null/boş olabilir) */
+  /** Listing description (may be null or empty). */
   description?: string | null;
-  /** Satıcının ortalama güven puanı (0..5), yoksa null */
-  sellerRating?: number | null;
-  /** Satıcı doğrulanmış mı */
-  isVerifiedSeller?: boolean;
+  /**
+   * The seller's stored trust rating, 0.00 to 5.00 (`SellerTrustView.rating`).
+   * Null for a seller without a score (`new`), which earns no rating points.
+   */
+  sellerTrustRating?: number | null;
 }
 
 export function computeQualityScore(input: QualityScoreInput): number {
   const photoCount = Math.max(0, Math.floor(input.photoCount ?? 0));
   const photoPart = Math.min(photoCount, 8) * 5; // 0..40
 
-  const description = (input.description ?? '').trim();
+  const description = (input.description ?? "").trim();
   let descCompleteness = 0;
   if (description.length >= 200) descCompleteness = 1;
   else if (description.length >= 50) descCompleteness = 0.5;
   const descPart = descCompleteness * 20; // 0..20
 
-  const sellerRating = Math.max(0, Math.min(5, input.sellerRating ?? 0));
-  const ratingPart = Math.round(sellerRating * 4); // 0..20
+  const trustRating = Math.max(0, Math.min(5, input.sellerTrustRating ?? 0));
+  const ratingPart = Math.round(trustRating * 4); // 0..20
 
-  const verifiedPart = input.isVerifiedSeller ? 5 : 0; // 0..5
-
-  return Math.round(photoPart + descPart + ratingPart + verifiedPart);
+  return Math.round(photoPart + descPart + ratingPart);
 }

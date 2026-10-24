@@ -1,5 +1,6 @@
 import { PaytrMerchant, RefundAttemptStatus } from "@prisma/client";
 import { RefundReconciliationService } from "./refund-reconciliation.service";
+import { REFUND_FAILURE_PROVIDER_NOTHING_LEFT } from "../helpers/refund-provider-failure";
 
 /**
  * Sonucu belirsiz (manual_review) iade denemelerinin durum-sorgu `returns` +
@@ -36,7 +37,12 @@ function makeAttempt(overrides: Record<string, unknown> = {}) {
 // createRefund'daki normalizasyonla aynı: UUID tireleri atılır.
 const REF_NO = "aaaa1111bbbb2222cccc333344445555";
 
-function makeHarness(opts: { attempts?: any[]; inquiry?: any }) {
+function makeHarness(opts: {
+  attempts?: any[];
+  inquiry?: any;
+  /** Staging guard (D1): rows up to this instant are production copies. */
+  copiedBefore?: Date | null;
+}) {
   const state: { status: RefundAttemptStatus; data: Record<string, unknown> } =
     {
       status:
@@ -74,6 +80,10 @@ function makeHarness(opts: { attempts?: any[]; inquiry?: any }) {
     {} as any, // paymentRefund — bu süpürmede kullanılmaz
     { resolve } as any,
     { get: jest.fn().mockReturnValue(undefined) } as any,
+    { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any, // cache
+    {
+      copiedBefore: jest.fn().mockResolvedValue(opts.copiedBefore ?? null),
+    } as any,
     providerEvents as any,
   );
   return { service, prisma, queryPaymentStatus, providerEvents, resolve };
@@ -217,5 +227,52 @@ describe("RefundReconciliationService.resolveUnknownRefundOutcomes", () => {
     expect(r.confirmed).toBe(0);
     expect(r.requeued).toBe(0);
     expect(prisma.state.status).toBe(RefundAttemptStatus.manual_review);
+  });
+
+  /**
+   * D1: PayTR said nothing of the payment is left to refund. The status
+   * inquiry would find no refund with our reference and requeue the attempt
+   * as `failed`, so the sweep would resend it and PayTR would refuse it again,
+   * every 15 minutes. Such an attempt waits for a person.
+   */
+  it("leaves 'nothing left to refund' attempts to a person (query filter)", async () => {
+    const { service, prisma } = makeHarness({ attempts: [] });
+
+    await service.resolveUnknownRefundOutcomes();
+
+    const where = prisma.refundAttempt.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { failureReason: null },
+      {
+        NOT: {
+          failureReason: { startsWith: REFUND_FAILURE_PROVIDER_NOTHING_LEFT },
+        },
+      },
+    ]);
+  });
+
+  it("staging: production copies are not queried at the PayTR test store", async () => {
+    const cutoff = new Date("2026-10-20T03:00:00.000Z");
+    const { service, prisma } = makeHarness({
+      attempts: [],
+      copiedBefore: cutoff,
+    });
+
+    await service.resolveUnknownRefundOutcomes();
+
+    const where = prisma.refundAttempt.findMany.mock.calls[0][0].where;
+    expect(where.payment).toEqual({
+      isTest: false,
+      OR: [{ isTest: true }, { createdAt: { gt: cutoff } }],
+    });
+  });
+
+  it("live production: only the live-lane filter on the payment (pin)", async () => {
+    const { service, prisma } = makeHarness({ attempts: [] });
+
+    await service.resolveUnknownRefundOutcomes();
+
+    const where = prisma.refundAttempt.findMany.mock.calls[0][0].where;
+    expect(where.payment).toEqual({ isTest: false });
   });
 });

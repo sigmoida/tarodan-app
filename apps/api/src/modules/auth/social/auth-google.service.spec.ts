@@ -1,4 +1,8 @@
-// apps/api/src/modules/auth/auth-google.service.spec.ts
+// apps/api/src/modules/auth/social/auth-google.service.spec.ts
+//
+// SocialLoginService.loginWithGoogle: token handling and the login response.
+// Identity -> account resolution (link, take-over, new account) is
+// SocialIdentityService's and is covered in social-identity.service.spec.ts.
 import { Test } from "@nestjs/testing";
 import { getQueueToken } from "@nestjs/bull";
 import { QUEUE_NAMES } from "../../../workers/constants";
@@ -11,6 +15,7 @@ import { AuthRegistrationService } from "../auth-registration.service";
 import { AuthPasswordService } from "../auth-password.service";
 import { AuthLoginService } from "../auth-login.service";
 import { SocialLoginService } from "./social-login.service";
+import { SocialIdentityService } from "./social-identity.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { AppleTokenService } from "./apple-token.service";
@@ -26,6 +31,11 @@ import { LegalIdentityService } from "../../legal-identity/legal-identity.servic
 describe("AuthService.loginWithGoogle", () => {
   let service: AuthService;
   const google = { verifyIdToken: jest.fn() };
+  const socialIdentity = {
+    resolveUser: jest
+      .fn()
+      .mockResolvedValue({ userId: "u1", outcome: "existing" }),
+  };
   const baseUser = {
     id: "u1",
     email: "a@b.com",
@@ -39,14 +49,8 @@ describe("AuthService.loginWithGoogle", () => {
     membership: null,
   };
   const prisma: any = {
-    oAuthAccount: {
-      findUnique: jest.fn(),
-      create: jest.fn().mockResolvedValue({ id: "oa1" }),
-    },
     user: {
       findUnique: jest.fn(),
-      findFirst: jest.fn(),
-      create: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
     },
     refreshToken: {
@@ -56,6 +60,10 @@ describe("AuthService.loginWithGoogle", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    socialIdentity.resolveUser.mockResolvedValue({
+      userId: "u1",
+      outcome: "existing",
+    });
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -64,6 +72,7 @@ describe("AuthService.loginWithGoogle", () => {
         AuthPasswordService,
         AuthLoginService,
         SocialLoginService,
+        { provide: SocialIdentityService, useValue: socialIdentity },
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,
@@ -122,20 +131,22 @@ describe("AuthService.loginWithGoogle", () => {
     service = moduleRef.get(AuthService);
   });
 
-  it("logs in via existing OAuthAccount (no new user)", async () => {
+  it("resolves the verified Google identity and answers with the login response", async () => {
     google.verifyIdToken.mockResolvedValue({
       sub: "g1",
       email: "a@b.com",
       name: "Ali",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue({
-      id: "oa1",
-      userId: "u1",
+      picture: "http://x/y.png",
     });
     prisma.user.findUnique.mockResolvedValue(baseUser); // buildUserAuthResponse re-query
     const res = await service.loginWithGoogle("tok");
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(prisma.oAuthAccount.create).not.toHaveBeenCalled();
+    expect(socialIdentity.resolveUser).toHaveBeenCalledWith(
+      { provider: "google", providerUserId: "g1", email: "a@b.com" },
+      { displayName: "Ali", avatarUrl: "http://x/y.png" },
+    );
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "u1" } }),
+    );
     expect(res.user.email).toBe("a@b.com");
     expect(res.tokens.accessToken).toBe("tok");
   });
@@ -145,10 +156,6 @@ describe("AuthService.loginWithGoogle", () => {
       sub: "g1",
       email: "a@b.com",
       name: "Ali",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue({
-      id: "oa1",
-      userId: "u1",
     });
     prisma.user.findUnique.mockResolvedValue({
       ...baseUser,
@@ -165,10 +172,6 @@ describe("AuthService.loginWithGoogle", () => {
       sub: "g1",
       email: "a@b.com",
       name: "Ali",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue({
-      id: "oa1",
-      userId: "u1",
     });
     prisma.user.findUnique.mockResolvedValue({
       ...baseUser,
@@ -190,10 +193,6 @@ describe("AuthService.loginWithGoogle", () => {
       email: "a@b.com",
       name: "Ali",
     });
-    prisma.oAuthAccount.findUnique.mockResolvedValue({
-      id: "oa1",
-      userId: "u1",
-    });
     prisma.user.findUnique.mockResolvedValue(baseUser);
 
     await service.loginWithGoogle("tok");
@@ -209,101 +208,11 @@ describe("AuthService.loginWithGoogle", () => {
     );
   });
 
-  it("auto-links to existing user with same email", async () => {
+  it("issues no tokens for a deleted row even when a link points to it", async () => {
     google.verifyIdToken.mockResolvedValue({
       sub: "g1",
       email: "a@b.com",
       name: "Ali",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findFirst.mockResolvedValue(baseUser); // step 2: email lookup (deletedAt:null)
-    prisma.user.findUnique.mockResolvedValue(baseUser); // buildUserAuthResponse re-query
-    await service.loginWithGoogle("tok");
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(prisma.oAuthAccount.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          provider: "google",
-          providerUserId: "g1",
-          userId: "u1",
-        }),
-      }),
-    );
-  });
-
-  it("creates a new user when no account/email match", async () => {
-    google.verifyIdToken.mockResolvedValue({
-      sub: "g1",
-      email: "new@b.com",
-      name: "Yeni",
-      picture: "http://x/y.png",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findFirst.mockResolvedValue(null); // step 2: email lookup → yok
-    prisma.user.findUnique.mockResolvedValue({
-      ...baseUser,
-      id: "u2",
-      email: "new@b.com",
-      displayName: "Yeni",
-    });
-    prisma.user.create.mockResolvedValue({
-      id: "u2",
-      email: "new@b.com",
-      isSeller: false,
-    });
-    await service.loginWithGoogle("tok");
-    expect(prisma.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          email: "new@b.com",
-          passwordHash: null,
-          isEmailVerified: true,
-          isSeller: false,
-        }),
-      }),
-    );
-    expect(prisma.oAuthAccount.create).toHaveBeenCalled();
-  });
-
-  it("silinmiş hesaba email ile oto-bağlanmaz; yeni temiz kullanıcı oluşturur", async () => {
-    // Senaryo: kullanıcı Google hesabını sildi (email serbest, OAuth koptu).
-    // Eski bozuk silme kalıntısı olarak deletedAt'li satır kalmış olsa bile
-    // findFirst({deletedAt:null}) onu görmez → step 3'te temiz yeni kullanıcı.
-    google.verifyIdToken.mockResolvedValue({
-      sub: "g1",
-      email: "a@b.com",
-      name: "Ali",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findFirst.mockResolvedValue(null); // deletedAt'li satır filtrelendi
-    prisma.user.findUnique.mockResolvedValue({
-      ...baseUser,
-      id: "u3",
-      email: "a@b.com",
-    });
-    prisma.user.create.mockResolvedValue({
-      id: "u3",
-      email: "a@b.com",
-      isSeller: false,
-    });
-    await service.loginWithGoogle("tok");
-    expect(prisma.user.create).toHaveBeenCalled();
-    expect(prisma.user.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ deletedAt: null }),
-      }),
-    );
-  });
-
-  it("silinmiş satıra ait OAuthAccount eşleşse bile token vermez (buildUserAuthResponse reddi)", async () => {
-    google.verifyIdToken.mockResolvedValue({
-      sub: "g1",
-      email: "a@b.com",
-      name: "Ali",
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue({
-      id: "oa1",
-      userId: "u1",
     });
     prisma.user.findUnique.mockResolvedValue({
       ...baseUser,

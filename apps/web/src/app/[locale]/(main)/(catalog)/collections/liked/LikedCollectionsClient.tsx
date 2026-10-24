@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { RectangleStackIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useAuthStore } from "@/stores/authStore";
 import { collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import { Button } from "@tarodan/ui";
+import { Button, EmptyState } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import ErrorState from "@/components/feedback/ErrorState";
 import CollectionCard from "../_components/CollectionCard";
 
 interface Collection {
@@ -160,34 +162,23 @@ export default function LikedCollectionsClient() {
             ))}
           </div>
         ) : error ? (
-          <div className="text-center py-20 bg-surface-elevated rounded border border-border">
-            <p className="text-danger-500 text-sm mb-3">{error}</p>
-            <Button
-              variant="secondary"
-              onClick={() => likedQuery.refetch()}
-              className="px-4 py-2 bg-surface-alt hover:bg-border-subtle text-body rounded text-sm font-medium transition-colors"
-            >
-              {t("collection.tryAgain")}
-            </Button>
-          </div>
+          <ErrorState
+            inline
+            description={error}
+            reset={() => likedQuery.refetch()}
+            retrying={likedQuery.isRefetching}
+          />
         ) : collections.length === 0 ? (
-          <div className="text-center py-20 bg-surface-elevated rounded border border-border">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-surface rounded mb-4">
-              <BookOpenIcon className="w-7 h-7 text-subtle" />
-            </div>
-            <p className="text-muted text-lg font-medium mb-1">
-              {t("collection.noLikedCollections")}
-            </p>
-            <p className="text-subtle text-sm mb-4">
-              {t("collection.exploreTip")}
-            </p>
-            <Link
-              href="/collections"
-              className="inline-block px-5 py-2 bg-primary-500 hover:bg-primary-600 text-inverted rounded text-sm font-medium transition-colors"
-            >
-              {t("collection.exploreCollections")}
-            </Link>
-          </div>
+          <EmptyState
+            icon={<RectangleStackIcon className="h-7 w-7" />}
+            title={t("collection.noLikedCollections")}
+            description={t("collection.exploreTip")}
+            action={
+              <ButtonLink href="/collections">
+                {t("collection.exploreCollections")}
+              </ButtonLink>
+            }
+          />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {collections.map((collection, index) => (

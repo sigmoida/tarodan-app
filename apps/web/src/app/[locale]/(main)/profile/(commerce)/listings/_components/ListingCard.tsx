@@ -3,7 +3,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDayMonth } from "@/lib/format";
 import {
   PencilIcon,
   TrashIcon,
@@ -17,10 +17,14 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
+import { ProductBadge } from "@tarodan/ui/product-badge";
+import { productCardAction, listingPath } from "@tarodan/types";
 import OptimizedImage from "@/components/OptimizedImage";
+import { useBoostEnabled } from "@/components/boost/useBoostOffers";
+import { useAuthStore } from "@/stores/authStore";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -67,11 +71,29 @@ export default function ListingCard({
   onBoost,
 }: ListingCardProps) {
   const t = useTranslations();
+  const locale = useLocale();
   const status = getListingStatus(listingStatusKey(listing), t);
   const StatusIcon = status.icon;
   const viewable = VIEWABLE.includes(listing.status);
   const onSale = isProductOnSaleDisplay(listing);
   const actions = getListingActions(listing);
+  // The boost button follows the listing cards' one rule. My listings are
+  // the viewer's own (`GET /products/my`), so the seller is the viewer.
+  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const canBoost = useBoostEnabled();
+  const cardAction = productCardAction(
+    {
+      sellerId: userId,
+      status: listing.status,
+      availableQuantity: null,
+      isBoosted: listing.isBoosted,
+    },
+    { userId, canBoost },
+  );
+  const boostEndsAt =
+    listing.isBoosted && listing.boostedUntil
+      ? formatDayMonth(listing.boostedUntil, locale)
+      : "";
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
@@ -96,14 +118,16 @@ export default function ListingCard({
           </Badge>
         </div>
         {listing.isBoosted && (
-          <div className="absolute right-2 top-2">
-            <Badge
-              variant="warning"
-              size="sm"
+          // The listing cards' boosted badge; above the stretched title link
+          // for its paid-placement tooltip.
+          <div className="absolute right-2 top-2 z-10">
+            <ProductBadge
+              variant="boosted"
+              title={t("product.boostedBadgeHint")}
               icon={<RocketLaunchIcon className="h-3 w-3" />}
             >
               {t("product.boostedBadge")}
-            </Badge>
+            </ProductBadge>
           </div>
         )}
       </div>
@@ -112,7 +136,7 @@ export default function ListingCard({
       <div className="flex flex-1 flex-col p-4">
         {viewable ? (
           <Link
-            href={`/listings/${listing.id}`}
+            href={listingPath(listing)}
             className="mb-2 line-clamp-2 font-semibold text-heading transition-colors after:absolute after:inset-0 group-hover:text-primary-600"
           >
             {listing.title}
@@ -151,6 +175,11 @@ export default function ListingCard({
               </div>
             )}
           </div>
+          {boostEndsAt && (
+            <p className="mt-0.5 text-xs text-muted">
+              {t("product.boostEndsAt", { date: boostEndsAt })}
+            </p>
+          )}
           {listing.status !== "sold" && estimatedNet != null && (
             <p className="mt-0.5 text-xs text-success-600">
               {t("product.estimatedNet", {
@@ -221,6 +250,8 @@ export default function ListingCard({
                   </ButtonLink>
                 );
               case "boost":
+                // Hidden (not disabled) while boost sales are off.
+                if (cardAction.kind !== "boost") return null;
                 return (
                   <Button
                     key={action}
@@ -230,7 +261,7 @@ export default function ListingCard({
                     className={className}
                   >
                     <RocketLaunchIcon className="h-4 w-4" />
-                    {listing.isBoosted
+                    {cardAction.extend
                       ? t("product.extendBoost")
                       : t("product.boostListing")}
                   </Button>

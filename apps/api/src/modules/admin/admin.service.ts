@@ -20,6 +20,7 @@ import { AdminSupportService } from "./ops/admin-support.service";
 import { AdminContentService } from "./catalog/admin-content.service";
 import { AdminTaxService } from "./finance/admin-tax.service";
 import { AdminMembershipService } from "./finance/admin-membership.service";
+import type { MembershipTierUpdateInput } from "../membership/membership-tier-update.service";
 import { AdminCatalogService } from "./catalog/admin-catalog.service";
 import { AdminCollectionService } from "./catalog/admin-collection.service";
 import {
@@ -66,11 +67,12 @@ import {
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
+  MarkPayoutTransferPaidDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
   RatingQueryDto,
-  RatingStatus,
+  UpdateRatingStatusDto,
   AdminUserRatingQueryDto,
   AdminCategoryQueryDto,
   AdminBrandQueryDto,
@@ -754,8 +756,24 @@ export class AdminService {
     );
   }
 
-  async retryPayoutTransfer(adminId: string, transferId: string) {
-    return this.payoutService.retryPayoutTransfer(adminId, transferId);
+  async retryPayoutTransfer(
+    adminId: string,
+    transferId: string,
+    input: { confirmProviderChecked?: boolean; reason?: string } = {},
+  ) {
+    return this.payoutService.retryPayoutTransfer(adminId, transferId, input);
+  }
+
+  async markPayoutTransferPaid(
+    adminId: string,
+    transferId: string,
+    input: MarkPayoutTransferPaidDto,
+  ) {
+    return this.payoutService.markPayoutTransferPaid(
+      adminId,
+      transferId,
+      input,
+    );
   }
 
   async getFailedPayouts(page = 1, limit = 20) {
@@ -1042,7 +1060,7 @@ export class AdminService {
   // ==================== EMAIL TEMPLATES ====================
   // Taşındı: admin-content.service.ts — imzalar aynen korunuyor (facade delege).
 
-  substituteVariables(text: string, data: Record<string, any>): string {
+  substituteVariables(text: string, data: Record<string, unknown>): string {
     return this.contentService.substituteVariables(text, data);
   }
 
@@ -1068,7 +1086,7 @@ export class AdminService {
 
   async previewEmailTemplate(
     key: string,
-    templateData?: Record<string, any>,
+    templateData?: Record<string, unknown>,
     overrideHtml?: string,
     overrideSubject?: string,
   ) {
@@ -1082,7 +1100,7 @@ export class AdminService {
 
   async sendTestEmail(
     key: string,
-    dto: { to: string; templateData?: Record<string, any> },
+    dto: { to: string; templateData?: Record<string, unknown> },
   ) {
     return this.contentService.sendTestEmail(key, dto);
   }
@@ -1275,20 +1293,7 @@ export class AdminService {
   async updateMembershipTier(
     adminId: string,
     tierId: string,
-    dto: {
-      name?: string;
-      description?: string;
-      monthlyPrice?: number;
-      yearlyPrice?: number;
-      maxFreeListings?: number;
-      maxTotalListings?: number;
-      maxImagesPerListing?: number;
-      canCreateCollections?: boolean;
-      canTrade?: boolean;
-      isAdFree?: boolean;
-      isActive?: boolean;
-      sortOrder?: number;
-    },
+    dto: MembershipTierUpdateInput,
   ) {
     return this.membershipService.updateMembershipTier(adminId, tierId, dto);
   }
@@ -1719,7 +1724,7 @@ export class AdminService {
   }
 
   // ==================== REVIEWS & RATINGS ====================
-  // Taşındı: admin-review.service.ts — imzalar aynen korunuyor (facade delege).
+  // Moved to admin-review.service.ts; the facade delegates.
 
   async getReviews(query: RatingQueryDto) {
     return this.reviewService.getReviews(query);
@@ -1728,19 +1733,25 @@ export class AdminService {
   async updateReviewStatus(
     adminId: string,
     reviewId: string,
-    status: RatingStatus,
+    dto: UpdateRatingStatusDto,
   ) {
-    return this.reviewService.updateReviewStatus(adminId, reviewId, status);
+    return this.reviewService.updateReviewStatus(adminId, reviewId, dto);
   }
 
   async getUserRatings(query: AdminUserRatingQueryDto) {
     return this.reviewService.getUserRatings(query);
   }
 
+  async updateUserRatingStatus(
+    adminId: string,
+    ratingId: string,
+    dto: UpdateRatingStatusDto,
+  ) {
+    return this.reviewService.updateUserRatingStatus(adminId, ratingId, dto);
+  }
+
   // ==================== SELLER APPLICATIONS ====================
-  // Taşındı: admin-seller-application.service.ts — imzalar aynen korunuyor (facade delege).
-  // Not: updateUserRatingStatus da bu banner aralığında
-  // olduğu için bölümle birlikte taşındı.
+  // Moved to admin-seller-application.service.ts; the facade delegates.
 
   async getSellerApplications(query: SellerApplicationQueryDto) {
     return this.sellerApplicationService.getSellerApplications(query);
@@ -1789,18 +1800,6 @@ export class AdminService {
     return this.sellerApplicationService.finalApproveSellerApplication(
       adminId,
       applicationId,
-    );
-  }
-
-  async updateUserRatingStatus(
-    adminId: string,
-    ratingId: string,
-    status: RatingStatus,
-  ) {
-    return this.sellerApplicationService.updateUserRatingStatus(
-      adminId,
-      ratingId,
-      status,
     );
   }
 }

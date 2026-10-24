@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import {
   ArrowsRightLeftIcon,
   ClockIcon,
@@ -14,6 +14,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useTrades } from "./_hooks/useTrades";
 import TradeCard from "./_components/TradeCard";
 
@@ -82,23 +84,18 @@ export default function TradesPage() {
           ))}
         </div>
       ) : trades.length === 0 ? (
-        <div className="rounded border border-border bg-surface-elevated p-12 text-center">
-          <ArrowsRightLeftIcon className="mx-auto mb-4 h-16 w-16 text-border-strong" />
-          <h2 className="mb-2 text-xl font-semibold text-heading">
-            {t("trade.noTrades")}
-          </h2>
-          <p className="mb-6 text-muted">
-            {isAuthenticated
+        <EmptyState
+          icon={<ArrowsRightLeftIcon className="h-7 w-7" />}
+          title={t("trade.noTrades")}
+          description={
+            isAuthenticated
               ? t("trade.noTradesHint")
-              : t("trade.tradeRequiresLogin")}
-          </p>
-          <Link
-            href="/listings"
-            className="inline-flex items-center gap-2 rounded bg-primary-500 px-6 py-3 font-medium text-inverted transition-colors hover:bg-primary-600"
-          >
-            {t("cart.browseListings")}
-          </Link>
-        </div>
+              : t("trade.tradeRequiresLogin")
+          }
+          action={
+            <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
+          }
+        />
       ) : (
         <div className="space-y-4">
           {trades.map((trade) => (

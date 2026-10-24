@@ -40,7 +40,13 @@ vi.mock("@/stores/authStore", () => ({
     selector({ user: { id: "me" } }),
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "tr",
   useTranslations: () => (key: string) => key,
+}));
+// The card's price-row action reads the boost switch (a query); collection
+// items carry no listing status, so the card shows no action here.
+vi.mock("@/components/boost/useBoostOffers", () => ({
+  useBoostEnabled: () => true,
 }));
 vi.mock("@/components/OptimizedImage", () => ({
   default: ({ alt }: { alt: string }) => <span data-img>{alt}</span>,
@@ -94,7 +100,8 @@ describe("CollectionItemsGrid rozetleri", () => {
     h.items = [item({ isBoosted: true })];
     act(() => root.render(<CollectionItemsGrid />));
     expect(stacks()).toHaveLength(1);
-    expect(container.textContent).toContain("product.sponsored");
+    expect(container.textContent).toContain("product.boostedBadge");
+    expect(container.textContent).not.toContain("product.sponsored");
   });
 
   it("satıldı öğede durum rozeti çizilir, kartın yığını çizilmez", () => {

@@ -1,25 +1,25 @@
 import { getTranslations } from "next-intl/server";
-import type { Product } from "@/types/product";
-import HomeSection from "./HomeSection";
+import { productBadgeLabels } from "@/lib/productCardBadges";
+import type { HomeRailSeed } from "../lib/rails";
 import FeaturedRailClient from "./FeaturedRailClient";
+import HomeRailSection from "./HomeRailSection";
 
-export default async function FeaturedRail({ items }: { items: Product[] }) {
+export default async function FeaturedRail({ items }: { items: HomeRailSeed }) {
   const t = await getTranslations();
-  if (items.length === 0) return null;
 
   return (
-    <HomeSection
+    <HomeRailSection
+      rail="featured"
+      items={items}
       title={t("home.featuredRailTitle")}
       viewAllHref="/listings"
-      viewAllLabel={t("home.viewAll")}
-    >
-      <FeaturedRailClient
-        initialItems={items}
-        sponsoredLabel={t("product.sponsored")}
-        tradeLabel={t("faq.trade")}
-        discountLabel={t("product.discount")}
-        outOfStockLabel={t("product.stockFinished")}
-      />
-    </HomeSection>
+      body={
+        <FeaturedRailClient
+          initialItems={items}
+          badgeLabels={productBadgeLabels(t)}
+          outOfStockLabel={t("product.stockFinished")}
+        />
+      }
+    />
   );
 }

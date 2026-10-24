@@ -57,6 +57,20 @@ export function fmtNumber(value?: number | string | null): string | undefined {
   return Number.isFinite(n) ? numFmt.format(n) : undefined;
 }
 
+/** `3,74` — plain number with a fixed number of decimals (default 2). */
+export function fmtDecimal(
+  value?: number | string | null,
+  fractionDigits = 2,
+): string | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(n);
+}
+
 /** `%12`, `%12,5` — Türkçe yazım: işaret önde, ondalık virgül. */
 export function fmtPercent(
   value?: number | string | null,

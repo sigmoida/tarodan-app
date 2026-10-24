@@ -5,6 +5,8 @@ export * from "./spacing";
 export * from "./typography";
 export * from "./motion";
 export * from "./z-index";
+export * from "./containers";
+export * from "./breakpoints";
 
 import { colors } from "./colors";
 import { radius } from "./radius";
@@ -13,6 +15,8 @@ import { spacing } from "./spacing";
 import { typography } from "./typography";
 import { motion } from "./motion";
 import { zIndex } from "./z-index";
+import { containers } from "./containers";
+import { breakpoints } from "./breakpoints";
 
 export const tokens = {
   colors,
@@ -22,6 +26,8 @@ export const tokens = {
   typography,
   motion,
   zIndex,
+  containers,
+  breakpoints,
 } as const;
 
 export type Tokens = typeof tokens;

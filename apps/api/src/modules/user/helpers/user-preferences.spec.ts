@@ -36,6 +36,7 @@ describe("user preferences", () => {
       {} as never, // search
       {} as never, // cache
       {} as never, // notifications
+      {} as never, // sellerTrust
     );
   });
 

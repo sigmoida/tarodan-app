@@ -5,18 +5,20 @@ import {
   isProductOutOfStock,
 } from "@/lib/productPrice";
 import type { Product } from "@/types/product";
+import type { Translate } from "@/types/i18n";
 
 /**
- * Grid kartının görsel sol-üst badge yığınının TEK seçim kuralı (`ProductCard`
- * ve ana sayfadaki `HomeProductCard` aynısını kullanır; mobil kartla birebir).
- * İndirim yüzdesi `getProductDiscountPercent`'ten gelir. Sıra sabittir: %İndirim → Sponsorlu → Takas → Kampanya adı; uygun olanların
- * ilk `MAX_CARD_BADGES` tanesi gösterilir.
+ * The one selection rule for the badge stack at the top left of a grid card's
+ * image (`ProductCard` and the home `HomeProductCard` use it; the mobile card
+ * mirrors it). The discount percent comes from `getProductDiscountPercent`.
+ * The order is fixed: discount, boosted ("Öne Çıkan"), trade, campaign name;
+ * the first `MAX_CARD_BADGES` that apply are shown.
  */
 export const MAX_CARD_BADGES = 2;
 
 export type ProductCardBadge =
   | { kind: "sale"; percent: number }
-  | { kind: "sponsored" }
+  | { kind: "boosted" }
   | { kind: "trade" }
   | { kind: "campaign"; label: string };
 
@@ -51,16 +53,38 @@ export function isProductTradeBadgeVisible(
   );
 }
 
+/** The copy the badges need; build it with `productBadgeLabels(t)`. */
 export interface ProductBadgeLabels {
-  /** "indirim" — yüzdenin yanındaki erişilebilir ad ("%38 indirim"). */
+  /** "indirim": read after the percent ("%38 indirim"). */
   discount: string;
-  sponsored: string;
+  /** "Öne Çıkan": the visible boosted badge. */
+  boosted: string;
+  /**
+   * "Satıcı bu ilanı ücretli olarak öne çıkardı": what a screen reader reads
+   * for the boosted badge, and its tooltip (paid placement disclosure).
+   */
+  boostedHint: string;
   trade: string;
 }
 
 /**
- * Rozetlerin ekran okuyucu metni ("%38 indirim, Takas"): rozetler görsel olarak
- * `aria-hidden`'dır; grid ve liste kartı AYNI biçimde bunu okutur.
+ * The badge copy from the shared catalog, for server (`getTranslations`) and
+ * client (`useTranslations`) cards alike. "Sponsorlu" (`product.sponsored`)
+ * is the ads' text and never a listing badge.
+ */
+export function productBadgeLabels(t: Translate): ProductBadgeLabels {
+  return {
+    discount: t("product.discount"),
+    boosted: t("product.boostedBadge"),
+    boostedHint: t("product.boostedBadgeHint"),
+    trade: t("faq.trade"),
+  };
+}
+
+/**
+ * The screen-reader text of the badges ("%38 indirim, Takas"): the visible
+ * badges are `aria-hidden`, and the grid and list cards read this one text
+ * inside their title link.
  */
 export function describeProductBadges(
   badges: ProductCardBadge[],
@@ -71,8 +95,8 @@ export function describeProductBadges(
       switch (badge.kind) {
         case "sale":
           return `%${badge.percent} ${labels.discount}`;
-        case "sponsored":
-          return labels.sponsored;
+        case "boosted":
+          return labels.boostedHint;
         case "trade":
           return labels.trade;
         case "campaign":
@@ -90,7 +114,7 @@ export function selectProductCardBadges(
   // Yüzde 1'in altındaysa (ör. %0 / hatalı fiyat) indirim rozeti hiç yok.
   const percent = getProductDiscountPercent(p);
   if (percent >= 1) badges.push({ kind: "sale", percent });
-  if (p.isBoosted === true) badges.push({ kind: "sponsored" });
+  if (p.isBoosted === true) badges.push({ kind: "boosted" });
   if (isProductTradeBadgeVisible(p)) badges.push({ kind: "trade" });
   // Bedel kampanyaları fiyatı DEĞİŞTİRMEZ (komisyonu/kargoyu indirir), bu
   // yüzden vitrinde ancak rozetle görünürler; kartta yalnız ilk kampanya.

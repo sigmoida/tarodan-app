@@ -1,4 +1,4 @@
-import { Button, type ButtonProps } from "@tarodan/ui";
+import { Button, type ButtonProps } from "@tarodan/ui/button";
 import { Link } from "@/i18n/navigation";
 import type { ReactNode } from "react";
 

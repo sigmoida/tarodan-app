@@ -379,6 +379,8 @@ export function getEmailTemplateSubject(
     "trade-cancelled-platform": `Takasınız Tarodan Tarafından İptal Edildi - ${data?.tradeNumber || ""}`,
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
+    "account-security-notice":
+      data?.title || "Hesabınızın giriş yöntemleri değişti",
     "site-access-invite": "Tarodan Erken Erişim Davetiniz",
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
     "seller-invoice": `Satıcı Faturanız - Sipariş #${data?.orderNumber || ""}`,
@@ -459,7 +461,7 @@ export function renderEmailTemplate(
   const greeting = (name: string) => `
     <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">Merhaba <strong style="color: #111827;">${name || "Değerli Üyemiz"}</strong>,</p>`;
 
-  const titleBlock = (text: string, _decoration?: string) => `
+  const titleBlock = (text: string) => `
     <h2 style="font-size: 24px; font-weight: 700; color: #27272a; margin: 0 0 16px 0; line-height: 1.3;">${text}</h2>`;
 
   // Ürün adına adet ekle ("Ürün adı × 3"); adet 1/boş ise gürültü yapma.
@@ -474,7 +476,7 @@ export function renderEmailTemplate(
   const templates: Record<string, string> = {
     welcome: wrapEmail(
       `
-      ${titleBlock("Tarodan'a Hoş Geldiniz!", "🎉")}
+      ${titleBlock("Tarodan'a Hoş Geldiniz!")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Türkiye'nin en büyük diecast pazaryerine katıldığınız için teşekkür ederiz!</p>
       ${successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">Hesabınız başarıyla oluşturuldu.<br/>E-postanızı doğrulayarak tüm özelliklere erişebilirsiniz.</p>`)}
@@ -488,7 +490,7 @@ export function renderEmailTemplate(
 
     "order-confirmation": wrapEmail(
       `
-      ${titleBlock("Sipariş Onayı", "✅")}
+      ${titleBlock("Sipariş Onayı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz başarıyla oluşturuldu!</p>
       ${detailsBox(`
@@ -506,7 +508,7 @@ export function renderEmailTemplate(
 
     "order-created-buyer": wrapEmail(
       `
-      ${titleBlock("Siparişiniz Alındı", "🛒")}
+      ${titleBlock("Siparişiniz Alındı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz başarıyla oluşturuldu ve ödemeniz alındı.</p>
       ${detailsBox(`
@@ -526,7 +528,7 @@ export function renderEmailTemplate(
 
     "order-created-seller": wrapEmail(
       `
-      ${titleBlock("Yeni Sipariş!", "🎉")}
+      ${titleBlock("Yeni Sipariş!")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz için yeni bir sipariş aldınız.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Yeni satış bildirimi</p>`)}
@@ -546,7 +548,7 @@ export function renderEmailTemplate(
 
     "order-paid": wrapEmail(
       `
-      ${titleBlock("Ödeme Alındı", "✅")}
+      ${titleBlock("Ödeme Alındı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için ödeme başarıyla alındı.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme başarıyla tamamlandı</p>`)}
@@ -571,7 +573,7 @@ export function renderEmailTemplate(
     // takip linki verilir. Satıcı mailleri/faturalar ÜRÜN BAŞINA ('order-paid-seller').
     "order-paid-group": wrapEmail(
       `
-      ${titleBlock("Siparişiniz Alındı", "✅")}
+      ${titleBlock("Siparişiniz Alındı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için ödeme başarıyla alındı. Ürünleriniz satıcı bazında paketler halinde (her satıcı için ayrı kargo) gönderilecektir.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme başarıyla tamamlandı</p>`)}
@@ -611,7 +613,7 @@ export function renderEmailTemplate(
 
     "order-paid-seller": wrapEmail(
       `
-      ${titleBlock("Yeni Sipariş!", "🎉")}
+      ${titleBlock("Yeni Sipariş!")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç ${emailTimingValue(data, "preparingDeadlineDays")} iş günü</strong> içinde kargoya veriniz.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme hesabınıza yansıyacak</p>`)}
@@ -634,7 +636,7 @@ export function renderEmailTemplate(
 
     "order-shipped": wrapEmail(
       `
-      ${titleBlock("Siparişiniz Kargoya Verildi", "📦")}
+      ${titleBlock("Siparişiniz Kargoya Verildi")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Harika haber! Siparişiniz kargoya verildi.</p>
       ${detailsBox(`
@@ -652,7 +654,7 @@ export function renderEmailTemplate(
 
     "order-delivered": wrapEmail(
       `
-      ${titleBlock("Siparişiniz Teslim Edildi", "🎁")}
+      ${titleBlock("Siparişiniz Teslim Edildi")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz başarıyla teslim edildi!</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Teslimat tamamlandı</p>`)}
@@ -672,7 +674,7 @@ export function renderEmailTemplate(
 
     "password-reset": wrapEmail(
       `
-      ${titleBlock("Şifre Sıfırlama Talebi", "🔐")}
+      ${titleBlock("Şifre Sıfırlama Talebi")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Hesabınız için şifre sıfırlama talebinde bulundunuz.</p>
       <div style="text-align: center; margin: 32px 0;">
@@ -685,7 +687,7 @@ export function renderEmailTemplate(
 
     "offer-received": wrapEmail(
       `
-      ${titleBlock("Yeni Teklif Aldınız!", "💰")}
+      ${titleBlock("Yeni Teklif Aldınız!")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüz için yeni bir teklif aldınız!</p>
       ${detailsBox(`
@@ -706,7 +708,7 @@ export function renderEmailTemplate(
 
     "offer-accepted": wrapEmail(
       `
-      ${titleBlock("Teklifiniz Kabul Edildi!", "🎉")}
+      ${titleBlock("Teklifiniz Kabul Edildi!")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! <strong>${data?.productTitle || ""}</strong> ürünü için verdiğiniz teklif kabul edildi.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Teklifiniz onaylandı</p>`)}
@@ -728,7 +730,7 @@ export function renderEmailTemplate(
 
     "wishlist-price-change": wrapEmail(
       `
-      ${titleBlock(data?.isPriceDrop ? "Fiyat Düştü!" : "Fiyat Değişti!", data?.isPriceDrop ? "🎉" : "📈")}
+      ${titleBlock(data?.isPriceDrop ? "Fiyat Düştü!" : "Fiyat Değişti!")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İstek listenizdeki bir ürünün fiyatı değişti:</p>
       ${detailsBox(`
@@ -754,7 +756,7 @@ export function renderEmailTemplate(
 
     "marketing-newsletter": wrapEmail(
       `
-      ${titleBlock("Tarodan Haftalık Bülteni", "📰")}
+      ${titleBlock("Tarodan Haftalık Bülteni")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bu hafta en çok ilgi gören ürünler:</p>
       ${
@@ -778,7 +780,7 @@ export function renderEmailTemplate(
 
     "marketing-monthly": wrapEmail(
       `
-      ${titleBlock("Tarodan Aylık Özel Fırsatlar", "🎁")}
+      ${titleBlock("Tarodan Aylık Özel Fırsatlar")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bu ay sizin için özel olarak seçtiğimiz ürünler:</p>
       ${
@@ -802,7 +804,7 @@ export function renderEmailTemplate(
 
     "payment-failed": wrapEmail(
       `
-      ${titleBlock("Ödemeniz Tamamlanamadı", "⚠️")}
+      ${titleBlock("Ödemeniz Tamamlanamadı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için ödeme işlemi tamamlanamadı ve sipariş iptal edildi.</p>
       ${detailsBox(`
@@ -821,7 +823,7 @@ export function renderEmailTemplate(
 
     "payment-refunded": wrapEmail(
       `
-      ${titleBlock("İade İşleminiz Tamamlandı", "💰")}
+      ${titleBlock("İade İşleminiz Tamamlandı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için iade işlemi başarıyla gerçekleştirildi.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İade işlemi onaylandı</p>`)}
@@ -840,7 +842,7 @@ export function renderEmailTemplate(
 
     "payment-refunded-seller": wrapEmail(
       `
-      ${titleBlock("İade İşlemi Bildirimi", "🔄")}
+      ${titleBlock("İade İşlemi Bildirimi")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir siparişiniz için iade işlemi gerçekleştirildi.</p>
       ${detailsBox(`
@@ -859,7 +861,7 @@ export function renderEmailTemplate(
 
     "premium-offer": wrapEmail(
       `
-      ${titleBlock("Premium ile Daha Fazlası Sizi Bekliyor", "🌟")}
+      ${titleBlock("Premium ile Daha Fazlası Sizi Bekliyor")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tarodan'da daha fazla satış ve özel ayrıcalıklar için Premium üyeliğe geçin!</p>
       ${detailsBox(`
@@ -879,7 +881,7 @@ export function renderEmailTemplate(
 
     "membership-expiring": wrapEmail(
       `
-      ${titleBlock("Üyeliğiniz Sona Eriyor", "⏰")}
+      ${titleBlock("Üyeliğiniz Sona Eriyor")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.tierName || "Üyeliğiniz"}</strong> üyeliğinizin süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : ""}sona erecek.</p>
       ${detailsBox(`
@@ -897,7 +899,7 @@ export function renderEmailTemplate(
 
     "membership-expiring-urgent": wrapEmail(
       `
-      ${titleBlock("Üyeliğiniz Yarın Sona Eriyor!", "🚨")}
+      ${titleBlock("Üyeliğiniz Yarın Sona Eriyor!")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.tierName || "Üyeliğiniz"}</strong> üyeliğinizin süresi <strong style="color: #dc2626;">yarın (${data?.expirationDate || ""})</strong> sona eriyor.</p>
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Üyeliğiniz sona erdiğinde Premium özelliklere erişiminiz kısıtlanacaktır.</p>`)}
@@ -910,7 +912,7 @@ export function renderEmailTemplate(
 
     "email-verification": wrapEmail(
       `
-      ${titleBlock("E-postanızı Doğrulayın", "✉️")}
+      ${titleBlock("E-postanızı Doğrulayın")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tarodan hesabınızı etkinleştirmek için e-posta adresinizi doğrulamanız gerekmektedir.</p>
       <div style="text-align: center; margin: 32px 0;">
@@ -924,7 +926,7 @@ export function renderEmailTemplate(
 
     "payment-received": wrapEmail(
       `
-      ${titleBlock("Ödeme Alındı", "✅")}
+      ${titleBlock("Ödeme Alındı")}
       ${greeting(data?.buyerName || data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ödemeniz başarıyla alındı.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme onaylandı</p>`)}
@@ -943,7 +945,7 @@ export function renderEmailTemplate(
 
     "product-approved": wrapEmail(
       `
-      ${titleBlock("Ürününüz Onaylandı", "✅")}
+      ${titleBlock("Ürününüz Onaylandı")}
       ${greeting(data?.sellerName || data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüz incelendi ve yayına alındı. Alıcılar artık ürününüzü görebilir!</p>
       ${successBox(`
@@ -961,7 +963,7 @@ export function renderEmailTemplate(
     // şablon kullanılır — fark yalnız karar cümlesi ve kutunun tonudur.
     "report-resolved": wrapEmail(
       `
-      ${titleBlock("Şikayetiniz Sonuçlandı", "📋")}
+      ${titleBlock("Şikayetiniz Sonuçlandı")}
       ${greeting(data?.reporterName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${
         data?.status === "dismissed"
@@ -991,7 +993,7 @@ export function renderEmailTemplate(
 
     "seller-application-approved": wrapEmail(
       `
-      ${titleBlock("Kurumsal Başvurunuz Onaylandı!", "🎉")}
+      ${titleBlock("Kurumsal Başvurunuz Onaylandı!")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         ${
@@ -1015,7 +1017,7 @@ export function renderEmailTemplate(
 
     "seller-application-rejected": wrapEmail(
       `
-      ${titleBlock("Kurumsal Başvurunuz Hakkında", "ℹ️")}
+      ${titleBlock("Kurumsal Başvurunuz Hakkında")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Kurumsal hesap başvurunuzu inceledik. Üzgünüz, şu an için başvurunuzu onaylayamıyoruz.
@@ -1046,7 +1048,7 @@ export function renderEmailTemplate(
 
     "seller-document-revision": wrapEmail(
       `
-      ${titleBlock("Belge Güncellemesi Gerekiyor", "📄")}
+      ${titleBlock("Belge Güncellemesi Gerekiyor")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Kurumsal başvurunuzdaki <strong>${data?.documentType || "belge"}</strong> için güncelleme istendi.
@@ -1063,7 +1065,7 @@ export function renderEmailTemplate(
 
     "seller-did-not-ship-refunded": wrapEmail(
       `
-      ${titleBlock("Satıcı Kargoya Vermedi — İadeniz Yapıldı", "💰")}
+      ${titleBlock("Satıcı Kargoya Vermedi — İadeniz Yapıldı")}
       ${greeting(data?.name || data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Satıcının belirlenen süre içinde kargoya vermemesi nedeniyle siparişiniz iptal edildi ve ödemeniz iade edildi.
@@ -1110,7 +1112,7 @@ export function renderEmailTemplate(
 
     "trade-received": wrapEmail(
       `
-      ${titleBlock("Yeni Takas Teklifi Aldınız!", "🔄")}
+      ${titleBlock("Yeni Takas Teklifi Aldınız!")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Bir kullanıcı size takas teklifi gönderdi. Teklifi inceleyip kabul veya reddedebilirsiniz.
@@ -1125,7 +1127,7 @@ export function renderEmailTemplate(
 
     "trade-accepted": wrapEmail(
       `
-      ${titleBlock("Takas Teklifiniz Kabul Edildi!", "🎉")}
+      ${titleBlock("Takas Teklifiniz Kabul Edildi!")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Harika haber! Takas teklifiniz karşı taraf tarafından kabul edildi.
@@ -1141,7 +1143,7 @@ export function renderEmailTemplate(
 
     "trade-shipped": wrapEmail(
       `
-      ${titleBlock("Takasınız Kargoya Verildi!", "🚚")}
+      ${titleBlock("Takasınız Kargoya Verildi!")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Takas ürünü kargoya verildi ve size doğru yola çıktı.
@@ -1160,7 +1162,7 @@ export function renderEmailTemplate(
 
     "trade-completed": wrapEmail(
       `
-      ${titleBlock("Takasınız Tamamlandı!", "✅")}
+      ${titleBlock("Takasınız Tamamlandı!")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Takas işleminiz başarıyla tamamlandı. Umarız her iki taraf için de keyifli bir deneyim olmuştur!
@@ -1200,7 +1202,7 @@ export function renderEmailTemplate(
 
     "guest-checkout-otp": wrapEmail(
       `
-      ${titleBlock("Misafir Sipariş Doğrulama Kodu", "🔑")}
+      ${titleBlock("Misafir Sipariş Doğrulama Kodu")}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Misafir alışverişinizi tamamlamak için doğrulama kodunuz:</p>
       <div style="text-align: center; margin: 32px 0;">
         <div style="display: inline-block; background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 16px; padding: 24px 48px;">
@@ -1215,7 +1217,7 @@ export function renderEmailTemplate(
 
     "email-change-otp": wrapEmail(
       `
-      ${titleBlock("E-posta Değişikliği Doğrulama Kodu", "📧")}
+      ${titleBlock("E-posta Değişikliği Doğrulama Kodu")}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Hesabınızın e-posta adresini bu adresle değiştirmek için doğrulama kodunuz:</p>
       <div style="text-align: center; margin: 32px 0;">
         <div style="display: inline-block; background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 16px; padding: 24px 48px;">
@@ -1226,6 +1228,20 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu değişikliği siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz; hesabınız etkilenmez.</p>
     `,
       "E-posta Değişikliği Doğrulama Kodu",
+    ),
+
+    "account-security-notice": wrapEmail(
+      `
+      ${titleBlock(data?.title || "Hesabınızın giriş yöntemleri değişti")}
+      ${greeting(data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${data?.message || ""}</p>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">${data?.warning || ""}</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Şifremi Sıfırla", data?.resetUrl || `${frontendUrl}/forgot-password`)}
+      </div>
+      <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Yardıma mı ihtiyacınız var? <a href="${safeEmailUrl(data?.supportUrl || `${frontendUrl}/support`, frontendUrl)}" style="color: #d95700;">Destek ekibimize ulaşın</a>.</p>
+    `,
+      data?.title || "Hesabınızın giriş yöntemleri değişti",
     ),
 
     "site-access-invite": wrapEmail(
@@ -1251,7 +1267,7 @@ export function renderEmailTemplate(
     // bedeli, üyelik, boost, takas, platform satışı, iade) bu tek şablonu kullanır. PDF ektedir.
     "elogo-invoice": wrapEmail(
       `
-      ${titleBlock("e-Arşiv Faturanız Hazır", "🧾")}
+      ${titleBlock("e-Arşiv Faturanız Hazır")}
       ${greeting(data?.recipientName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         <strong>${data?.description || "İşleminize ait"}</strong> için e-Arşiv faturanız oluşturuldu.
@@ -1273,7 +1289,7 @@ export function renderEmailTemplate(
     // Kurumsal satıcının siparişe yüklediği ÜRÜN faturası → ALICIYA (PDF ektedir).
     "seller-invoice": wrapEmail(
       `
-      ${titleBlock("Satıcı Faturanız Hazır", "🧾")}
+      ${titleBlock("Satıcı Faturanız Hazır")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         <strong>${data?.sellerName || "Satıcı"}</strong>, siparişinize ait faturayı yükledi. Fatura PDF'i bu e-postanın ekindedir.
@@ -1294,7 +1310,7 @@ export function renderEmailTemplate(
     // Fatura kesmek satıcının yasal yükümlülüğü; platform yalnız hatırlatır.
     "seller-invoice-reminder": wrapEmail(
       `
-      ${titleBlock("Fatura Bekleniyor", "⏳")}
+      ${titleBlock("Fatura Bekleniyor")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Teslim edilen aşağıdaki siparişinize ait <strong>ürün faturası</strong> henüz yüklenmedi.
@@ -1317,7 +1333,7 @@ export function renderEmailTemplate(
 
     "order-cancelled-buyer": wrapEmail(
       `
-      ${titleBlock("Siparişiniz İptal Edildi", "❌")}
+      ${titleBlock("Siparişiniz İptal Edildi")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki siparişiniz iptal edildi.</p>
       ${detailsBox(`
@@ -1338,7 +1354,7 @@ export function renderEmailTemplate(
 
     "order-cancelled-seller": wrapEmail(
       `
-      ${titleBlock("Sipariş İptal Edildi", "❌")}
+      ${titleBlock("Sipariş İptal Edildi")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüze ait bir sipariş iptal edildi. Bu ürün için ayırdığınız stok serbest bırakıldı.</p>
       ${detailsBox(`
@@ -1360,7 +1376,7 @@ export function renderEmailTemplate(
     // süresi değildir, bu yüzden metinde rakam yoktur.
     "order-cancelled-by-platform-buyer": wrapEmail(
       `
-      ${titleBlock("Siparişiniz Tarodan Tarafından İptal Edildi", "🛡️")}
+      ${titleBlock("Siparişiniz Tarodan Tarafından İptal Edildi")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki siparişiniz Tarodan tarafından iptal edildi.</p>
       ${detailsBox(`
@@ -1387,7 +1403,7 @@ export function renderEmailTemplate(
 
     "order-cancelled-by-platform-seller": wrapEmail(
       `
-      ${titleBlock("Sipariş Tarodan Tarafından İptal Edildi", "🛡️")}
+      ${titleBlock("Sipariş Tarodan Tarafından İptal Edildi")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüze ait bir sipariş Tarodan tarafından iptal edildi. ${
         data?.paid
@@ -1410,7 +1426,7 @@ export function renderEmailTemplate(
 
     "refund-requested-seller": wrapEmail(
       `
-      ${titleBlock("İade Talebi Aldınız", "🔄")}
+      ${titleBlock("İade Talebi Aldınız")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir alıcı siparişiniz için iade talebi oluşturdu. Sürecin güncel durumunu satış detayından takip edebilirsiniz.</p>
       ${detailsBox(`
@@ -1432,7 +1448,7 @@ export function renderEmailTemplate(
 
     "refund-approved-buyer": wrapEmail(
       `
-      ${titleBlock("İade Talebiniz Onaylandı", "✅")}
+      ${titleBlock("İade Talebiniz Onaylandı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz onaylandı.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İadeniz işleme alındı</p>`)}
@@ -1453,7 +1469,7 @@ export function renderEmailTemplate(
 
     "refund-rejected-buyer": wrapEmail(
       `
-      ${titleBlock("İade Talebiniz Hakkında", "ℹ️")}
+      ${titleBlock("İade Talebiniz Hakkında")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz incelendi. Üzgünüz, talebiniz şu an için onaylanamadı.</p>
       ${detailsBox(`
@@ -1474,7 +1490,7 @@ export function renderEmailTemplate(
 
     "refund-return-label-buyer": wrapEmail(
       `
-      ${titleBlock("İade Kargo Bilgileri", "📦")}
+      ${titleBlock("İade Kargo Bilgileri")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz onaylandı. Ürünü aşağıdaki bilgilerle kargoya verebilirsiniz.</p>
       ${detailsBox(`
@@ -1495,7 +1511,7 @@ export function renderEmailTemplate(
 
     "refund-completed": wrapEmail(
       `
-      ${titleBlock("İadeniz Tamamlandı", "💰")}
+      ${titleBlock("İadeniz Tamamlandı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade tutarınız ödeme yönteminize iade edildi. İşlem tamamlandı.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İadeniz tamamlandı</p>`)}
@@ -1516,7 +1532,7 @@ export function renderEmailTemplate(
 
     "refund-request-received-buyer": wrapEmail(
       `
-      ${titleBlock("İade Talebiniz Alındı", "📨")}
+      ${titleBlock("İade Talebiniz Alındı")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz alındı. Satıcının yanıtı bekleniyor; en geç 48 saat içinde sonuçlanır.</p>
       ${detailsBox(`
@@ -1535,7 +1551,7 @@ export function renderEmailTemplate(
 
     "refund-return-incoming-seller": wrapEmail(
       `
-      ${titleBlock("İade Kargosu Yola Çıktı", "📦")}
+      ${titleBlock("İade Kargosu Yola Çıktı")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Alıcı iade ürününü kargoya verdi; ürün size doğru yolda. Ürün elinize ulaştığında iade süreci tamamlanacaktır.</p>
       ${detailsBox(`
@@ -1554,7 +1570,7 @@ export function renderEmailTemplate(
 
     "refund-completed-seller": wrapEmail(
       `
-      ${titleBlock("İade Tamamlandı", "↩️")}
+      ${titleBlock("İade Tamamlandı")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bu sipariş için iade tamamlandı; tutar alıcıya iade edildi.</p>
       ${detailsBox(`
@@ -1573,7 +1589,7 @@ export function renderEmailTemplate(
 
     "refund-auto-accepted-seller": wrapEmail(
       `
-      ${titleBlock("İade Otomatik Onaylandı", "⏰")}
+      ${titleBlock("İade Otomatik Onaylandı")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebine 48 saat içinde yanıt verilmediği için talep otomatik olarak onaylandı.</p>
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade süreci başlatıldı. Ürün size iade kargosuyla gönderilecektir.</p>`)}
@@ -1592,7 +1608,7 @@ export function renderEmailTemplate(
 
     "review-received-seller": wrapEmail(
       `
-      ${titleBlock("Yeni Değerlendirme Aldınız", "⭐")}
+      ${titleBlock("Yeni Değerlendirme Aldınız")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.reviewerName || "Bir alıcı"}</strong> sizi değerlendirdi.</p>
       ${detailsBox(`
@@ -1611,7 +1627,7 @@ export function renderEmailTemplate(
 
     "listing-expiring": wrapEmail(
       `
-      ${titleBlock("İlanınızın Süresi Doluyor", "⏰")}
+      ${titleBlock("İlanınızın Süresi Doluyor")}
       ${greeting(data?.sellerName || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Süre dolunca ilanlarım sayfasından tek tıkla yenileyip görünürlüğünü koruyabilirsiniz.</p>
       ${detailsBox(`
@@ -1629,7 +1645,7 @@ export function renderEmailTemplate(
 
     "listing-expired": wrapEmail(
       `
-      ${titleBlock("İlanınızın Süresi Doldu", "📭")}
+      ${titleBlock("İlanınızın Süresi Doldu")}
       ${greeting(data?.sellerName || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanlarım sayfasındaki "Süresi dolan" sekmesinden ilanınızı tek tıkla, isterseniz birkaç ilanı birlikte yenileyebilirsiniz.</p>`)}
@@ -1642,7 +1658,7 @@ export function renderEmailTemplate(
 
     "new-follower": wrapEmail(
       `
-      ${titleBlock("Yeni Takipçiniz Var", "👥")}
+      ${titleBlock("Yeni Takipçiniz Var")}
       ${greeting(data?.name || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.followerName || "Yeni bir kullanıcı"}</strong> sizi takip etmeye başladı. Profilinizdeki yeni ilanlar takipçilerinize bildirilir.</p>
       <div style="text-align: center; margin: 32px 0;">
@@ -1654,7 +1670,7 @@ export function renderEmailTemplate(
 
     "back-in-stock": wrapEmail(
       `
-      ${titleBlock("Stoğa Geri Geldi!", "🔔")}
+      ${titleBlock("Stoğa Geri Geldi!")}
       ${greeting(data?.userName || data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Takip ettiğiniz <strong style="color: #111827;">${data?.productTitle || "ürün"}</strong> yeniden stokta! Tükenmeden hemen inceleyin.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ürün tekrar satışta</p>`)}
@@ -1677,7 +1693,7 @@ export function renderEmailTemplate(
 
     "payout-released-seller": wrapEmail(
       `
-      ${titleBlock("Ödemeniz Aktarıldı", "💸")}
+      ${titleBlock("Ödemeniz Aktarıldı")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Bir satışınıza ait ödeme banka hesabınıza aktarıldı.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme aktarımı tamamlandı</p>`)}
@@ -1699,7 +1715,7 @@ export function renderEmailTemplate(
 
     "payout-returned-seller": wrapEmail(
       `
-      ${titleBlock("Ödemeniz Geri Döndü", "⚠️")}
+      ${titleBlock("Ödemeniz Geri Döndü")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Size gönderdiğimiz ödeme, bankanız tarafından geri gönderildi. Bu genellikle IBAN'ın kapalı, bloke veya hatalı olmasından kaynaklanır. Tutar güvende — banka bilgileriniz güncellendikten sonra yeniden aktarılacak.</p>
       ${detailsBox(`
@@ -1719,13 +1735,14 @@ export function renderEmailTemplate(
 
     "payout-failed-seller": wrapEmail(
       `
-      ${titleBlock("Ödemeniz Aktarılamadı", "⚠️")}
+      ${titleBlock("Ödemeniz Aktarılamadı")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir satışınıza ait ödeme, banka hesabınıza aktarılamadı. Tutar güvende — banka bilgileriniz doğrulandıktan sonra yeniden aktarılacak.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Tutar", formatEmailPrice(data?.payoutAmount || 0) + " TL", true)}
           ${data?.bankAccountLast4 ? detailRow("Hesap", "•••• " + data.bankAccountLast4) : ""}
+          ${data?.failureReason ? detailRow("Neden", String(data.failureReason)) : ""}
         </table>
       `)}
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Lütfen profilinizden IBAN ve hesap sahibi bilgilerinizin doğru olduğundan emin olun. Sorun devam ederse destek ekibimizle iletişime geçin.</p>`)}
@@ -1742,7 +1759,7 @@ export function renderEmailTemplate(
 
   return wrapEmail(
     `
-    ${titleBlock("Tarodan Bildirimi", "🔔")}
+    ${titleBlock("Tarodan Bildirimi")}
     ${greeting(data?.buyerName || data?.sellerName || data?.userName || data?.name)}
     <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Hesabınızla ilgili yeni bir bildiriminiz var.</p>
     <div style="text-align: center; margin: 32px 0;">

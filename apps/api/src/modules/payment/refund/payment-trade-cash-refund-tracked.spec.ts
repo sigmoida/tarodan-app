@@ -15,9 +15,16 @@ import { i18nMessage } from "../../i18n";
 describe("PaymentTradeRefundService.refundTradeCashTracked — MONEY-H2 failure tracking", () => {
   const TRADE_ID = "trade-1";
 
-  const makeService = () => {
+  const makeService = (opts: { markerAlreadySet?: boolean } = {}) => {
     const prisma = {
-      trade: { update: jest.fn().mockResolvedValue({}) },
+      trade: {
+        update: jest.fn().mockResolvedValue({}),
+        // D1: the failure marker is written with a CAS on "no marker yet";
+        // only the call that starts the failure episode notifies the payer.
+        updateMany: jest
+          .fn()
+          .mockResolvedValue({ count: opts.markerAlreadySet ? 0 : 1 }),
+      },
       tradeCashPayment: {
         // Başarı yolunda iade edilen satırın sahibi findFirst ile çözülür;
         // hata yolunda tek-satırlı (v1) takasta sahibi findMany(take:2) bulur
@@ -52,18 +59,100 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — MONEY-H2 failure 
 
     expect(r.failed).toBe(true);
     expect(r.refunded).toBe(false);
-    expect(prisma.trade.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: TRADE_ID },
-        data: expect.objectContaining({
-          refundFailureReason: expect.stringContaining("PayTR down"),
-          refundFailureAt: expect.any(Date),
-        }),
-      }),
-    );
+    expect(prisma.trade.updateMany).toHaveBeenCalledWith({
+      where: { id: TRADE_ID, refundFailureReason: null },
+      data: {
+        refundFailureReason: expect.stringContaining("PayTR down"),
+        refundFailureAt: expect.any(Date),
+      },
+    });
     expect(eventService.emitTradeRefundFailed).toHaveBeenCalledWith(
       expect.objectContaining({ tradeId: TRADE_ID, cashPayerId: "payer-1" }),
     );
+  });
+
+  /**
+   * D1 parity: the retry sweep re-ran a marked trade every 5 minutes and each
+   * failure pushed "refund failed" to the cash payer again (about 24 a day
+   * after the push worker's 1 h dedupe). The payer hears it once per failure
+   * episode: when this call sets the marker. A retry while the marker is set
+   * only refreshes it. Success clears the marker and ends the episode.
+   */
+  it("a repeated failure while the trade is already marked refreshes the marker and does not notify again", async () => {
+    const { service, prisma, eventService } = makeService({
+      markerAlreadySet: true,
+    });
+    jest
+      .spyOn(service, "refundTradeCashPaymentIfCompleted")
+      .mockRejectedValue(new Error("PayTR down again"));
+
+    const r = await service.refundTradeCashTracked(TRADE_ID);
+
+    expect(r.failed).toBe(true);
+    expect(prisma.trade.update).toHaveBeenCalledWith({
+      where: { id: TRADE_ID },
+      data: {
+        refundFailureReason: expect.stringContaining("PayTR down again"),
+        refundFailureAt: expect.any(Date),
+      },
+    });
+    expect(eventService.emitTradeRefundFailed).not.toHaveBeenCalled();
+  });
+
+  it("if the marker cannot be written, the payer is still told (fail loud)", async () => {
+    const { service, prisma, eventService } = makeService();
+    prisma.trade.updateMany.mockRejectedValue(new Error("db down"));
+    jest
+      .spyOn(service, "refundTradeCashPaymentIfCompleted")
+      .mockRejectedValue(new Error("PayTR down"));
+
+    await service.refundTradeCashTracked(TRADE_ID);
+
+    expect(eventService.emitTradeRefundFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("a caller that alarms itself gets the failure at warn, any other caller at error", async () => {
+    type Logs = {
+      logger: {
+        error: (message: string) => void;
+        warn: (message: string) => void;
+      };
+    };
+    const failedLine = (calls: unknown[][]) =>
+      calls.filter(([line]) =>
+        String(line).startsWith("refundTradeCashTracked failed"),
+      );
+
+    const quiet = makeService();
+    const quietLogger = (quiet.service as unknown as Logs).logger;
+    const quietError = jest
+      .spyOn(quietLogger, "error")
+      .mockImplementation(() => undefined);
+    const quietWarn = jest
+      .spyOn(quietLogger, "warn")
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn(quiet.service, "refundTradeCashPaymentIfCompleted")
+      .mockRejectedValue(new Error("PayTR down"));
+
+    await quiet.service.refundTradeCashTracked(TRADE_ID, {
+      callerAlarms: true,
+    });
+
+    expect(failedLine(quietError.mock.calls)).toEqual([]);
+    expect(failedLine(quietWarn.mock.calls)).toHaveLength(1);
+
+    const loud = makeService();
+    const loudError = jest
+      .spyOn((loud.service as unknown as Logs).logger, "error")
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn(loud.service, "refundTradeCashPaymentIfCompleted")
+      .mockRejectedValue(new Error("PayTR down"));
+
+    await loud.service.refundTradeCashTracked(TRADE_ID);
+
+    expect(failedLine(loudError.mock.calls)).toHaveLength(1);
   });
 
   it("iade başarılıysa: marker'ı temizler, refund-completed yayınlar", async () => {
@@ -253,7 +342,10 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — kapsamlı iade ve
 describe("PaymentTradeRefundService.refundTradeCashTracked — 'henüz bildirilmedi' ertelemesi", () => {
   const makeService = () => {
     const prisma = {
-      trade: { update: jest.fn().mockResolvedValue({}) },
+      trade: {
+        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const eventService = {
@@ -294,6 +386,7 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — 'henüz bildirilm
       }),
     );
     expect(prisma.trade.update).not.toHaveBeenCalled();
+    expect(prisma.trade.updateMany).not.toHaveBeenCalled();
     expect(eventService.emitTradeRefundFailed).not.toHaveBeenCalled();
   });
 
@@ -305,7 +398,7 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — 'henüz bildirilm
     });
 
     expect(r.failed).toBe(true);
-    expect(prisma.trade.update).toHaveBeenCalledWith(
+    expect(prisma.trade.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           refundFailureReason: expect.any(String),

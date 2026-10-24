@@ -123,9 +123,14 @@ model User {
   oauthAccounts           OAuthAccount[]
   appleSignInTokens       AppleSignInToken[]
   reports                 Report[]                 @relation("ReporterReports")
-  productBoosts           ProductBoost[]
+  productBoosts           ProductBoost[]           @relation("UserProductBoosts")
+  boostsGranted           ProductBoost[]           @relation("BoostGrantedBy")
+  boostsCancelled         ProductBoost[]           @relation("BoostCancelledBy")
+  boostOfferDismissals    BoostOfferDismissal[]
   deletedIdentity         DeletedUserIdentity?
   consentRecords          ConsentRecord[]
+  sellerTrustScore        SellerTrustScore?
+  savedSearches           SavedSearch[]
 
   @@index([email])
   @@index([adminCode])
@@ -232,40 +237,51 @@ enum IdentitySnapshotSource {
 /// misafir siparişinin alıcısı paylaşılan sistem hesabıdır, kişiyi göstermez)
 /// ya da giriş yapmamış ziyaretçi (`visitorId`, yalnız çerez tercihi).
 model ConsentRecord {
-  id              String         @id @default(uuid())
+  id                 String            @id @default(uuid())
   /// Belge anahtarı: `@tarodan/types` CONSENT_DOCUMENT_KEYS. Enum DEĞİL —
   /// anahtar listesinin tek kaynağı o paket; müşteri yeni bir metin (ör. açık
   /// rıza) verdiğinde şema göçü gerekmesin. Yazım yalnız ConsentService'ten,
   /// anahtar doğrulanarak yapılır.
-  document        String
+  document           String
   /// Onaylanan metnin sürümü — kayıt anında `CONSENT_DOCUMENTS[document]
   /// .version`. Metin sonradan değişse de hangi metnin kabul edildiği kalır.
-  version         String
-  action          ConsentAction
-  source          ConsentSource
-  userId          String?        @map("user_id")
+  version            String
+  action             ConsentAction
+  source             ConsentSource
+  userId             String?           @map("user_id")
   /// Giriş yapmamış ziyaretçinin tarayıcıda ürettiği kalıcı kimlik (UUID).
   /// Yalnız çerez tercihinde dolar; üye girişliyse `userId` de yazılır.
-  visitorId       String?        @map("visitor_id")
+  visitorId          String?           @map("visitor_id")
   /// Misafir checkout'ta alıcının e-postası (küçük harf).
-  guestEmail      String?        @map("guest_email")
+  guestEmail         String?           @map("guest_email")
   /// Belgeye özgü ayrıntı: çerez kategorileri ({ functional, analytics,
   /// marketing }) gibi. Hukuki metin buraya yazılmaz — sürüm yeter.
-  details         Json?
+  details            Json?
   /// İstemci IP'si: web gateway'inden gelen istekte gateway'in taşıdığı
   /// tarayıcı IP'si, doğrudan çağrıda (mobil) bağlantının IP'si.
-  ipAddress       String?        @map("ip_address")
-  userAgent       String?        @map("user_agent")
+  ipAddress          String?           @map("ip_address")
+  userAgent          String?           @map("user_agent")
   /// Mesafeli satış onayının ait olduğu sepet / tekil (teklif) sipariş.
   /// SET NULL: kanıt, bağlı satır silinse bile (test şeridi temizliği) kalır.
-  checkoutGroupId String?        @map("checkout_group_id")
-  orderId         String?        @map("order_id")
-  createdAt       DateTime       @default(now()) @map("created_at")
+  checkoutGroupId    String?           @map("checkout_group_id")
+  orderId            String?           @map("order_id")
+  /// The trade cash payment a distance sales consent belongs to: a trade has
+  /// no order or cart, and each party pays its own `TradeCashPayment` row. A
+  /// partial unique index in the migration
+  /// (`consent_records_trade_cash_payment_granted_key`) keeps ONE granted
+  /// distance sales row per payment, so two concurrent pay-page submits cannot
+  /// record it twice. SET NULL like the cart and order links: the evidence
+  /// stays when the test-lane purge deletes the trade. Rows written before
+  /// this column carry the reference only in `details`
+  /// (`backfill:prod:consent-trade-cash-payments` copies it here).
+  tradeCashPaymentId String?           @map("trade_cash_payment_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
   /// Restrict: üyeler fiziksel silinmez (anonimleşir); kanıt satırı, kullanıcı
   /// kaydının yanlışlıkla silinmesini de engeller (apps/api/prisma/CLAUDE.md).
-  user            User?          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
-  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user               User?             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  checkoutGroup      CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
+  order              Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tradeCashPayment   TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id], onDelete: SetNull)
 
   // Yeniden-onay hesabı: üyenin belge başına en son satırı.
   @@index([userId, document, createdAt])
@@ -276,6 +292,8 @@ model ConsentRecord {
   // Ödeme kapısı: "bu sepet/sipariş için onay var mı".
   @@index([checkoutGroupId])
   @@index([orderId])
+  // The FK's SET NULL and the admin trade-number search join on it.
+  @@index([tradeCashPaymentId])
   @@map("consent_records")
 }
 
@@ -293,7 +311,8 @@ enum ConsentSource {
   /// Yeniden-onay kapısı: hiç onayı olmayan (eski üye, sosyal giriş, eski
   /// mobil kaydı) ya da belge sürümü değişen üye.
   consent_prompt
-  /// Sepet checkout'u (üye ve misafir).
+  /// The checkout step of a purchase: the cart checkout (member and guest)
+  /// and the boost purchase dialog (platform service consents).
   checkout
   /// Ödeme formu adımı (teklif siparişi, sepet dışı ödemeler).
   payment
@@ -305,6 +324,10 @@ enum ConsentSource {
   newsletter_unsubscribe
   /// Hesap silme (pazarlama izni kapanır).
   account_deletion
+  /// Social sign-in took over an unverified account: the registrant never
+  /// proved the inbox, so the consents they gave are withdrawn and the
+  /// re-consent gate asks the provider user again.
+  social_link_reset
   /// Bu tablodan önceki kayıtların geriye dönük aktarımı
   /// (`checkout_groups.distance_sales_*`).
   legacy_backfill
@@ -419,6 +442,31 @@ model FeaturedSnapshot {
   computedAt DateTime @default(now()) @map("computed_at")
 
   @@map("featured_snapshots")
+}
+
+/// Stored seller trust score (ADR 0014, `docs/SELLER_TRUST.md`): written only
+/// by the nightly `seller-trust-refresh` batch, read by primary key. A table of
+/// its own so the nightly write never touches the hot `users` row. Only the
+/// primary key is indexed and the table has `fillfactor = 90` (raw SQL in the
+/// migration), so the nightly updates stay HOT. Derived data, so it cascades
+/// with the user; a missing row reads as "new seller".
+model SellerTrustScore {
+  userId         String   @id @map("user_id")
+  /// Score in hundredths of a point, 0 to 500 (a `CHECK` in the migration):
+  /// exactly two decimals and no Decimal on the read path. Not money. Null =
+  /// below the minimum data rule (5 counted transactions, 3 counterparties).
+  scoreX100      Int?     @map("score_x100") @db.SmallInt
+  /// `SELLER_TRUST_FORMULA_VERSION` that produced the row.
+  formulaVersion Int      @map("formula_version") @db.SmallInt
+  /// `SellerTrustComponentsV1`: counts and sub-scores for admin support. No
+  /// ids, names or other personal data.
+  components     Json
+  /// The run's single `asOf` instant (every window ends there). The cleanup
+  /// after a fully successful run deletes rows older than it.
+  computedAt     DateTime @map("computed_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_trust_scores")
 }
 
 model OAuthAccount {
@@ -592,6 +640,9 @@ model AdminUser {
   adminSessions    AdminSession[]
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs        AuditLog[]
+  /// Reviews and ratings this admin last hid or showed again.
+  moderatedRatings        Rating[]        @relation("RatingModerator")
+  moderatedProductRatings ProductRating[] @relation("ProductRatingModerator")
 
   @@map("admin_users")
 }
@@ -645,6 +696,11 @@ model MembershipTier {
   isAdFree             Boolean             @default(false) @map("is_ad_free")
   featuredListingSlots Int                 @default(0) @map("featured_listing_slots")
   commissionDiscount   Decimal             @default(0) @map("commission_discount") @db.Decimal(5, 4)
+  /// Most saved searches a member of this tier may keep (`POST /saved-searches`
+  /// refuses the next one). Admin-editable; the post-deploy script
+  /// `set-saved-search-limits` sets basic 10, premium 20 and business 50. After
+  /// a downgrade existing searches stay, only new saves are refused.
+  maxSavedSearches     Int                 @default(5) @map("max_saved_searches")
   isActive             Boolean             @default(true) @map("is_active")
   sortOrder            Int                 @default(0) @map("sort_order")
   createdAt            DateTime            @default(now()) @map("created_at")
@@ -936,6 +992,7 @@ model Product {
   likes               ProductLike[]
   productRatings      ProductRating[]
   boosts              ProductBoost[]
+  boostOfferDismissal BoostOfferDismissal?
   removalEvents       ProductRemovalEvent[]
   brand               Brand?                  @relation(fields: [brandId], references: [id])
   carModel            CarModel?               @relation(fields: [carModelId], references: [id])
@@ -1063,15 +1120,31 @@ model ProductBoost {
   status                 BoostStatus @default(pending)
   autoRenew              Boolean     @default(false) @map("auto_renew")
   startsAt               DateTime?   @map("starts_at")
+  /// End of this boost's own stretch of the listing's search priority. The
+  /// running boosts of a listing lie end to end in `endsAt` order, so a stacked
+  /// boost ends after the ones before it; its own remaining time is `endsAt`
+  /// minus the later of now and the previous boost's `endsAt`
+  /// (`BoostTimelineService`).
   endsAt                 DateTime?   @map("ends_at")
+  /// End of this boost's own home showcase stretch (showcase packages only).
+  /// The showcase runs a queue of its own: a showcase boost stacked behind a
+  /// search-only boost is in the showcase at once, for its own days only.
+  /// Null on rows written before the column; the timeline then reads the
+  /// listing's `homeShowcaseUntil`, capped by `endsAt`.
+  showcaseEndsAt         DateTime?   @map("showcase_ends_at")
   /// Set on activation — the LIFO ordering key for search + home showcase.
   purchasedAt            DateTime?   @map("purchased_at")
   pausedAt               DateTime?   @map("paused_at")
+  /// The boost's own unused search-priority seconds while it is paused, never
+  /// the time of the boosts stacked before it (that gave free days on resume).
   pausedRemainingSeconds Int?        @map("paused_remaining_seconds")
-  /// SİSTEM duraklatması: ürün yayından düşünce (süre dolumu, satış, pasife
-  /// alma, red, askı) cron boost'u otomatik duraklatır ve ürün yayına dönünce
-  /// otomatik sürdürür. Admin'in elle duraklattığı boost (false) otomatik
-  /// SÜRDÜRÜLMEZ — admin kararı korunur.
+  /// The boost's own unused showcase seconds while it is paused (showcase
+  /// packages only); a resume queues them behind the running showcase boosts.
+  pausedShowcaseSeconds  Int?        @map("paused_showcase_seconds")
+  /// System pause: when the listing goes offline (expiry, sale, deactivation,
+  /// rejection, suspension) the cron pauses its boosts and resumes them once
+  /// it is live again. A boost staff paused by hand (false) is never resumed
+  /// automatically: the staff decision stands.
   pausedBySystem         Boolean     @default(false) @map("paused_by_system")
   extendedDays           Int         @default(0) @map("extended_days")
   baselineViewCount      Int?        @map("baseline_view_count")
@@ -1081,10 +1154,33 @@ model ProductBoost {
   finalLikeCount         Int?        @map("final_like_count")
   finalClickCount        Int?        @map("final_click_count")
   orderId                String?     @unique @map("order_id")
+  /// How the boost came about. An `admin_grant` is free: no order, no payment,
+  /// no invoice and no revenue, so reports and refunds must tell it apart.
+  source                 BoostSource @default(purchase)
+  /// The staff user who granted a free boost (`source = admin_grant`).
+  grantedById            String?     @map("granted_by_id")
+  /// Why the boost was granted; the same text goes to the audit log.
+  grantReason            String?     @map("grant_reason")
+  /// When staff stopped the boost early (revoke, or refund and deactivate).
+  /// The status is then `cancelled`; `refundedAmount > 0` marks a refund.
+  cancelledAt            DateTime?   @map("cancelled_at")
+  /// The staff user who stopped the boost.
+  cancelledById          String?     @map("cancelled_by_id")
+  cancelReason           String?     @map("cancel_reason")
+  /// Sum refunded through the boost refund screen. The next refund is capped
+  /// at `price - refundedAmount`.
+  refundedAmount         Decimal?    @map("refunded_amount") @db.Decimal(10, 2)
+  /// Claim stamp of the "ends within 24 hours" reminder, so a cron rerun never
+  /// sends it twice. A purchase stacked behind creates a new tail row, which can
+  /// be reminded; when this boost's end moves past the window the reminder
+  /// announced (an extension, a resume), it is due again (`isBoostReminderDue`).
+  reminderSentAt         DateTime?   @map("reminder_sent_at")
   createdAt              DateTime    @default(now()) @map("created_at")
   updatedAt              DateTime    @updatedAt @map("updated_at")
   product                Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User        @relation("UserProductBoosts", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy              User?       @relation("BoostGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  cancelledBy            User?       @relation("BoostCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   package                AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   @@index([productId])
@@ -1094,6 +1190,23 @@ model ProductBoost {
   // Dashboard: dönem içinde satın alınan öne çıkarma geliri.
   @@index([purchasedAt])
   @@map("product_boosts")
+}
+
+/// The one-time boost offer for a new listing was dismissed. Rows are written
+/// only on dismissal; whether an offer is due is computed (listing age, never
+/// boosted, a matching package), so no listing activation path needs a hook.
+/// Server-side, so a dismissed offer stays dismissed on every device.
+model BoostOfferDismissal {
+  /// One row per listing: an offer is shown at most once per listing.
+  productId   String   @id @map("product_id")
+  /// The seller who dismissed it (the listing's owner at that time).
+  userId      String   @map("user_id")
+  dismissedAt DateTime @map("dismissed_at")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("boost_offer_dismissals")
 }
 
 /// Admin-managed advertisement/boost package (e.g. "Ekonomik", "Vitrin"). Fully
@@ -1403,6 +1516,7 @@ model TradeCashPayment {
   trade               Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   payment             Payment?
   payoutTransfers     PayoutTransfer[] @relation("TradeCashPayoutTransfers")
+  consentRecords      ConsentRecord[]
 
   /// Taraf başına TEK ödeme satırı (v2'de aynı takasta iki taraf, iki satır).
   @@unique([tradeId, payerId])
@@ -1506,18 +1620,28 @@ model ContentFilter {
 }
 
 model Rating {
-  id         String       @id @default(uuid())
-  giverId    String       @map("giver_id")
-  receiverId String       @map("receiver_id")
-  orderId    String?      @map("order_id")
-  tradeId    String?      @map("trade_id")
-  score      Int
-  comment    String?
-  status     RatingStatus @default(pending)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  giver      User         @relation("RatingGiver", fields: [giverId], references: [id])
-  receiver   User         @relation("RatingReceiver", fields: [receiverId], references: [id])
+  id                 String       @id @default(uuid())
+  giverId            String       @map("giver_id")
+  receiverId         String       @map("receiver_id")
+  orderId            String?      @map("order_id")
+  tradeId            String?      @map("trade_id")
+  score              Int
+  comment            String?
+  status             RatingStatus @default(pending)
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  /// Why an admin last hid this rating (free text, 5-500 characters, shown
+  /// only to admins). Kept when the rating is shown again; every change and
+  /// its reason is in `audit_logs`.
+  moderationReason   String?      @map("moderation_reason")
+  /// When an admin last changed the visibility (hide or unhide).
+  moderatedAt        DateTime?    @map("moderated_at")
+  /// The admin who last changed the visibility. SET NULL keeps the rating
+  /// if the admin row goes; the audit log keeps the actor.
+  moderatedByAdminId String?      @map("moderated_by_admin_id")
+  giver              User         @relation("RatingGiver", fields: [giverId], references: [id])
+  receiver           User         @relation("RatingReceiver", fields: [receiverId], references: [id])
+  moderatedBy        AdminUser?   @relation("RatingModerator", fields: [moderatedByAdminId], references: [id], onDelete: SetNull)
 
   @@unique([giverId, orderId])
   @@unique([giverId, tradeId])
@@ -1542,8 +1666,18 @@ model ProductRating {
   adminReply         String?      @map("admin_reply")
   adminReplyAt       DateTime?    @map("admin_reply_at")
   status             RatingStatus @default(pending)
+  /// Why an admin last hid this review (free text, 5-500 characters, shown
+  /// only to admins). Kept when the review is shown again; every change and
+  /// its reason is in `audit_logs`.
+  moderationReason   String?      @map("moderation_reason")
+  /// When an admin last changed the visibility (hide or unhide).
+  moderatedAt        DateTime?    @map("moderated_at")
+  /// The admin who last changed the visibility. SET NULL keeps the review
+  /// if the admin row goes; the audit log keeps the actor.
+  moderatedByAdminId String?      @map("moderated_by_admin_id")
   product            Product      @relation(fields: [productId], references: [id])
   user               User         @relation(fields: [userId], references: [id])
+  moderatedBy        AdminUser?   @relation("ProductRatingModerator", fields: [moderatedByAdminId], references: [id], onDelete: SetNull)
 
   @@unique([productId, userId, orderId])
   @@index([productId])
@@ -1572,6 +1706,35 @@ model WishlistItem {
   @@unique([wishlistId, productId])
   @@index([productId])
   @@map("wishlist_items")
+}
+
+/// A saved product search (`/saved-searches`, docs/SAVED_SEARCHES.md). The
+/// tier limit is `MembershipTier.maxSavedSearches`. Account deletion deletes
+/// the rows inside the deletion transaction: the user row is anonymised, not
+/// deleted, so the cascade alone would not.
+model SavedSearch {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  /// The user's name, else the default name derived at save time
+  /// (`savedSearchDefaultName`); null when neither exists (clients render
+  /// `savedSearch.untitled`).
+  name      String?
+  /// The canonical `GET /products` query (`canonicalizeSavedSearchQuery` in
+  /// `@tarodan/types`): allow-listed filters only, never `page` or `limit`.
+  query     Json
+  /// Display labels of the ids in `query` (category, brand, ...), a snapshot
+  /// at save time: a later rename does not update them.
+  labels    Json     @default("{}")
+  /// SHA-256 hex of the stable JSON of `query`; with `userId` it makes a
+  /// duplicate save a unique violation (409 `SAVED_SEARCH_DUPLICATE`).
+  queryHash String   @map("query_hash")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, queryHash])
+  @@index([userId, createdAt])
+  @@map("saved_searches")
 }
 
 model Collection {
@@ -2142,6 +2305,12 @@ model RefundAttempt {
   providerResponse    Json?               @map("provider_response")
   status              RefundAttemptStatus @default(prepared)
   failureReason       String?             @map("failure_reason")
+  /// Consecutive definite provider failures (rejected or never sent) of this
+  /// attempt. The refund retry sweeps wait 10 min * 2^(n-1), at most 6 h,
+  /// after `updatedAt` before resending it. A requeue by the status inquiry
+  /// keeps the count (no evidence a resend now succeeds); an attempt that
+  /// only ever went to review has 0 and waits 10 min.
+  failureCount        Int                 @default(0) @map("failure_count")
   requestStartedAt    DateTime?           @map("request_started_at")
   providerSucceededAt DateTime?           @map("provider_succeeded_at")
   finalizedAt         DateTime?           @map("finalized_at")
@@ -2504,12 +2673,25 @@ model PayoutTransfer {
   retryCount             Int                           @default(0) @map("retry_count")
   maxRetries             Int                           @default(3) @map("max_retries")
   nextRetryAt            DateTime?                     @map("next_retry_at")
-  // PayTR aşama-1 (talimat kabulü) anı ve o an GERÇEKTEN gönderilen net tutar.
-  // Aşama-2 callback'i saatler/günler sonra gelir; mail + ledger o anki
-  // netAmount'a değil bu snapshot'a bakar (adjustment/iade netAmount'ı değiştirebilir).
-  // submittedAt doluysa payout PayTR'ye iletilmiştir → zombi tespiti bunu takılı saymaz.
+  /// When PayTR accepted the instruction (stage 1) and the net it carried.
+  /// The stage-2 callback comes hours or days later; e-mail and ledger read
+  /// this snapshot, not the current netAmount (adjustments and refunds can
+  /// change it). A set submittedAt means PayTR has the instruction, so the
+  /// zombie check skips the row. On an unknown outcome (`failed` /
+  /// `transfer_outcome_unknown`) submittedAmount holds the net of the request
+  /// that may have gone through; submittedAt stays null until a PayTR
+  /// callback confirms the transfer and stamps the send time.
   submittedAt            DateTime?                     @map("submitted_at")
   submittedAmount        Decimal?                      @map("submitted_amount") @db.Decimal(10, 2)
+  /// PayTR `total_amount` of the transfer instruction this row sent or is
+  /// sending: the slice of the payment (merchant_oid) it settles, computed per
+  /// attempt (order total minus cash refunded, capped by what the payment has
+  /// left). Written at claim time, cleared when the request provably took
+  /// nothing from the oid (rejection, connect failure), kept on success and
+  /// on an unknown outcome. Sibling transfers on the same oid subtract it.
+  /// Null on rows sent before 2026-10-23, which sent `amount`; 0 means
+  /// nothing was taken from the oid (e.g. settled outside PayTR).
+  submittedTotalAmount   Decimal?                      @map("submitted_total_amount") @db.Decimal(10, 2)
   processedAt            DateTime?                     @map("processed_at")
   createdAt              DateTime                      @default(now()) @map("created_at")
   updatedAt              DateTime                      @updatedAt @map("updated_at")
@@ -3435,6 +3617,9 @@ model SecurityLog {
   @@index([ipAddress])
   @@index([userId])
   @@index([createdAt])
+  // The per-user history, newest first (admin user detail: sign-in method
+  // events; system logs filtered by user). A backward scan serves DESC.
+  @@index([userId, createdAt])
   @@map("security_logs")
 }
 
@@ -4078,6 +4263,12 @@ enum ProductCondition {
   fair
 }
 
+/// Where a `ProductBoost` came from (see `ProductBoost.source`).
+enum BoostSource {
+  purchase
+  admin_grant
+}
+
 enum BoostStatus {
   pending
   active
@@ -4471,12 +4662,20 @@ enum CouponReservationStatus {
   released
 }
 
+/// Moderation state of a product review (`ProductRating`) and a user rating
+/// (`Rating`). Only `approved` is public (`common/helpers/public-rating.ts`).
+/// New reviews are written `approved` (post-moderation); admins move them
+/// between `approved` and `hidden`. `pending` and `rejected` exist only in
+/// legacy and fixture rows; `spam` and `deleted` are never written.
 enum RatingStatus {
   pending
   approved
   rejected
   spam
   deleted
+  /// Taken off every public surface by an admin, with a reason
+  /// (`moderation_reason`). The author still sees it, flagged.
+  hidden
 }
 
 enum TaxRuleScope {

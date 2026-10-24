@@ -74,6 +74,11 @@ tables, CRUD).
 - **Copy from `@tarodan/i18n`**, `tr` and `en`, one key per string
   (`@tarodan/no-hardcoded-turkish` is an error). Dates, money and numbers go
   through `lib/format.ts`.
+- **Typed TL amounts** are `type="text" inputMode="decimal"` fields read by
+  `parseTlAmount` from `@tarodan/shared` ("1.000" is refused, never 1 TL);
+  never `type="number"`, `Number()` or `parseFloat()` on the field text.
+  Refusals show `validation.amountFormatRefused`; prefill with
+  `tlAmountInputValue` (decimal comma).
 - **TR phone numbers only** (`+905XXXXXXXXX`): `trPhone`, `FormPhone`,
   `combinePhone`; the API checks `@IsTrPhone`. Never a local regex.
 - Shared config is upstream (`@tarodan/tsconfig`, the tokens preset,

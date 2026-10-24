@@ -2,6 +2,7 @@
 
 import { createApiClient, type AxiosError } from "@tarodan/api-client";
 import { hasAuthMarker } from "@/lib/authMarker";
+import { isSessionPreservedPath, reportSessionGone } from "@/lib/sessionGone";
 import { getPublicApiOrigin } from "./origin";
 
 // Browser → same-origin gateway proxy (`/gateway`): the proxy adds the `Bearer`
@@ -27,16 +28,10 @@ export const api = createApiClient({
   onResponseError: handleApiError,
 });
 
-/** Checkout / ödeme sırasında 401'de token silmek PayTR dönüşü veya /payments/status çağrısını kırar. */
+/** See `isSessionPreservedPath`: checkout and payment pages keep their session. */
 function shouldPreserveAuthTokenOn401(): boolean {
   if (typeof window === "undefined") return false;
-  const p = window.location?.pathname || "";
-  return (
-    p === "/checkout" ||
-    p.endsWith("/checkout") ||
-    p.includes("/cart") ||
-    p.includes("/payment")
-  );
+  return isSessionPreservedPath(window.location?.pathname || "");
 }
 
 /**
@@ -52,8 +47,8 @@ function isProtectedPath(path: string): boolean {
 }
 
 async function handleApiError(error: AxiosError) {
-  // Banlı kullanıcı: backend BannedUserGuard tüm istekleri 403 + USER_BANNED
-  // ile bloklar. Kullanıcıyı /banned sayfasına yönlendir (zaten oradaysa dokunma).
+  // Banned user: the API's BannedUserGuard answers every request with 403 +
+  // USER_BANNED. Send the user to /banned (unless already there).
   const errData = error.response?.data as
     { errorCode?: string; bannedReason?: string } | undefined;
   if (
@@ -93,6 +88,10 @@ async function handleApiError(error: AxiosError) {
   if (error.response?.status === 401 && typeof window !== "undefined") {
     const sessionGone = !hasAuthMarker();
     if (sessionGone && !shouldPreserveAuthTokenOn401()) {
+      // The store and its query cache must not stay with the ended session,
+      // including on the public pages that are not redirected below. The
+      // store confirms with the server first (see reportSessionGone).
+      reportSessionGone(error.config?.signal);
       const currentPath = window.location?.pathname || "";
       const publicPathsNoRedirect = [
         "/track-order",

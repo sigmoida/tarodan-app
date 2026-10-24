@@ -1,7 +1,14 @@
+import { NotFoundException } from "@nestjs/common";
+import { RatingStatus } from "@prisma/client";
+import { RATING_STATUSES } from "@tarodan/types";
 import { RatingService } from "./rating.service";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
 import { ProductCommonService } from "../product/product-common.service";
-import { publicProductRatingWhere } from "../../common/helpers/public-rating";
+import {
+  isPublicRatingStatus,
+  publicProductRatingWhere,
+  publicUserRatingWhere,
+} from "../../common/helpers/public-rating";
 
 /**
  * Onaysız yorum hiçbir herkese açık yüzeyde SAYILMAZ.
@@ -22,7 +29,13 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
             .mockResolvedValue({ _avg: { score: 4.5 }, _count: 2 }),
         },
         product: { update: jest.fn().mockResolvedValue({}) },
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        // the recompute runs in its own transaction when none is given
+        $transaction: jest.fn(),
       };
+      prisma.$transaction.mockImplementation(
+        (fn: (tx: typeof prisma) => unknown) => fn(prisma),
+      );
       const service = new RatingService(
         prisma as any,
         {} as any,
@@ -49,6 +62,21 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
           where: { id: "p1" },
           data: { averageRating: 4.5, ratingCount: 2 },
         }),
+      );
+    });
+
+    it("locks the product row before counting, in one transaction (a new review cannot overwrite a moderation's count)", async () => {
+      const { service, prisma } = makeService();
+
+      await service.updateProductRatingStats("p1");
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const lockOrder = prisma.$queryRaw.mock.invocationCallOrder[0];
+      expect(lockOrder).toBeLessThan(
+        prisma.productRating.aggregate.mock.invocationCallOrder[0],
+      );
+      expect(prisma.$queryRaw.mock.calls[0][0].join("?")).toContain(
+        'FROM "products" WHERE id = ? FOR UPDATE',
       );
     });
 
@@ -185,6 +213,148 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
       expect(
         publicProductRatingWhere({ productId: "p1", status: "pending" }),
       ).toEqual({ productId: "p1", status: "approved" });
+    });
+  });
+
+  describe("hidden (admin moderation) is non-public like every non-approved status", () => {
+    it("only approved is public; hidden and the legacy statuses are not", () => {
+      for (const status of Object.values(RatingStatus)) {
+        expect([status, isPublicRatingStatus(status)]).toEqual([
+          status,
+          status === RatingStatus.approved,
+        ]);
+      }
+    });
+
+    it("the shared status list (@tarodan/types) matches the database enum", () => {
+      expect([...RATING_STATUSES].sort()).toEqual(
+        Object.values(RatingStatus).sort(),
+      );
+    });
+
+    it("the public filters override a caller's hidden status", () => {
+      expect(
+        publicProductRatingWhere({ productId: "p1", status: "hidden" }),
+      ).toEqual({ productId: "p1", status: "approved" });
+      expect(
+        publicUserRatingWhere({ receiverId: "u1", status: "hidden" }),
+      ).toEqual({ receiverId: "u1", status: "approved" });
+    });
+  });
+
+  describe("RatingService user ratings (seller profile list and stats)", () => {
+    const makeService = () => {
+      const prisma = {
+        rating: {
+          findMany: jest.fn().mockResolvedValue([]),
+          count: jest.fn().mockResolvedValue(0),
+        },
+      };
+      const service = new RatingService(
+        prisma as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        { isEnabled: false } as never,
+        userBlockServiceStub() as never,
+      );
+      return { service, prisma };
+    };
+
+    it("the list and its total read only published ratings", async () => {
+      const { service, prisma } = makeService();
+
+      await service.getUserRatings("seller-1", 1, 20);
+
+      for (const call of [
+        prisma.rating.findMany.mock.calls[0][0],
+        prisma.rating.count.mock.calls[0][0],
+      ]) {
+        expect(call.where).toEqual(
+          expect.objectContaining({
+            receiverId: "seller-1",
+            status: "approved",
+          }),
+        );
+      }
+    });
+
+    it("the average and distribution read only published ratings", async () => {
+      const { service, prisma } = makeService();
+
+      await service.getUserRatingStats("seller-1");
+
+      expect(prisma.rating.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { receiverId: "seller-1", status: "approved" },
+        }),
+      );
+    });
+  });
+
+  describe("RatingService.markProductRatingHelpful", () => {
+    it("a hidden review is not found and its counter does not move", async () => {
+      const prisma = {
+        productRating: {
+          findUnique: jest.fn().mockResolvedValue({ status: "hidden" }),
+          update: jest.fn(),
+        },
+      };
+      const service = new RatingService(
+        prisma as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        { isEnabled: false } as never,
+        userBlockServiceStub() as never,
+      );
+
+      await expect(
+        service.markProductRatingHelpful("pr-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.productRating.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("ProductCommonService seller block (product detail and lists)", () => {
+    it("aggregates the seller's rating from published ratings only", async () => {
+      const prisma = {
+        product: { groupBy: jest.fn().mockResolvedValue([]) },
+        order: { groupBy: jest.fn().mockResolvedValue([]) },
+        rating: { groupBy: jest.fn().mockResolvedValue([]) },
+        userMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        productRating: { groupBy: jest.fn().mockResolvedValue([]) },
+        setting: { findUnique: jest.fn().mockResolvedValue(null) },
+        membershipTier: { findUnique: jest.fn().mockResolvedValue(null) },
+      };
+      const service = new ProductCommonService(
+        prisma as never,
+        {
+          getEffectiveDisplayPriceMany: jest.fn().mockResolvedValue(new Map()),
+        } as never,
+        {
+          getPublicAssetUrl: (k: string) => `https://cdn/${k}`,
+          getPresignedDownloadUrl: jest.fn(),
+        } as never,
+      );
+
+      await service.formatProductResponseMany([
+        {
+          id: "p1",
+          title: "Model",
+          price: 100,
+          images: [],
+          averageRating: 4,
+          ratingCount: 1,
+          seller: { id: "seller-1" },
+        },
+      ]);
+
+      expect(prisma.rating.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { receiverId: { in: ["seller-1"] }, status: "approved" },
+        }),
+      );
     });
   });
 });

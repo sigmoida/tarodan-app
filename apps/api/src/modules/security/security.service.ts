@@ -3,7 +3,6 @@ import {
   BadRequestException,
   NotFoundException,
   UnauthorizedException,
-  ForbiddenException,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -16,7 +15,6 @@ import {
   Enable2FAResponseDto,
   TwoFactorStatusDto,
   CsrfTokenResponseDto,
-  AdminSessionDto,
   AdminSessionListDto,
 } from "./dto";
 import { generateTotpSecret, verifyTotpCode } from "./totp.util";
@@ -424,17 +422,38 @@ export class SecurityService {
   /**
    * Revoke all user's refresh tokens
    */
-  async revokeAllUserTokens(userId: string): Promise<void> {
-    // Oturumlarla birlikte push token'ları da düşer: "tüm cihazlardan çıkış"
-    // sonrası çıkışı yapılan cihazlar bildirim almaya devam etmesin. İkisi aynı
-    // transaction'da — biri kalıp diğeri düşmesin.
-    await this.prisma.$transaction(async (tx) => {
-      await tx.refreshToken.updateMany({
+  async revokeAllUserTokens(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    // Push tokens go with the sessions: devices signed out by "sign out
+    // everywhere" must stop receiving notifications. Both in one transaction
+    // (the caller's, when given) so one cannot stay while the other goes.
+    const revoke = async (db: Prisma.TransactionClient) => {
+      await db.refreshToken.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      await this.pushTokens.deactivateAllForUser(userId, tx);
-    });
+      await this.pushTokens.deactivateAllForUser(userId, db);
+    };
+    if (tx) {
+      await revoke(tx);
+      return;
+    }
+    await this.prisma.$transaction(revoke);
+  }
+
+  /**
+   * Removes the 2FA secret (enabled or a pending setup) without asking for a
+   * code. Only for a caller that has already decided the account must lose
+   * it: the social take-over of an unverified registration, where whoever set
+   * it up never owned the inbox.
+   */
+  async removeTwoFactorSecret(
+    userId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    await tx.twoFactorSecret.deleteMany({ where: { userId } });
   }
 
   // ==========================================================================

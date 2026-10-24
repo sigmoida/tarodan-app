@@ -1,5 +1,6 @@
 /** @format */
 
+import { tlAmountValue } from "@tarodan/shared";
 import type { SaleData } from "./cards/DiscountCard";
 
 /**
@@ -9,6 +10,10 @@ import type { SaleData } from "./cards/DiscountCard";
  * ÖNCESİ fiyattır, indirim bölümündeki "indirimli fiyat" ondan küçükse indirim
  * uygulanır. Kural iki yerde ayrı yazıldığında yeni ilan ile düzenleme aynı
  * girdide farklı sonuç üretebiliyordu.
+ *
+ * The two amounts are field text read by the shared `tlAmountValue`; text that
+ * is not an amount reads as none here, so the screen blocks it first
+ * (`saleDataError`).
  */
 
 export const createEmptySaleData = (): SaleData => ({
@@ -35,10 +40,10 @@ export function saleDataToPayload(
   saleData: SaleData,
   formPrice: number,
 ): SalePayload {
-  const original = saleData.originalPrice
-    ? Number(saleData.originalPrice)
+  const original = saleData.originalPrice.trim()
+    ? tlAmountValue(saleData.originalPrice)
     : formPrice;
-  const sale = saleData.salePrice ? Number(saleData.salePrice) : 0;
+  const sale = tlAmountValue(saleData.salePrice);
   // İndirim öncesi fiyat girilen fiyattan küçük olamaz; aksi halde ürün
   // "indirimli" görünürken çizili fiyat daha düşük çıkardı.
   const effectiveOriginal = Math.max(original, formPrice);
