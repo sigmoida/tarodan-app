@@ -3,9 +3,9 @@ import type { Logger } from "@nestjs/common";
 import { errorMessage } from "../common/helpers/error-message";
 
 /**
- * En az bir cron adımı başarısız olduğunda tur sonunda fırlatılan hata.
- * `runTrackedJob` bunu görünce Bull job'ını "failed" işaretler → attempts/backoff
- * çalışır ve Sentry Cron check-in'i "error" olur.
+ * Thrown at the end of a run when at least one cron step failed.
+ * `runTrackedJob` then marks the Bull job failed, so attempts/backoff apply,
+ * and a monitored job's Sentry cron check-in is "error".
  */
 export class CronStepFailuresError extends Error {
   /**

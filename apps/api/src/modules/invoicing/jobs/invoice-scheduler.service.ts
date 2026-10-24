@@ -6,13 +6,13 @@ import { QUEUE_NAMES } from "../../../workers/constants";
 import { InvoicingService } from "../invoicing.service";
 
 /**
- * Gelir e-belgeleri için retry zamanlayıcı (sağlayıcıdan bağımsız).
- * pending/failed kalan kayıtları periyodik olarak yeniden gönderir (aynı numara/ETTN).
- * Sağlayıcı kapalıysa (eLogo: ELOGO_ENABLED=false) no-op.
+ * Retry scheduler for revenue e-documents (provider-independent).
+ * Periodically resends the records left pending/failed (same number/ETTN).
+ * A no-op while the provider is off (eLogo: ELOGO_ENABLED=false).
  *
- * Faz 7.5: Bull tek zamanlama mekanizması ('elogo-retry-pending' repeatable job).
- * Cron kimliği eski adıyla kalır: Bull repeatable anahtarı ve Sentry check-in'i
- * ona bağlı, yeniden adlandırma bir ops adımıdır (bkz. workers/cron-catalog.ts).
+ * Phase 7.5: Bull is the only scheduler (the 'elogo-retry-pending' repeatable).
+ * The cron id keeps its old name: the Bull repeatable key and the run history
+ * are bound to it, so renaming it is an ops step (see workers/cron-catalog.ts).
  */
 @Injectable()
 export class InvoiceSchedulerService implements OnModuleInit {
@@ -49,9 +49,9 @@ export class InvoiceSchedulerService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`eLogo retry cron hatası: ${err?.message}`);
       log(`HATA: ${err?.message}`);
-      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
-      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
-      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      // Rethrow, do not swallow: the Bull job must fail so attempts/backoff and
+      // the cron tracker's failure alarm really apply (otherwise even a failed
+      // run looks successful and the error stays in a log line).
       throw err;
     }
   }

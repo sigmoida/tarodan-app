@@ -1,28 +1,49 @@
 /**
- * Cron kataloğu — `scheduled` kuyruğundaki TÜM repeatable işlerin tek kaynağı.
+ * Cron catalog: the single source of every repeatable job on the `scheduled`
+ * queue.
  *
- * `key` alanı Bull job adının TA KENDİSİDİR (@Process(...) ile birebir aynı);
- * sözleşme spec'i (cron-catalog.contract.spec.ts) bu eşitliği iki yönlü zorlar,
- * böylece test araçlarındaki liste ile gerçek işler arasında isim kayması
- * yaşanamaz (eski test-tools listesi 4 işte kaymıştı: check-expired-memberships
- * ↔ membership-expired-downgrades gibi).
+ * `key` IS the Bull job name (identical to `@Process(...)`); the contract spec
+ * (cron-catalog.contract.spec.ts) enforces the equality both ways, so the test
+ * tools list cannot drift from the real jobs (the old hand-written list had
+ * drifted on 4 jobs, e.g. check-expired-memberships vs
+ * membership-expired-downgrades).
  *
- * `triggerable`: admin Test Araçları ekranından elle tetiklenebilir mi?
- * false olanlar üç gruptur ve bilinçlidir:
- *  - toplu gönderim yapanlar (mükerrer e-posta riski),
- *  - zaten dakikada bir koşanlar (butonun kazancı yok),
- *  - başka ekranda düğmesi olan / yalnız zamanlanmış koşması gerekenler
- *    (para transferleri dahil).
- * Elle tetikleme kuyruğa fiş atarak yapılır — iş yine worker'da, runTrackedJob
- * sarmalamasıyla koşar; HTTP process'inde doğrudan servis çağrısı YOKTUR.
+ * `triggerable`: can it be run by hand from the admin Test Tools screen?
+ * The false ones fall into three deliberate groups:
+ *  - bulk senders (duplicate e-mail risk),
+ *  - jobs that already run every minute (a button gains nothing),
+ *  - jobs with a button on another screen or that must only run on schedule
+ *    (money transfers included).
+ * A manual run puts a job on the queue: it still runs in the worker, wrapped
+ * by runTrackedJob; the HTTP process never calls the service directly.
+ *
+ * `monitor`: a Sentry cron monitor (missed, failed or overrunning runs open an
+ * issue). Only an entry with one sends check-ins, and only from the
+ * production environment (CronTrackerService). The Sentry plan includes one
+ * cron monitor, so it is spent on the job whose silent stop costs the most:
+ * `payout-process`. Adding another is a plan and alert decision, not a
+ * code-only change.
  */
+export interface CronMonitorConfig {
+  /** Minutes after the expected start before a run counts as missed. */
+  checkinMarginMinutes: number;
+  /** Minutes a run may stay in progress before it counts as timed out. */
+  maxRuntimeMinutes: number;
+  /** Consecutive failed, missed or timed-out runs that open an issue. */
+  failureIssueThreshold: number;
+  /** Consecutive successful runs that resolve it. */
+  recoveryThreshold: number;
+}
+
 export interface CronCatalogEntry {
-  /** Bull job adı (`@Process(key)` ile birebir aynı). */
+  /** Bull job name (identical to `@Process(key)`). */
   key: string;
   label: string;
   description: string;
-  /** Test Araçları ekranından elle tetiklenebilir mi? */
+  /** Can it be run by hand from the Test Tools screen? */
   triggerable: boolean;
+  /** Sentry cron monitor; absent = no check-ins (see above). */
+  monitor?: CronMonitorConfig;
 }
 
 export const CRON_CATALOG: CronCatalogEntry[] = [
@@ -134,9 +155,9 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
   {
-    // Kimlik eLogo adını taşısa da iş sağlayıcıdan bağımsızdır (InvoiceSchedulerService).
-    // Bull repeatable anahtarı, Sentry check-in'i ve geçmiş koşu kayıtları bu
-    // değere bağlı; değiştirmek bir ops adımı ister (docs/INVOICING_PROVIDERS.md).
+    // The id carries the eLogo name but the job is provider-independent
+    // (InvoiceSchedulerService). The Bull repeatable key and the run history are
+    // bound to it; renaming it is an ops step (docs/INVOICING_PROVIDERS.md).
     key: "elogo-retry-pending",
     label: "e-Fatura gönderimlerini yeniden dene",
     description: "Bekleyen/başarısız e-Logo faturalarını yeniden dener",
@@ -267,16 +288,27 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: false,
   },
 
-  // ── Elle tetiklenmez (test aracından): gerçek para akışı ──────────────────
-  // İKİNCİ üretici: admin manuel escrow release fast-path'i de 'payout-process'
-  // fişi atar (admin-payout.service.queueImmediatePayout) — iş yine yalnız
-  // worker'da, tek-sefer kilidiyle koşar. triggerable:false yalnız Test
-  // Araçları düğmesini kapatır; release sonrası tetikleme bilinçli istisnadır.
+  // ── Not triggerable (from the test tools): real money movement ───────────
+  // A SECOND producer: the admin manual escrow release fast path also queues a
+  // 'payout-process' job (admin-payout.service.queueImmediatePayout); it still
+  // runs only in the worker, under the single-run lock. triggerable:false only
+  // hides the Test Tools button; the post-release trigger is a deliberate
+  // exception. Manual runs are not check-ins (runTrackedJob).
   {
     key: "payout-process",
     label: "Payout işleme",
     description: "Bekleyen satıcı ödemelerini (havale) işler",
     triggerable: false,
+    // Every 15 minutes. A run that has not started 10 minutes late, or is
+    // still running after 30 (two slots), counts as failed; two in a row open
+    // the issue (one Bull retry or a slow PayTR minute is not an alarm), and
+    // the first good run resolves it.
+    monitor: {
+      checkinMarginMinutes: 10,
+      maxRuntimeMinutes: 30,
+      failureIssueThreshold: 2,
+      recoveryThreshold: 1,
+    },
   },
   {
     key: "payout-check-returned",
@@ -306,3 +338,14 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: false,
   },
 ];
+
+const MONITORS = new Map(
+  CRON_CATALOG.flatMap((entry) =>
+    entry.monitor ? [[entry.key, entry.monitor] as const] : [],
+  ),
+);
+
+/** The Sentry cron monitor of a catalog job, if it has one. */
+export function cronMonitorFor(key: string): CronMonitorConfig | undefined {
+  return MONITORS.get(key);
+}

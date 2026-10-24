@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import "reflect-metadata";
-import { CRON_CATALOG } from "./cron-catalog";
+import { CRON_CATALOG, cronMonitorFor } from "./cron-catalog";
 
 /**
  * SÖZLEŞME: cron kataloğu ile `scheduled` kuyruğunun gerçek @Process
@@ -86,5 +86,51 @@ describe("cron-catalog sözleşmesi", () => {
   it("scheduled kuyruğundaki her işleyici katalogda kayıtlıdır", () => {
     const unlisted = [...handlerNames].filter((n) => !catalogKeys.includes(n));
     expect(unlisted).toEqual([]);
+  });
+});
+
+/**
+ * CONTRACT: the Sentry cron monitors. The plan includes one monitor and it is
+ * spent on payout-process (a silent stop leaves sellers unpaid). A new monitor
+ * is a plan and alert decision: change this list on purpose. Sentry rejects a
+ * monitor config with a non-positive margin, runtime or threshold, and then
+ * every check-in of that job is dropped.
+ */
+describe("cron-catalog Sentry monitors", () => {
+  const monitored = CRON_CATALOG.flatMap((c) =>
+    c.monitor ? [{ key: c.key, monitor: c.monitor }] : [],
+  );
+
+  it("monitors payout-process only", () => {
+    expect(monitored.map((c) => c.key)).toEqual(["payout-process"]);
+  });
+
+  it.each(monitored.map((c) => [c.key, c.monitor] as const))(
+    "%s has positive whole-minute settings",
+    (_key, monitor) => {
+      for (const value of [
+        monitor.checkinMarginMinutes,
+        monitor.maxRuntimeMinutes,
+        monitor.failureIssueThreshold,
+        monitor.recoveryThreshold,
+      ]) {
+        expect(Number.isInteger(value)).toBe(true);
+        expect(value).toBeGreaterThanOrEqual(1);
+      }
+    },
+  );
+
+  it("pins the payout-process thresholds", () => {
+    expect(cronMonitorFor("payout-process")).toEqual({
+      checkinMarginMinutes: 10,
+      maxRuntimeMinutes: 30,
+      failureIssueThreshold: 2,
+      recoveryThreshold: 1,
+    });
+  });
+
+  it("has no monitor for an unknown or unmonitored job", () => {
+    expect(cronMonitorFor("payment-expired")).toBeUndefined();
+    expect(cronMonitorFor("no-such-job")).toBeUndefined();
   });
 });

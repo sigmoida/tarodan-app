@@ -7,6 +7,11 @@ import {
   SENTRY_REPEAT_WINDOW_SECONDS,
   buildErrorReportKey,
 } from "../common/logging/error-report-key";
+import { cronMonitorFor } from "../workers/cron-catalog";
+import {
+  type SentryMonitorConfig,
+  buildSentryMonitorConfig,
+} from "./cron-monitor-config";
 
 export type CronStatus = "idle" | "running" | "success" | "failed";
 
@@ -23,13 +28,29 @@ export interface CronRunRecord {
 }
 
 /**
- * Cron izleme — izlenen her cron çalıştığında başlangıç/bitiş/durum/süre kaydı.
+ * The Sentry environment whose runs check in. Staging and development run the
+ * same crons but have no monitors: their check-ins were only dropped events.
+ */
+const CHECK_IN_ENVIRONMENT = "production";
+
+/** An open Sentry check-in of one run. */
+interface OpenCheckIn {
+  checkInId: string;
+  monitorSlug: string;
+  config: SentryMonitorConfig | undefined;
+}
+
+/**
+ * Cron tracking: start, finish, status and duration of every tracked cron run.
  *
- * - In-memory (restart'ta sıfırlanır); kalıcı geçmiş için Sentry Crons devreye
- *   girer (DSN tanımlıysa). DB persistleme ileride eklenebilir (şema değişikliği
- *   gerektirdiği için bilinçli olarak şimdilik yok).
- * - Sentry check-in çağrıları DSN yokken güvenle no-op'tur; production'da DSN +
- *   Sentry Cron Monitoring açılınca otomatik "job çalışmadı/patladı" alarmı verir.
+ * - In memory (reset on restart) for the admin jobs page. Persisting it would
+ *   need a schema change and is deliberately not done yet.
+ * - Sentry cron check-ins only for a job with a `monitor` in the cron catalog
+ *   and only when the Sentry client's environment is production. The monitor
+ *   config (schedule, time zone, thresholds) goes with every check-in, so
+ *   Sentry creates and updates the monitor itself. Check-ins are fire and
+ *   forget: nothing is awaited or flushed and every Sentry call is guarded,
+ *   so Sentry can never fail, delay or change a run.
  * - A failed run is an `error` (an alarm) on a state change: the first
  *   failure, or a failure that differs from the previous run's (another
  *   reason, another entity; compared by the repeat-report key). The same
@@ -37,10 +58,10 @@ export interface CronRunRecord {
  *   since it was last raised; then it is raised again, so a failure that
  *   lasts still reaches Sentry about once a day, as the throttle intends.
  *   The first success after a failure is logged as a recovery. Every run
- *   still fails (Bull retry) and sends its "error" check-in. The state is in
- *   memory: after a restart the first failure is an `error` again, and the
- *   Redis repeat throttle keeps that from becoming a second event inside its
- *   window (`SentryReportThrottle`).
+ *   still fails (Bull retry) and, on a monitored job, sends its "error"
+ *   check-in. The state is in memory: after a restart the first failure is
+ *   an `error` again, and the Redis repeat throttle keeps that from becoming
+ *   a second event inside its window (`SentryReportThrottle`).
  */
 @Injectable()
 export class CronTrackerService implements OnModuleInit {
@@ -55,9 +76,11 @@ export class CronTrackerService implements OnModuleInit {
     string,
     { key: string; runs: number; raisedAt: number | null }
   >();
+  /** Monitored jobs already warned about a schedule with no crontab form. */
+  private readonly warnedSchedules = new Set<string>();
 
   constructor() {
-    // Decorator'lar cron tetiklenmeden önce tracker'a ulaşabilsin.
+    // Let the run helpers reach the tracker before any cron fires.
     setCronTracker(this);
   }
 
@@ -95,13 +118,18 @@ export class CronTrackerService implements OnModuleInit {
   }
 
   /**
-   * Orijinal cron işini SARMALAR: davranışı birebir korur (sonucu döndürür,
-   * hatayı aynen rethrow eder), sadece etrafına ölçüm + check-in ekler.
+   * WRAPS the cron run without changing it: returns its result and rethrows
+   * its error as is; only adds the record and, for a monitored job, the
+   * Sentry check-ins around it.
+   *
+   * @param schedule the Bull repeatable cron expression of this run.
+   * @param timezone the Bull repeatable time zone (`job.opts.repeat.tz`).
    */
   async track<T>(
     job: string,
     schedule: string,
     fn: () => Promise<T> | T,
+    timezone?: string,
   ): Promise<T> {
     const rec = this.ensure(job, schedule);
     rec.schedule = schedule;
@@ -110,15 +138,7 @@ export class CronTrackerService implements OnModuleInit {
     rec.runs += 1;
     const start = Date.now();
 
-    let checkInId: string | undefined;
-    try {
-      checkInId = Sentry.captureCheckIn({
-        monitorSlug: this.slug(job),
-        status: "in_progress",
-      });
-    } catch {
-      /* Sentry yoksa sessiz geç */
-    }
+    const checkIn = this.openCheckIn(job, schedule, timezone);
 
     const finalize = (status: "success" | "failed", error?: unknown) => {
       rec.status = status;
@@ -130,17 +150,11 @@ export class CronTrackerService implements OnModuleInit {
       } else {
         rec.lastError = null;
       }
-      try {
-        if (checkInId) {
-          Sentry.captureCheckIn({
-            checkInId,
-            monitorSlug: this.slug(job),
-            status: status === "success" ? "ok" : "error",
-          });
-        }
-      } catch {
-        /* no-op */
-      }
+      this.closeCheckIn(
+        checkIn,
+        status === "success" ? "ok" : "error",
+        rec.lastDurationMs,
+      );
     };
 
     try {
@@ -151,8 +165,71 @@ export class CronTrackerService implements OnModuleInit {
     } catch (e) {
       finalize("failed", e);
       this.reportFailure(job, rec, e);
-      throw e; // davranış korunur — hata yukarı aynen gider
+      throw e; // unchanged: the error goes up as is
     }
+  }
+
+  /**
+   * Sends the "in_progress" check-in of a monitored job in production.
+   * Never throws: a Sentry problem only costs the check-in.
+   */
+  private openCheckIn(
+    job: string,
+    schedule: string,
+    timezone: string | undefined,
+  ): OpenCheckIn | undefined {
+    try {
+      const monitor = cronMonitorFor(job);
+      if (!monitor) return undefined;
+      if (
+        Sentry.getClient()?.getOptions().environment !== CHECK_IN_ENVIRONMENT
+      ) {
+        return undefined;
+      }
+      const config =
+        buildSentryMonitorConfig(schedule, timezone, monitor) ?? undefined;
+      if (!config) this.warnUnsupportedSchedule(job, schedule);
+      const monitorSlug = this.slug(job);
+      const checkInId = Sentry.captureCheckIn(
+        { monitorSlug, status: "in_progress" },
+        config,
+      );
+      return { checkInId, monitorSlug, config };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Sends the closing check-in with the same id and config. Never throws. */
+  private closeCheckIn(
+    checkIn: OpenCheckIn | undefined,
+    status: "ok" | "error",
+    durationMs: number,
+  ): void {
+    if (!checkIn) return;
+    try {
+      Sentry.captureCheckIn(
+        {
+          checkInId: checkIn.checkInId,
+          monitorSlug: checkIn.monitorSlug,
+          status,
+          duration: durationMs / 1000,
+        },
+        checkIn.config,
+      );
+    } catch {
+      /* the check-in is lost, the run is not */
+    }
+  }
+
+  private warnUnsupportedSchedule(job: string, schedule: string): void {
+    if (this.warnedSchedules.has(job)) return;
+    this.warnedSchedules.add(job);
+    // A warn, not an alarm: check-ins still go out, but Sentry can only
+    // match them to a monitor created by hand.
+    this.logger.warn(
+      `Cron '${job}' schedule '${schedule}' has no 5-field crontab form; its Sentry check-ins carry no monitor config`,
+    );
   }
 
   private reportFailure(job: string, rec: CronRunRecord, error: unknown) {

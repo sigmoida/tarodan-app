@@ -22,8 +22,12 @@ describe("runTrackedJob", () => {
   const makeTracker = () => {
     const tracker = {
       track: jest.fn(
-        <T>(_job: string, _schedule: string, fn: () => Promise<T> | T) =>
-          Promise.resolve(fn()),
+        <T>(
+          _job: string,
+          _schedule: string,
+          fn: () => Promise<T> | T,
+          _timezone?: string,
+        ) => Promise.resolve(fn()),
       ),
     } as unknown as CronTrackerService;
     setCronTracker(tracker);
@@ -47,9 +51,35 @@ describe("runTrackedJob", () => {
       "payout-process",
       "*/15 * * * *",
       expect.any(Function),
+      undefined,
     );
     expect(res.ok).toBe(true);
     expect(res.summary).toBe("2 işlendi");
+  });
+
+  it("passes the repeatable's time zone to the tracker (Sentry monitor config)", async () => {
+    const tracker = makeTracker();
+    const job = makeJob({
+      repeat: { cron: "*/15 * * * *", tz: "Europe/Istanbul" },
+    });
+
+    await runTrackedJob(job, "payout-process", () => undefined);
+
+    expect(tracker.track).toHaveBeenCalledWith(
+      "payout-process",
+      "*/15 * * * *",
+      expect.any(Function),
+      "Europe/Istanbul",
+    );
+  });
+
+  it("does not track a manual run even when it carries a time zone", async () => {
+    const tracker = makeTracker();
+    const job = makeJob({ repeat: { tz: "Europe/Istanbul" } });
+
+    await runTrackedJob(job, "payout-process", () => undefined);
+
+    expect(tracker.track).not.toHaveBeenCalled();
   });
 
   it("manuel fiş (repeat yok) tracker'a GİRMEZ ama iş yine koşar", async () => {
