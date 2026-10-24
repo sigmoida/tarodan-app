@@ -80,7 +80,7 @@ import { WebSocketModule } from "./modules/websocket";
 // Sentry for error tracking and performance monitoring
 import { SentryModule } from "./modules/sentry";
 
-// Cron job monitoring (in-app tracker + Sentry check-ins)
+// Cron job monitoring (in-app tracker + Sentry check-ins for monitored jobs)
 import { MonitoringModule } from "./monitoring/monitoring.module";
 
 // Health check for monitoring

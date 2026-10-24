@@ -3,9 +3,9 @@ import type { Logger } from "@nestjs/common";
 import { errorMessage } from "../common/helpers/error-message";
 
 /**
- * En az bir cron adımı başarısız olduğunda tur sonunda fırlatılan hata.
- * `runTrackedJob` bunu görünce Bull job'ını "failed" işaretler → attempts/backoff
- * çalışır ve Sentry Cron check-in'i "error" olur.
+ * Thrown at the end of a run when at least one cron step failed.
+ * `runTrackedJob` then marks the Bull job failed, so attempts/backoff apply,
+ * and a monitored job's Sentry cron check-in is "error".
  */
 export class CronStepFailuresError extends Error {
   /**
@@ -32,23 +32,23 @@ export function isAlreadyReportedCronFailure(error: unknown): boolean {
 
 export interface CronStepRunner {
   /**
-   * Bir adımı izole çalıştırır: hata diğer adımları BLOKLAMAZ, kaydedilir.
-   * Adımın dönüş değeri geri verilir; hata durumunda `undefined`.
+   * Runs one step in isolation: its error does NOT block the other steps and
+   * is recorded. Returns the step's value; `undefined` on an error.
    */
   step<T>(name: string, fn: () => Promise<T>): Promise<T | undefined>;
-  /** Başarısız adım varsa fırlatır — tur sonunda çağrılmalı. */
+  /** Throws when a step failed; call it at the end of the run. */
   assertAllStepsSucceeded(): void;
   readonly failedSteps: string[];
 }
 
 /**
- * Çok adımlı cron turları için adım koşucusu.
+ * Step runner for multi-step cron runs.
  *
- * Şema neden gerekli: scheduler'lar her adımı try/catch ile sarıp hatayı yutuyordu
- * (adım izolasyonu doğru bir hedef) ama tur sonunda hata FIRLATILMADIĞI için
- * `runTrackedJob` her turu başarılı sayıyordu — Bull retry'ı ve Sentry Cron
- * alarmı hiç tetiklenmiyordu. Bu koşucu izolasyonu korur ve turun sonunda
- * toplu hata fırlatarak gözlemlenebilirliği geri verir.
+ * Why: the schedulers wrapped every step in try/catch and swallowed the error
+ * (step isolation is a fair goal), but since nothing was THROWN at the end of
+ * the run, `runTrackedJob` counted every run as a success: the Bull retry and
+ * the cron failure alarm never fired. This runner keeps the isolation and
+ * throws one summary error at the end of the run, which restores the signal.
  */
 export function createCronStepRunner(params: {
   logger: Logger;
@@ -71,7 +71,7 @@ export function createCronStepRunner(params: {
           `Step "${name}" failed: ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
-        log?.(`HATA ${name}: ${message}`);
+        log?.(`FAILED ${name}: ${message}`);
         failedSteps.push(name);
         details.push(`${name}: ${message}`);
         return undefined;

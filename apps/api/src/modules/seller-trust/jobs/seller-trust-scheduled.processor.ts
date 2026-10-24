@@ -10,8 +10,8 @@ import {
 /**
  * `seller-trust-refresh` on the `scheduled` queue: the nightly repeatable, the
  * boot-time bootstrap run and a manual trigger from admin Test Tools all land
- * here. `runTrackedJob` feeds the admin jobs page and, for the scheduled fire,
- * the Sentry cron check-in.
+ * here. `runTrackedJob` feeds the admin jobs page for the scheduled fire (the
+ * job has no Sentry cron monitor: `monitor` in workers/cron-catalog.ts).
  */
 @Processor(QUEUE_NAMES.SCHEDULED)
 export class SellerTrustScheduledProcessor {

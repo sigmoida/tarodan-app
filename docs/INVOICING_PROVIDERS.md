@@ -121,9 +121,9 @@ bıraktı. eLogo adını yalnız adaptör taşır: `provider/elogo.provider.ts`,
 | `invoice/elogo-document-number.ts`, `invoice/elogo-guest-recipient`  | `invoice/document-number.ts`, `invoice/guest-recipient.ts`              |
 | `ELOGO_MAX_SEND_ATTEMPTS`, `isTransientElogoFailure`                 | `INVOICE_MAX_SEND_ATTEMPTS`, `isTransientInvoiceFailure`                |
 | `formatElogoInvoiceNumber`, `ELOGO_NUMBER_LENGTH`                    | `formatInvoiceNumber`, `INVOICE_NUMBER_LENGTH`                          |
-| `ElogoInvoice` / `elogo_invoices`                                    | `FiscalInvoice` / DB adı değişmedi: `elogo_invoices`                                     |
+| `ElogoInvoice` / `elogo_invoices`                                    | `FiscalInvoice` / DB adı değişmedi: `elogo_invoices`                    |
 | `ElogoInvoiceType` / `Context` / `Status`                            | `FiscalInvoiceType` / `Context` / `Status`                              |
-| `ElogoDocSequence` / `elogo_doc_sequences`                           | `FiscalDocSequence` / DB adı değişmedi: `elogo_doc_sequences`                            |
+| `ElogoDocSequence` / `elogo_doc_sequences`                           | `FiscalDocSequence` / DB adı değişmedi: `elogo_doc_sequences`           |
 | `elogoRefId` / `elogoResultCode` / `elogoResultMsg`                  | `providerRef` / `providerResultCode` / `providerResultMsg`              |
 | —                                                                    | `provider` (`EInvoiceProviderName`, varsayılan `elogo`)                 |
 
@@ -136,8 +136,7 @@ adlarını değiştirmek bir taşıma ya da ops adımı ister, kozmetik olduğu 
 ayrı bir fazda yapılır:
 
 - Yollar `/elogo/invoices*` — mobil sözleşme; Swagger etiketi `elogo-invoices`.
-- Cron kimliği `elogo-retry-pending` — Bull repeatable anahtarı ve Sentry
-  check-in'i.
+- Cron id `elogo-retry-pending`: the Bull repeatable key and the run history.
 - `ELOGO_*` ortam anahtarları — eLogo sağlayıcısını yapılandırırlar.
 - i18n anahtarları `server.elogo.*`, `server.notification.elogoInvoiceExhausted`.
 - S3 klasörü `elogo-invoices/` ve dosya kaydı türü `elogo_invoice`

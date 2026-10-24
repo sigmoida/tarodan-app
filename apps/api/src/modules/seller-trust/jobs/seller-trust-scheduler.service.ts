@@ -152,7 +152,7 @@ export class SellerTrustSchedulerService implements OnModuleInit {
     ) {
       // setIfAbsent also answers false when Redis fails. Only a lock that is
       // really there is a skip; anything else fails the job so Bull retries
-      // and the cron monitor sees it, instead of a silent green no-op.
+      // and the failure alarm sees it, instead of a silent green no-op.
       if (!(await this.cache.exists(SELLER_TRUST_LOCK_KEY))) {
         throw new Error("seller-trust-refresh: run lock unavailable");
       }
@@ -250,7 +250,7 @@ export class SellerTrustSchedulerService implements OnModuleInit {
         .join(" ");
     if (stats.failedBatches > 0) {
       // Keep every existing row: a failed batch's sellers keep yesterday's
-      // score. Throwing marks the Bull job failed (retries, Sentry cron alert).
+      // score. Throwing marks the Bull job failed (retries, failure alarm).
       log(`not cleaned up: ${counters()}`);
       throw new Error(
         `seller-trust-refresh: ${stats.failedBatches} of ${stats.batches} batches failed; stale rows kept`,
