@@ -4,13 +4,19 @@
  * in builds with a DSN.
  */
 import * as Sentry from "@sentry/nextjs";
-import { scrubSentryEvent, scrubSentryTransaction } from "@tarodan/logger";
+import {
+  scrubSentryEvent,
+  scrubSentryTransaction,
+  sentrySampling,
+} from "@tarodan/logger";
 
 import {
   sentryEnvironment,
   sentryRelease,
   sentryTracesSampleRate,
 } from "./sentry.release";
+
+const replays = sentrySampling(sentryEnvironment);
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -21,9 +27,9 @@ Sentry.init({
 
   tracesSampleRate: sentryTracesSampleRate,
 
-  // Session replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
+  // Session replay rates from the shared table (production: errors only).
+  replaysSessionSampleRate: replays.replaysSessionSampleRate,
+  replaysOnErrorSampleRate: replays.replaysOnErrorSampleRate,
 
   ignoreErrors: ["Network request failed", "Failed to fetch", "NetworkError"],
 
