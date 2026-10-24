@@ -6,7 +6,7 @@ import {
   resolveSentryEnvironment,
   resolveSentryRelease,
 } from "./sentry-event";
-import type { Event } from "@sentry/node";
+import type { Breadcrumb, Event } from "@sentry/node";
 import { runWithRequestId } from "../../common/context/request-context";
 
 /**
@@ -27,7 +27,7 @@ describe("applySentryBreadcrumbPolicy", () => {
           "?CariKodu=1561604773&Sifre=S3CR3T&WebSiparisKodu=PKG-2HGNFGEGTD",
         method: "POST",
       },
-    } as any);
+    } satisfies Breadcrumb);
     const serialized = JSON.stringify(crumb);
     expect(serialized).not.toContain("S3CR3T");
     expect(serialized).not.toContain("1561604773");
@@ -43,7 +43,7 @@ describe("applySentryBreadcrumbPolicy", () => {
       applySentryBreadcrumbPolicy({
         category: "http",
         data: { url: "https://api/x/health" },
-      } as any),
+      } satisfies Breadcrumb),
     ).toBeNull();
   });
 
@@ -52,14 +52,14 @@ describe("applySentryBreadcrumbPolicy", () => {
       category: "console",
       message: `Surat tracking API request failed for ${suratUrl}`,
       data: { password: "hunter2" },
-    } as any);
+    } satisfies Breadcrumb);
     expect(JSON.stringify(crumb)).not.toContain("hunter2");
     expect(crumb?.message).not.toContain("S3CR3T");
     expect(crumb?.message).toContain("Sifre=***");
   });
 
   it("passes breadcrumbs without data through untouched", () => {
-    const crumb = { category: "navigation", message: "x" } as any;
+    const crumb: Breadcrumb = { category: "navigation", message: "x" };
     expect(applySentryBreadcrumbPolicy(crumb)).toEqual(crumb);
   });
 });
@@ -102,7 +102,7 @@ describe("applySentryTransactionPolicy", () => {
           },
         },
       ],
-    } as any);
+    } satisfies Event);
 
     const serialized = JSON.stringify(tx);
     expect(serialized).not.toContain("S3CR3T");
@@ -121,9 +121,9 @@ describe("applySentryTransactionPolicy", () => {
       applySentryTransactionPolicy({
         type: "transaction",
         request: { url: "https://api/x/health" },
-      } as any),
+      } satisfies Event),
     ).toBeNull();
-    const plain = { type: "transaction", transaction: "GET /orders" } as any;
+    const plain: Event = { type: "transaction", transaction: "GET /orders" };
     expect(applySentryTransactionPolicy(plain)).toMatchObject(plain);
   });
 });
@@ -137,25 +137,25 @@ describe("applySentryTransactionPolicy", () => {
  */
 describe("applySentryEventPolicy", () => {
   it("sağlık kontrolü olaylarını düşürür", () => {
-    const event = { request: { url: "https://api/x/health" } } as any;
+    const event: Event = { request: { url: "https://api/x/health" } };
     expect(applySentryEventPolicy(event)).toBeNull();
   });
 
   it("korelasyon kimliğini ARANABİLİR tag olarak ekler", () => {
     const event = runWithRequestId("req-abc", () =>
-      applySentryEventPolicy({ message: "boom" } as any),
+      applySentryEventPolicy<Event>({ message: "boom" }),
     );
     expect(event?.tags).toMatchObject({ requestId: "req-abc" });
   });
 
   it("istek bağlamı dışında (cron/worker) tag eklemez", () => {
-    const event = applySentryEventPolicy({ message: "cron" } as any);
+    const event = applySentryEventPolicy<Event>({ message: "cron" });
     expect(event?.tags?.requestId).toBeUndefined();
   });
 
   it("mevcut tag'leri korur", () => {
     const event = runWithRequestId("req-1", () =>
-      applySentryEventPolicy({ tags: { area: "payment" } } as any),
+      applySentryEventPolicy({ tags: { area: "payment" } } satisfies Event),
     );
     expect(event?.tags).toMatchObject({ area: "payment", requestId: "req-1" });
   });
@@ -163,7 +163,7 @@ describe("applySentryEventPolicy", () => {
   it("hassas alanları redakte eder", () => {
     const event = applySentryEventPolicy({
       request: { url: "https://api/login", data: { password: "hunter2" } },
-    } as any);
+    } satisfies Event);
     expect(JSON.stringify(event)).not.toContain("hunter2");
   });
 
@@ -174,7 +174,7 @@ describe("applySentryEventPolicy", () => {
         data: JSON.stringify({ password: "hunter2", code: "g-code" }),
       },
       extra: { code: "P2002" },
-    } as any);
+    } satisfies Event);
 
     expect(JSON.stringify(event)).not.toContain("hunter2");
     expect(JSON.stringify(event)).not.toContain("g-code");
@@ -204,7 +204,7 @@ describe("applySentryEventPolicy", () => {
         url: "https://api/auth/login",
         data: '{"ref":4111111111111111,"password":"hunter2"}',
       },
-    } as any);
+    } satisfies Event);
 
     expect(JSON.stringify(event)).not.toContain("hunter2");
     expect(JSON.stringify(event)).not.toContain("4111111111111111");
