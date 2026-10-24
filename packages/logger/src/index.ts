@@ -14,3 +14,8 @@ export {
 } from "./redact";
 export { scrubSentryEvent, scrubSentryTransaction } from "./sentry-scrub";
 export type { ScrubbableEvent } from "./sentry-scrub";
+export { sentrySampling } from "./sentry-sampling";
+export type {
+  SentrySampling,
+  SentrySamplingEnvironment,
+} from "./sentry-sampling";

@@ -9,14 +9,7 @@ import { SentryService } from "./sentry.service";
 import { SentryInterceptor } from "./sentry.interceptor";
 import { SentryReportThrottle } from "./sentry-report-throttle";
 import { initAppLogger } from "../../common/logging/logger";
-import {
-  applySentryBreadcrumbPolicy,
-  applySentryEventPolicy,
-  applySentryTransactionPolicy,
-  isProductionRuntime,
-  resolveSentryEnvironment,
-  resolveSentryRelease,
-} from "./sentry-event";
+import { buildSentryNodeOptions } from "./sentry-event";
 
 @Global()
 @Module({
@@ -33,36 +26,24 @@ export class SentryModule implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    const dsn = this.configService.get<string>("SENTRY_DSN");
-    // Etiket SENTRY_ENVIRONMENT'tan, örnekleme gerçek çalışma kipinden:
-    // staging de production build'i olduğu için NODE_ENV ikisinde de aynıdır.
-    const environment = resolveSentryEnvironment();
-    const isProd = isProductionRuntime();
+    // The app logger needs the SentryService sink in every case: with or
+    // without a DSN, and when the worker already initialized Sentry.
+    initAppLogger(this.sentryService);
 
-    if (dsn) {
-      Sentry.init({
-        dsn,
-        environment,
-        // Sürüm etiketi: "bu hata hangi deploy'la geldi" sorusunu cevaplar ve
-        // Sentry'nin regresyon takibini (çözülen issue yeni sürümde tekrar
-        // açılırsa uyarma) çalıştırır.
-        release: resolveSentryRelease(),
-        tracesSampleRate: isProd ? 0.2 : 1.0,
-        profilesSampleRate: isProd ? 0.1 : 1.0,
-        // Sentry v8's default Node integrations include inbound and outbound
-        // HTTP instrumentation; no deprecated @sentry/tracing shim is needed.
-        // Sağlık kontrolü filtresi + redaksiyon + korelasyon tag'i: tek kapı.
-        beforeSend: applySentryEventPolicy,
-        // Sağlık kontrolü filtresi + alan/URL redaksiyonu: worker ile ortak kapı.
-        beforeBreadcrumb: applySentryBreadcrumbPolicy,
-        // Performans izleri de dış çağrı URL'lerini taşır; aynı redaksiyon.
-        beforeSendTransaction: applySentryTransactionPolicy,
-      });
-      initAppLogger(this.sentryService);
-      this.logger.log("Sentry initialized");
-    } else {
-      initAppLogger(this.sentryService);
-      this.logger.warn("Sentry DSN not configured, error tracking disabled");
+    // The worker entry point (`worker.ts`) initializes Sentry before Nest
+    // boots, with the same options. A second `Sentry.init` in the same
+    // process would replace that client, so it is skipped.
+    if (Sentry.getClient()) {
+      this.logger.log("Sentry already initialized by the entry point");
+      return;
     }
+
+    const dsn = this.configService.get<string>("SENTRY_DSN");
+    if (!dsn) {
+      this.logger.warn("Sentry DSN not configured, error tracking disabled");
+      return;
+    }
+    Sentry.init(buildSentryNodeOptions(dsn));
+    this.logger.log("Sentry initialized");
   }
 }
