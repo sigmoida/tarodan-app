@@ -1,7 +1,8 @@
 # @tarodan/design-tokens (packages/design-tokens)
 
 **The single source of truth for every design value** on web, admin and mobile:
-`colors`, `spacing`, `radius`, `typography`, `shadows`, `motion`, `z-index`
+`colors`, `spacing`, `radius`, `typography`, `shadows`, `motion`, `z-index`,
+`containers`, `breakpoints`
 (`src/*.ts`), plus `tailwind-preset.ts`, the web adapter that projects them onto
 a Tailwind theme. Repo rules: [root CLAUDE.md](../../CLAUDE.md). Cross-repo
 policy: tarodan-ops: `docs/design-system.md`.
