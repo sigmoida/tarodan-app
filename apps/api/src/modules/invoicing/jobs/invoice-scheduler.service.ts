@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { InvoicingService } from "../invoicing.service";
@@ -33,7 +34,7 @@ export class InvoiceSchedulerService implements OnModuleInit {
   }
 
   /** Gerçek iş — Bull processor 'elogo-retry-pending' buradan çağırır. */
-  async runRetryPending(log: (msg: string) => void = () => {}) {
+  async runRetryPending(log: (msg: string) => void = () => undefined) {
     try {
       await this.invoicing.retryPendingInvoices();
       // Deneme bütçesi tükenmiş faturalar otomatik kurtarılmaz; görünür olmaları
@@ -46,9 +47,9 @@ export class InvoiceSchedulerService implements OnModuleInit {
         summary: `eLogo retry tamam${exhausted > 0 ? ` · ${exhausted} tükenmiş` : ""}`,
         stats: { exhausted } as Record<string, number>,
       };
-    } catch (err: any) {
-      this.logger.warn(`eLogo retry cron hatası: ${err?.message}`);
-      log(`HATA: ${err?.message}`);
+    } catch (err) {
+      this.logger.warn(`eLogo retry cron hatası: ${errorMessage(err)}`);
+      log(`HATA: ${errorMessage(err)}`);
       // Rethrow, do not swallow: the Bull job must fail so attempts/backoff and
       // the cron tracker's failure alarm really apply (otherwise even a failed
       // run looks successful and the error stays in a log line).

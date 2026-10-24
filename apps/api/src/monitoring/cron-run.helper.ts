@@ -1,4 +1,5 @@
 import type { Job } from "bull";
+import { errorMessage } from "../common/helpers/error-message";
 import { getCronTracker } from "./cron-tracker.holder";
 
 export interface CronRunSummary {
@@ -49,8 +50,8 @@ export async function runTrackedJob(
       const durationMs = Date.now() - started;
       log(`bitti (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
       return { ok: true, durationMs, summary: res.summary, stats: res.stats };
-    } catch (e: any) {
-      log(`HATA (${Date.now() - started}ms): ${e?.message ?? e}`);
+    } catch (e) {
+      log(`HATA (${Date.now() - started}ms): ${errorMessage(e)}`);
       throw e; // Bull marks the job failed and the Error tab shows the stack.
     }
   };
