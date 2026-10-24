@@ -121,8 +121,8 @@ Cron `seller-trust-refresh` at 02:30 Europe/Istanbul, before
 5. **Cleanup** only when every batch succeeded:
    `DELETE ... WHERE computed_at < asOf` removes sellers that dropped out, or
    were banned, deleted or moved to the test lane. Otherwise every old row is
-   kept and the job fails (Bull retries 3 times; the Sentry cron monitor
-   alerts by e-mail). A run that wrote no row at all also skips the cleanup
+   kept and the job fails (Bull retries 3 times; the failed run logs its
+   alarm at `error`, which reaches Sentry). A run that wrote no row at all also skips the cleanup
    (`cleanup skipped: ...`): an empty result is far more likely a broken
    query or an empty snapshot than every seller leaving at once.
 6. **Result** (admin jobs page, Bull job data): `candidates`, `batches`,

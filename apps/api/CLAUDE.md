@@ -155,9 +155,13 @@ shares a process with HTTP.
 - Queue consumers live in `src/workers/`; `*-scheduled.processor.ts` jobs run in
   the worker role. `BullRootModule` loads everywhere (web still enqueues).
 - Every scheduled job is idempotent and re-runnable, registers in
-  `src/workers/cron-catalog.ts` (monitoring and Sentry check-ins), uses a bounded,
+  `src/workers/cron-catalog.ts` (admin jobs page, test tools), uses a bounded,
   **ordered** candidate query, and claims its work so two instances cannot
   double-process. Cron keys are bound to Bull and Sentry: renaming one is an ops step.
+- **Sentry cron monitors** come from a catalog entry's `monitor` (today only
+  `payout-process`; the plan includes one). Only those jobs check in, only
+  from production, with the schedule and time zone of the Bull repeatable.
+  Check-ins never await or throw into the job.
 
 ## Logging and Sentry
 
@@ -181,7 +185,7 @@ shares a process with HTTP.
   the repeat-report key), logs at `error`; the same failure on the next runs
   logs at `warn` until the ~20h window has passed, then it is raised again.
   The first success after a failure logs the recovery. Every run still fails
-  (Bull retry) and sends its "error" check-in.
+  (Bull retry) and, on a monitored job, sends its "error" check-in.
 - **One failure, one alarm in crons.** A per-record failure logs at `warn`
   and its id goes into the run summary, which is the alarm. A step that
   throws logs its own `error`; a summary made only of those is

@@ -437,9 +437,10 @@ at 02:30 Europe/Istanbul in the worker role and writes only its own table,
   id `seller-trust-bootstrap`, so several instances queue it once; the worker
   runs it. If it fails, the next nightly run fills the table (the read path
   shows "new seller" until then).
-- **Sentry.** The scheduled fire checks in to the cron monitor
-  `seller-trust-refresh`; a failed or missed run alerts by e-mail. Bootstrap
-  and manual runs are not tracked there (they show in Bull Board).
+- **Monitoring.** The job has no Sentry cron monitor (see "Sentry cron
+  monitor (API)"). A failed run logs its alarm at `error`, which reaches
+  Sentry; a run that never starts shows only on the admin jobs page and in
+  Bull Board, as do the bootstrap and manual runs.
 - **Manual run.** Admin, Test Tools, "Satıcı güven skorları". On staging this
   is the calibration step. In production it is a production write: only with
   the user's approval.
@@ -1150,6 +1151,31 @@ Coolify settings, per app (Advanced > Build):
 Sentry project settings (both projects): turn on "Prevent Storing of IP
 Addresses" and the server-side data scrubber; the client SDK does not send IPs
 (`sendDefaultPii: false`), this covers what Sentry would infer itself.
+
+### Sentry cron monitor (API)
+
+The Sentry plan includes one cron monitor and it watches `payout-process`
+(every 15 minutes, Europe/Istanbul): a payout run that is missed (10 minutes
+late), fails, or is still running after 30 minutes counts as failed; two in a
+row open an issue and the first good run resolves it. The settings are the
+`monitor` of its entry in `apps/api/src/workers/cron-catalog.ts`.
+
+- **Production only.** Only a worker whose Sentry environment is `production`
+  sends check-ins, and only for catalog entries with a `monitor`; staging and
+  development send none. Manual runs (the admin release fast path, Bull Board
+  retries) are not check-ins.
+- **No manual setup.** Every check-in carries the monitor config (schedule,
+  time zone, margin, runtime, thresholds), so the first production run creates
+  the monitor and a deploy that changes the settings updates it. Check after
+  the first production deploy that Crons in project `tarodan-api` lists
+  `payout-process` with environment `production`, and that the project's
+  issue alert e-mails cron monitor issues.
+- **Another monitor** needs a plan slot (or a paid one) first: add `monitor`
+  to the entry and update `cron-catalog.contract.spec.ts`, which pins the
+  monitored set. The schedule must have a 5-field form (a 6-field one with a
+  leading `0` seconds field is converted; others get no config and a `warn`).
+- **Renaming** the `payout-process` key orphans the monitor: delete the old
+  one in Sentry after the deploy.
 
 ---
 
