@@ -116,7 +116,7 @@ jobs:
       # Next's own incremental build cache (webpack/SWC artefacts), not a
       # result cache: the build still runs, only faster.
       - name: Cache Next.js build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             apps/web/.next/cache
