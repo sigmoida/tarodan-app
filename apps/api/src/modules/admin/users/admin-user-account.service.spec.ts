@@ -28,6 +28,9 @@ describe("AdminUserAccountService", () => {
     const authService = {
       resendEmailVerification: jest.fn().mockResolvedValue({ success: true }),
       queueEmailVerification: jest.fn().mockResolvedValue(undefined),
+      markEmailVerifiedByAdmin: jest
+        .fn()
+        .mockResolvedValue({ isEmailVerified: true }),
     };
     const staffService = { banUser: jest.fn().mockResolvedValue({}) };
     const analyticsOrderService = {
@@ -124,21 +127,18 @@ describe("AdminUserAccountService", () => {
   });
 
   describe("verifyEmailByAdmin", () => {
-    it("e-postayı doğrular, açık token'ları kullanıldı işaretler, audit yazar", async () => {
-      const { service, tx, audit } = makeService();
+    it("verifies through the auth domain (which also claims guest orders) and writes the audit log", async () => {
+      const { service, prisma, authService, audit } = makeService();
 
       await expect(
         service.verifyEmailByAdmin("admin-1", "user-1"),
       ).resolves.toEqual({ success: true, userId: "user-1" });
 
-      expect(tx.user.update).toHaveBeenCalledWith({
-        where: { id: "user-1" },
-        data: { isEmailVerified: true },
-      });
-      expect(tx.emailVerificationToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: "user-1", usedAt: null },
-        data: { usedAt: expect.any(Date) },
-      });
+      expect(authService.markEmailVerifiedByAdmin).toHaveBeenCalledWith(
+        "user-1",
+      );
+      // No direct write from admin (writes go through the domain service).
+      expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(audit.createAuditLog).toHaveBeenCalledWith(
         "admin-1",
         "user_email_verified_by_admin",
@@ -149,8 +149,8 @@ describe("AdminUserAccountService", () => {
       );
     });
 
-    it("zaten doğrulanmış hesapta yazmaz", async () => {
-      const { service, prisma } = makeService({
+    it("writes nothing and claims nothing for an already verified account", async () => {
+      const { service, authService, audit } = makeService({
         ...baseUser,
         isEmailVerified: true,
       });
@@ -160,7 +160,22 @@ describe("AdminUserAccountService", () => {
       ).rejects.toMatchObject({
         response: { i18nKey: "server.auth.emailAlreadyVerified" },
       });
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(authService.markEmailVerifiedByAdmin).not.toHaveBeenCalled();
+      expect(audit.createAuditLog).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing and claims nothing for a deleted account", async () => {
+      const { service, authService } = makeService({
+        ...baseUser,
+        deletedAt: new Date(),
+      });
+
+      await expect(
+        service.verifyEmailByAdmin("admin-1", "user-1"),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.user.deleted" },
+      });
+      expect(authService.markEmailVerifiedByAdmin).not.toHaveBeenCalled();
     });
   });
 

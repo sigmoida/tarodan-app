@@ -52,10 +52,10 @@ describe("AuthRegistrationService.register — yasal kimlik", () => {
       prisma as never,
       { sendWelcomeEmail: jest.fn() } as never,
       { syncUserConsent: jest.fn() } as never,
-      undefined as never,
       { add: jest.fn() } as never,
       consents as never,
       legalIdentity as never,
+      { request: jest.fn(), flush: jest.fn() } as never,
     );
     jest
       .spyOn(service, "sendEmailVerification")

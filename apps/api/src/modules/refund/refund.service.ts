@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { RefundReason, RefundRequestStatus } from "@prisma/client";
+import { Prisma, RefundReason, RefundRequestStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { CreateRefundRequestDto } from "./dto/create-refund-request.dto";
 import { NotificationType } from "../notification/dto/notification.dto";
@@ -201,6 +201,35 @@ export class RefundService {
       },
     });
     return rows.map((rr) => this.notifications.withResolvedImages(rr));
+  }
+
+  /**
+   * Guest order claim (`OrderGuestClaimService`, in its transaction): requests
+   * opened "for the buyer" while the order was on the system guest (a seller
+   * or platform cancellation) move to the account that proved the guest
+   * e-mail, so `listForBuyer` and the ownership checks see them. Guarded on
+   * the requester still being the guest: a repeat moves nothing.
+   * `requester_id` is outside the finalized-policy trigger. Returns the moved
+   * count and every request id of the orders (penalty invoices key on them).
+   */
+  async reassignGuestRequests(
+    tx: Prisma.TransactionClient,
+    input: { guestUserId: string; userId: string; orderIds: string[] },
+  ): Promise<{ moved: number; requestIds: string[] }> {
+    if (input.orderIds.length === 0) return { moved: 0, requestIds: [] };
+    const moved = await tx.refundRequest.updateMany({
+      where: {
+        orderId: { in: input.orderIds },
+        requesterId: input.guestUserId,
+      },
+      data: { requesterId: input.userId },
+    });
+    const requests = await tx.refundRequest.findMany({
+      where: { orderId: { in: input.orderIds } },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return { moved: moved.count, requestIds: requests.map((r) => r.id) };
   }
 
   async listForSeller(userId: string) {

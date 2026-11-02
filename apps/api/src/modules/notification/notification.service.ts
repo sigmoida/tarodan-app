@@ -423,6 +423,13 @@ export class NotificationService {
     return this.account.sendAccountSecurityNotice(userId, event, details);
   }
 
+  sendGuestOrdersClaimedNotice(
+    userId: string,
+    orderCount: number,
+  ): Promise<void> {
+    return this.account.sendGuestOrdersClaimedNotice(userId, orderCount);
+  }
+
   async sendEmailChangeCode(email: string, code: string, ttlSeconds: number) {
     return this.account.sendEmailChangeCode(email, code, ttlSeconds);
   }

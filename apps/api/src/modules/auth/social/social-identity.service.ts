@@ -36,6 +36,7 @@ import {
   staffAccountCustomerLoginError,
 } from "../utils/staff-account";
 import { allocateUsernameFromEmail } from "../utils/username.util";
+import { GuestOrderClaimRequestService } from "../verification/guest-order-claim-request.service";
 import { AppleTokenService } from "./apple-token.service";
 
 /** Alias kept for the sign-in paths; the one list is `SignInProvider`. */
@@ -154,7 +155,15 @@ const HEAL_USER_DATA = {
 /** `link`: create the link, then link or take over; `heal`: the link exists. */
 type ResolveMode = "link" | "heal";
 
-type Resolved = { result: SocialIdentityResolution; unsubscribe?: string };
+type Resolved = {
+  result: SocialIdentityResolution;
+  unsubscribe?: string;
+  /**
+   * The guest order claim requested in the transaction that verified the
+   * e-mail (a new account, a take-over or a heal); flushed after commit.
+   */
+  claimKey?: string;
+};
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -238,6 +247,7 @@ export class SocialIdentityService {
     private readonly sentry: SentryService,
     private readonly notifications: NotificationService,
     private readonly appleTokens: AppleTokenService,
+    private readonly guestOrderClaims: GuestOrderClaimRequestService,
   ) {}
 
   async resolveUser(
@@ -284,11 +294,10 @@ export class SocialIdentityService {
       assertCanOpenSession(match);
       return this.linkOrTakeOver(identity, match.id, "link");
     }
+    const created = await this.create(identity, newUser);
     return {
-      result: {
-        userId: await this.create(identity, newUser),
-        outcome: "created",
-      },
+      result: { userId: created.userId, outcome: "created" },
+      claimKey: created.claimKey,
     };
   }
 
@@ -429,7 +438,10 @@ export class SocialIdentityService {
       if (mode === "heal") {
         await tx.user.update({ where: { id: userId }, data: HEAL_USER_DATA });
         await securityLog(SIGN_IN_METHOD_EVENTS.socialLinkReset, "high");
-        return { result: { userId, outcome: "tookOver" } };
+        return {
+          result: { userId, outcome: "tookOver" },
+          claimKey: await this.guestOrderClaims.request(tx, userId),
+        };
       }
 
       await tx.user.update({
@@ -454,6 +466,7 @@ export class SocialIdentityService {
       return {
         result: { userId, outcome: "tookOver" },
         unsubscribe: user.acceptsMarketingEmails ? user.email : undefined,
+        claimKey: await this.guestOrderClaims.request(tx, userId),
       };
     });
   }
@@ -629,11 +642,15 @@ export class SocialIdentityService {
     );
   }
 
-  /** New account and its link in one transaction (no half-created account). */
+  /**
+   * New account and its link in one transaction (no half-created account).
+   * The provider verified the e-mail, so the guest order claim is requested
+   * in the same transaction (variant 1 of the guest claim plan).
+   */
   private async create(
     identity: ProviderIdentity,
     profile: NewSocialUserProfile,
-  ): Promise<string> {
+  ): Promise<{ userId: string; claimKey: string }> {
     // Social sign-in does not ask for a username: it is derived from the
     // e-mail. `usernameClaimedAt` stays empty, so the member may change it once.
     const username = await allocateUsernameFromEmail(
@@ -663,7 +680,10 @@ export class SocialIdentityService {
           userId: created.id,
         },
       });
-      return created.id;
+      return {
+        userId: created.id,
+        claimKey: await this.guestOrderClaims.request(tx, created.id),
+      };
     });
   }
 
@@ -693,6 +713,12 @@ export class SocialIdentityService {
     resolution: Resolved,
   ): Promise<void> {
     const { userId, outcome } = resolution.result;
+    // Awaited, so the claimed orders are normally there in the first
+    // session (unless the drainer took the row first and is still running
+    // it); the flush never throws (the outbox drainer is the backstop).
+    if (resolution.claimKey) {
+      await this.guestOrderClaims.flush(resolution.claimKey);
+    }
     if (outcome === "emailMatch") {
       // Context only: the sign-in opened the account by its verified e-mail
       // and wrote nothing. Ids only, no e-mail.

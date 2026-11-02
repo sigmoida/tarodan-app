@@ -17,6 +17,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { TaxService } from "../tax";
@@ -78,7 +79,7 @@ export class InvoiceService {
       throw new BadRequestException(i18nMessage("server.invoice.partyMissing"));
     }
 
-    const pay = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
+    const pay = order.payment ?? order.checkoutGroup?.payment ?? null;
     if (!pay || String(pay.status) !== "completed") {
       throw new BadRequestException(i18nMessage("server.invoice.orderNotPaid"));
     }
@@ -142,12 +143,12 @@ export class InvoiceService {
       items: [
         {
           description: order.product?.title || "Ürün",
-          quantity: (order as any).quantity ?? 1,
+          quantity: order.quantity ?? 1,
           unitPrice:
-            (order as any).unitPrice != null
-              ? Number((order as any).unitPrice)
-              : (order as any).quantity > 1
-                ? subtotal / (order as any).quantity
+            order.unitPrice != null
+              ? Number(order.unitPrice)
+              : order.quantity > 1
+                ? subtotal / order.quantity
                 : subtotal,
           total: subtotal,
         },
@@ -572,5 +573,23 @@ export class InvoiceService {
     throw new BadRequestException(
       i18nMessage("server.invoice.returnViaElogoOnly"),
     );
+  }
+
+  /**
+   * Guest order claim (`OrderGuestClaimService`, in its transaction): the
+   * order summary (`Invoice`) of a claimed guest order moves from the system guest to the account
+   * that proved the guest e-mail, so the buyer's ownership check passes.
+   * Guarded on the buyer still being the guest: a repeat moves nothing.
+   */
+  async reassignGuestBuyer(
+    tx: Prisma.TransactionClient,
+    input: { guestUserId: string; userId: string; orderIds: string[] },
+  ): Promise<number> {
+    if (input.orderIds.length === 0) return 0;
+    const moved = await tx.invoice.updateMany({
+      where: { orderId: { in: input.orderIds }, buyerId: input.guestUserId },
+      data: { buyerId: input.userId },
+    });
+    return moved.count;
   }
 }

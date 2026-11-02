@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { OutboxStatus, Prisma } from "@prisma/client";
+import { OutboxHandlerRegistry } from "./outbox-handler.registry";
 
 export interface OutboxEnqueueInput {
   /** Handler dispatch anahtarı (OutboxHandlerRegistry ile eşleşmeli). */
@@ -26,6 +27,8 @@ export interface OutboxEnqueueInput {
  */
 @Injectable()
 export class OutboxService {
+  constructor(private readonly registry: OutboxHandlerRegistry) {}
+
   async enqueue(
     tx: Prisma.TransactionClient,
     input: OutboxEnqueueInput,
@@ -103,5 +106,30 @@ export class OutboxService {
       // (idempotent) çalıştırır. Başarılı işi hataya çevirmeyiz.
       .catch(() => undefined);
     return { ran: true, result };
+  }
+
+  /**
+   * Runs the registered handler of a pending row right away, as its owner:
+   * the inline path for a caller that must not know the handler (it lives in
+   * a module the caller cannot import without a cycle). Same CAS as
+   * `runInline`: a row that is missing or no longer pending is not run
+   * (`{ ran: false }`). A type without a registered handler throws before the
+   * row is claimed, so the row stays pending for the drainer. A failing
+   * handler releases the row to pending and rethrows.
+   */
+  async runPendingInline(
+    db: Prisma.TransactionClient,
+    dedupeKey: string,
+  ): Promise<{ ran: boolean }> {
+    const row = await db.outboxEvent.findUnique({ where: { dedupeKey } });
+    if (!row || row.status !== OutboxStatus.pending) return { ran: false };
+    const handler = this.registry.get(row.type);
+    if (!handler) {
+      throw new Error(`no outbox handler registered: ${row.type}`);
+    }
+    const outcome = await this.runInline(db, dedupeKey, () =>
+      handler(row.payload, row),
+    );
+    return { ran: outcome.ran };
   }
 }

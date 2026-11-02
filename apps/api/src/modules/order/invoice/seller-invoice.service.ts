@@ -13,6 +13,7 @@ import { SmtpProvider } from "../../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../../common/helpers/email-template-renderer";
 import { isBusinessMembershipEntitled } from "../../membership/helpers/membership.util";
 import { frontendUrl as resolveFrontendUrl } from "../../../config/app-urls";
+import { errorMessage } from "../../../common/helpers/error-message";
 
 /**
  * Kurumsal (şirket) satıcının siparişe ELLE yüklediği ÜRÜN faturası (PDF).
@@ -117,7 +118,7 @@ export class SellerInvoiceService {
         isPublic: false,
         entityType: "seller_invoice",
         entityId: orderId,
-      } as any,
+      },
       sellerId,
     );
 
@@ -189,13 +190,13 @@ export class SellerInvoiceService {
         attachments: [
           { filename: `fatura-${order.orderNumber}.pdf`, content: pdf },
         ],
-      } as any);
+      });
       await this.prisma.sellerUploadedInvoice
         .update({ where: { id: recId }, data: { emailSentAt: new Date() } })
         .catch(() => undefined);
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `satıcı faturası mail hatası (order ${order.orderNumber}): ${e?.message}`,
+        `Seller invoice mail failed (order ${order.orderNumber}): ${errorMessage(e)}`,
       );
     }
   }
@@ -280,9 +281,9 @@ export class SellerInvoiceService {
           where: { id: order.id },
           data: { sellerInvoiceReminderAt: now },
         })
-        .catch((e: any) =>
+        .catch((e: unknown) =>
           this.logger.warn(
-            `satıcı fatura hatırlatma işareti yazılamadı ${order.id}: ${e?.message}`,
+            `Seller invoice reminder stamp not written ${order.id}: ${errorMessage(e)}`,
           ),
         );
       reminded++;
@@ -327,11 +328,11 @@ export class SellerInvoiceService {
         // Hatırlatma şablonu yönlendirme kaydında yok: alan açıkça fatura.
         template: "seller-invoice-reminder",
         area: "invoice",
-      } as any);
+      });
       return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `satıcı fatura hatırlatma maili hatası (order ${order.orderNumber}): ${e?.message}`,
+        `Seller invoice reminder mail failed (order ${order.orderNumber}): ${errorMessage(e)}`,
       );
       return false;
     }
@@ -418,5 +419,23 @@ export class SellerInvoiceService {
       3600,
     );
     return { url, fileName: inv.fileName };
+  }
+
+  /**
+   * Guest order claim (`OrderGuestClaimService`, in its transaction): the
+   * seller's uploaded product invoice of a claimed guest order moves from the system guest to the account
+   * that proved the guest e-mail, so the buyer's ownership check passes.
+   * Guarded on the buyer still being the guest: a repeat moves nothing.
+   */
+  async reassignGuestBuyer(
+    tx: Prisma.TransactionClient,
+    input: { guestUserId: string; userId: string; orderIds: string[] },
+  ): Promise<number> {
+    if (input.orderIds.length === 0) return 0;
+    const moved = await tx.sellerUploadedInvoice.updateMany({
+      where: { orderId: { in: input.orderIds }, buyerId: input.guestUserId },
+      data: { buyerId: input.userId },
+    });
+    return moved.count;
   }
 }

@@ -37,11 +37,11 @@ describe("AuthRegistrationService.register — onay kayıtları", () => {
     };
     const newsletter = { syncUserConsent: jest.fn() };
     const notification = { sendWelcomeEmail: jest.fn() };
+    const guestOrderClaims = { request: jest.fn(), flush: jest.fn() };
     const service = new AuthRegistrationService(
       prisma as never,
       notification as never,
       newsletter as never,
-      undefined as never,
       { add: jest.fn() } as never,
       consents as never,
       // Yasal kimlik: bu dto alanları göndermiyor, servis çağrılmaz.
@@ -49,12 +49,13 @@ describe("AuthRegistrationService.register — onay kayıtları", () => {
         consumeLookupBudget: jest.fn(),
         assertNationalIdAvailable: jest.fn(),
       } as never,
+      guestOrderClaims as never,
     );
     // E-posta doğrulaması bu testin konusu değil.
     jest
       .spyOn(service, "sendEmailVerification")
       .mockResolvedValue({ success: true });
-    return { service, tx, consents };
+    return { service, tx, prisma, consents, guestOrderClaims };
   };
 
   const dto = {

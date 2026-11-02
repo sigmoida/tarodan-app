@@ -159,7 +159,7 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
         return { refunded: true, failed: false };
       }),
     };
-    const outbox = new OutboxService();
+    const outbox = new OutboxService(new OutboxHandlerRegistry());
     const d = {} as never;
     const service = new PaymentFulfillmentService(
       prisma as never,

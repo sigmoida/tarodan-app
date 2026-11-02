@@ -26,6 +26,7 @@ import { SecurityService } from "../../security/security.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
 import { ConsentService } from "../../consent/consent.service";
 import { LegalIdentityService } from "../../legal-identity/legal-identity.service";
+import { GuestOrderClaimRequestService } from "../verification/guest-order-claim-request.service";
 
 describe("AuthService.loginWithApple", () => {
   let service: AuthService;
@@ -115,6 +116,7 @@ describe("AuthService.loginWithApple", () => {
         },
         // Kayıt formundaki yasal kimlik (bu spec'in konusu değil).
         { provide: LegalIdentityService, useValue: {} },
+        { provide: GuestOrderClaimRequestService, useValue: {} },
         // AuthRegistrationService toplu aktivasyon mailini kuyruğa yazıyor.
         {
           provide: getQueueToken(QUEUE_NAMES.EMAIL),

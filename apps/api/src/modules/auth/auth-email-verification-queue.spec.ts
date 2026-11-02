@@ -30,10 +30,10 @@ describe("AuthRegistrationService — aktivasyon maili kuyruğu", () => {
       prisma as any,
       notificationService as any,
       undefined as any,
-      undefined as any,
       emailQueue as any,
       undefined as any,
       // Yasal kimlik (bu spec'in konusu değil).
+      undefined as any,
       undefined as any,
     );
     return { service, prisma, notificationService, emailQueue };

@@ -349,8 +349,8 @@ describe("TradePlatformCancelService", () => {
         .fn()
         .mockResolvedValue(undefined),
     };
-    const outbox = new OutboxService();
     const registry = new OutboxHandlerRegistry();
+    const outbox = new OutboxService(registry);
     const onCancelled = jest.fn().mockResolvedValue(undefined);
 
     const service = new TradePlatformCancelService(

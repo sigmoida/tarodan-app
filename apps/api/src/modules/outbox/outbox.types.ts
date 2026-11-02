@@ -253,3 +253,49 @@ export const searchProductReindexDedupeKey = (
   productId: string,
   cause: string,
 ): string => `${OUTBOX_SEARCH_PRODUCT_REINDEX}:${productId}:${cause}`;
+
+/**
+ * Claim the guest orders bought with a user's e-mail, once that e-mail is
+ * proven (verification link, social sign-up or take-over, corporate
+ * activation, e-mail change, admin verification). Written in the transaction
+ * that sets `isEmailVerified = true`; the auth side runs it inline after
+ * commit (`OutboxService.runPendingInline`) and the drainer is the backstop.
+ * The handler (`OrderGuestClaimService`) reads the user's current e-mail when
+ * it runs, so the payload holds the id only. It is idempotent: every write is
+ * guarded on "still on the system guest".
+ */
+export const OUTBOX_GUEST_ORDER_CLAIM = "guest_order.claim";
+
+export interface GuestOrderClaimPayload {
+  userId: string;
+}
+
+/**
+ * One row per request (the nonce is a fresh UUID): a fixed per-user key would
+ * turn a later, legitimate claim (after an e-mail change) into a no-op.
+ */
+export const guestOrderClaimDedupeKey = (
+  userId: string,
+  nonce: string,
+): string => `${OUTBOX_GUEST_ORDER_CLAIM}:${userId}:${nonce}`;
+
+/**
+ * Tell the account owner that a guest order claim added orders to the
+ * account ("if you did not create this account, reset your password").
+ * Written in the claim's transaction only when it moved orders, so a repeat
+ * claim writes none; run inline after commit, the drainer is the backstop.
+ * One row per claim: the key carries the smallest claimed order id, which
+ * moves only once.
+ */
+export const OUTBOX_GUEST_ORDER_CLAIM_NOTICE = "guest_order.claim_notice";
+
+export interface GuestOrderClaimNoticePayload {
+  userId: string;
+  orderCount: number;
+}
+
+export const guestOrderClaimNoticeDedupeKey = (
+  userId: string,
+  firstClaimedOrderId: string,
+): string =>
+  `${OUTBOX_GUEST_ORDER_CLAIM_NOTICE}:${userId}:${firstClaimedOrderId}`;

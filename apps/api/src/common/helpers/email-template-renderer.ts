@@ -3,6 +3,11 @@
  * Used by EmailWorker (queue processor) and AdminService (preview).
  */
 import { TIMING_RULES, type TimingRuleId } from "@tarodan/types";
+import { defaultLocale } from "@tarodan/i18n";
+import {
+  buildGuestOrdersClaimedMailData,
+  type GuestOrdersClaimedTemplateData,
+} from "./guest-orders-claimed-mail";
 
 export interface EmailBrandOptions {
   frontendUrl?: string;
@@ -337,6 +342,32 @@ const reportTypeLabel = (type?: string): string =>
 const reportReasonLabel = (reason?: string): string =>
   (reason && REPORT_REASON_LABELS[reason]) || "Diğer";
 
+/**
+ * The lines of the guest orders claimed mail: the sender's (catalog, the
+ * recipient's language) or, for an admin preview or test mail without them,
+ * the default-locale catalog copy, escaped like any template data.
+ */
+function guestOrdersClaimedLines(
+  data: Record<string, any>,
+): Pick<
+  GuestOrdersClaimedTemplateData,
+  "title" | "greeting" | "message" | "warning" | "resetLabel" | "help"
+> {
+  if (data?.message) {
+    return {
+      title: data.title || "",
+      greeting: data.greeting || "",
+      message: data.message,
+      warning: data.warning || "",
+      resetLabel: data.resetLabel || "",
+      help: data.help || "",
+    };
+  }
+  return escapeEmailTemplateData(
+    buildGuestOrdersClaimedMailData(defaultLocale, 1),
+  );
+}
+
 export function getEmailTemplateSubject(
   template: string,
   data: Record<string, any>,
@@ -381,6 +412,7 @@ export function getEmailTemplateSubject(
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
     "account-security-notice":
       data?.title || "Hesabınızın giriş yöntemleri değişti",
+    "guest-orders-claimed": guestOrdersClaimedLines(data).title,
     "site-access-invite": "Tarodan Erken Erişim Davetiniz",
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
     "seller-invoice": `Satıcı Faturanız - Sipariş #${data?.orderNumber || ""}`,
@@ -472,6 +504,8 @@ export function renderEmailTemplate(
   // Kargo değeri: 0 → "Ücretsiz" (pakete dahil), aksi halde tutar + TL.
   const shippingValue = (cost: number) =>
     cost > 0 ? `${formatEmailPrice(cost)} TL` : "Ücretsiz";
+
+  const claimed = guestOrdersClaimedLines(data);
 
   const templates: Record<string, string> = {
     welcome: wrapEmail(
@@ -1242,6 +1276,23 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Yardıma mı ihtiyacınız var? <a href="${safeEmailUrl(data?.supportUrl || `${frontendUrl}/support`, frontendUrl)}" style="color: #d95700;">Destek ekibimize ulaşın</a>.</p>
     `,
       data?.title || "Hesabınızın giriş yöntemleri değişti",
+    ),
+
+    // Every line comes from the catalog in the recipient's language
+    // (common/helpers/guest-orders-claimed-mail.ts); no copy here. The admin
+    // preview and test mail carry no lines: they show the default-locale copy.
+    "guest-orders-claimed": wrapEmail(
+      `
+      ${titleBlock(claimed.title)}
+      <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">${claimed.greeting}</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${claimed.message}</p>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">${claimed.warning}</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton(claimed.resetLabel, data?.resetUrl || `${frontendUrl}/forgot-password`)}
+      </div>
+      <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">${claimed.help}</p>
+    `,
+      claimed.title,
     ),
 
     "site-access-invite": wrapEmail(
