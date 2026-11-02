@@ -1808,16 +1808,16 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
     });
   });
 
-  // ──────────────────────────── Misafir sipariş bağlama ────────────────────────────
+  // ──────────────────────────── Guest order claim ────────────────────────────
   describe("Guest order linking", () => {
-    // AUTH-114: register sırasında guest@tarodan.system altındaki, shippingAddress.guestEmail'i
-    // yeni kullanıcının e-postasıyla eşleşen siparişler yeni kullanıcıya bağlanır. Bunu kurmak
-    // sistem-guest kullanıcısı + tam bir Order (zorunlu FK/alanlar: checkoutGroup, seller, ürün,
-    // tutarlar) seed'i gerektirir; AUTH domaininde ürün/sipariş fabrikası kapsamı yok →
-    // sipariş domain spec'inde (07-ord) daha uygun. Burada skip.
+    // AUTH-114: guest orders are claimed when the e-mail becomes verified, not
+    // at registration. The flow needs a full guest checkout (seller, product,
+    // OTP), so it lives with the order scenarios in
+    // test/e2e/guest-order-claim.e2e-spec.ts (ORD-245 e-mail registration,
+    // ORD-246 social sign-up).
     scenario.skip(
       "AUTH-114",
-      "Guest sipariş bağlama tam Order seed’i (checkoutGroup/seller/ürün/tutarlar) ister — sipariş domaininde kapsanır",
+      "covered by test/e2e/guest-order-claim.e2e-spec.ts (ORD-245, ORD-246)",
     );
   });
 
