@@ -35,6 +35,9 @@ import { UserBlockModule } from "../user-block/user-block.module";
 import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { OrderSellerTrustStatsService } from "./stats/order-seller-trust-stats.service";
+import { OrderGuestClaimService } from "./claim/order-guest-claim.service";
+import { PaymentModule } from "../payment/payment.module";
+import { InvoiceModule } from "../invoice/invoice.module";
 
 @Module({
   imports: [
@@ -54,6 +57,11 @@ import { OrderSellerTrustStatsService } from "./stats/order-seller-trust-stats.s
     RefundModule,
     // Sepet checkout'undaki mesafeli satış onayı (consent_records).
     ConsentModule,
+    // Guest order claim: the PayTR status check of claimed pending orders and
+    // the guest link on order summaries. Neither imports OrderModule (it was
+    // already reachable through RefundModule), so there is no cycle.
+    PaymentModule,
+    InvoiceModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OrderController, SellerInvoiceController],
@@ -76,6 +84,8 @@ import { OrderSellerTrustStatsService } from "./stats/order-seller-trust-stats.s
     ...scheduledProcessors(OrderScheduledProcessor),
     SellerInvoiceService,
     OrderSellerTrustStatsService,
+    // Registers the `guest_order.claim` outbox handler (auth enqueues it).
+    OrderGuestClaimService,
   ],
   // OrderCheckoutCommonService: teklif/sipariş bedel primitifleri (OfferService
   // teklif kabulünde aynı hesabı kullanır — tek kaynak).
