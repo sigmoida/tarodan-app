@@ -40,6 +40,12 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     area: "account",
   },
   {
+    key: "guest-orders-claimed",
+    name: "Misafir siparişleri hesaba eklendi",
+    group: "Hesap",
+    area: "account",
+  },
+  {
     key: "site-access-invite",
     name: "Erken erişim daveti",
     group: "Hesap",

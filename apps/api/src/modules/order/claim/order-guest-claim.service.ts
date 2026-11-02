@@ -14,6 +14,7 @@ import { InvoiceService } from "../../invoice/invoice.service";
 import { RefundService } from "../../refund/refund.service";
 import { PaymentService } from "../../payment/payment.service";
 import { SentryService } from "../../sentry/sentry.service";
+import { NotificationService } from "../../notification/notification.service";
 import { SellerInvoiceService } from "../invoice/seller-invoice.service";
 
 /** Why a claim wrote nothing before it looked at any order. */
@@ -139,6 +140,7 @@ export class OrderGuestClaimService implements OnModuleInit {
     private readonly sellerInvoices: SellerInvoiceService,
     private readonly payments: PaymentService,
     private readonly sentry: SentryService,
+    private readonly notifications: NotificationService,
   ) {}
 
   onModuleInit(): void {
@@ -162,6 +164,11 @@ export class OrderGuestClaimService implements OnModuleInit {
       this.claimInTransaction(tx, userId),
     );
     this.report(userId, result);
+    // Only a run that moved orders tells the owner: a repeat (an outbox
+    // retry, a second verification) moves nothing and sends nothing.
+    if (result.claimedOrderIds.length > 0) {
+      await this.noticeOwner(userId, result.claimedOrderIds.length);
+    }
 
     if (
       (options.verifyPendingPayments ?? true) &&
@@ -365,6 +372,20 @@ export class OrderGuestClaimService implements OnModuleInit {
       message: summary,
       level: "info",
     });
+  }
+
+  /**
+   * The "guest orders added to your account" mail, after commit. Never
+   * fails the claim: the orders are already the account's.
+   */
+  private async noticeOwner(userId: string, orderCount: number): Promise<void> {
+    try {
+      await this.notifications.sendGuestOrdersClaimedNotice(userId, orderCount);
+    } catch (e: unknown) {
+      this.logger.warn(
+        `Guest order claim notice not queued (user=${userId}, orders=${orderCount}): ${errorMessage(e)}`,
+      );
+    }
   }
 
   /**

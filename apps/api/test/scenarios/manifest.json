@@ -11456,7 +11456,7 @@
       "tur": "Happy path / Regression",
       "pri": "P1",
       "steps": "1. Guest cart checkout with e-mail X (OTP), and another guest checkout with e-mail Y. 2. Register with X (other case). 3. Orders, package and group stay on the system guest. 4. Verify X. 5. Sign in; GET /api/orders/groups and GET /api/orders/groups/:id. 6. Another user opens and cancels the group. 7. The buyer cancels the group.",
-      "exp": "Nothing moves at registration. After verification the orders, package and checkout group of X belong to the account and Y's stay on the system guest; the list contains X's group only, the detail answers 200 with viewerRole buyer; another user gets 403, an empty list and 403 on cancel; a repeat verification changes nothing; the buyer's group cancel succeeds.",
+      "exp": "Nothing moves at registration. After verification the orders, package and checkout group of X belong to the account and Y's stay on the system guest; the owner gets one 'guest orders added' mail with the count and the password reset link; the list contains X's group only, the detail answers 200 with viewerRole buyer; another user gets 403, an empty list and 403 on cancel; a repeat verification changes nothing; the buyer's group cancel succeeds.",
       "gap": false,
       "gapRefs": []
     },

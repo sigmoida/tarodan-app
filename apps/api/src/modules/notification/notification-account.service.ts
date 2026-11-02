@@ -21,6 +21,11 @@ import {
   type AccountSecurityNoticeEvent,
 } from "../../common/helpers/account-security-notice-mail";
 import { getEmailTemplateSubject } from "../../common/helpers/email-template-renderer";
+import {
+  buildGuestOrdersClaimedMailData,
+  GUEST_ORDERS_CLAIMED_TEMPLATE,
+} from "../../common/helpers/guest-orders-claimed-mail";
+import { defaultLocale, isLocale } from "@tarodan/i18n";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
 import {
   buildEmailVerificationTemplateData,
@@ -228,6 +233,37 @@ export class NotificationAccountService {
         `Failed to queue account security notice (userId=${userId}, event=${event}): ${redactString(error instanceof Error ? error.message : String(error))}`,
       );
     }
+  }
+
+  /**
+   * Tells the account owner that guest orders bought with their e-mail were
+   * added to the account, with the password reset as the way out if they
+   * did not create it. Transactional (no marketing consent, no preference
+   * gate), in the recipient's language. Queued on the e-mail queue after the
+   * claim committed; the payload holds the count and links only and stays
+   * out of `EmailLog.metadata`. Throws when the mail could not be queued so
+   * the caller decides; a missing user sends nothing.
+   */
+  async sendGuestOrdersClaimedNotice(
+    userId: string,
+    orderCount: number,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, preferredLanguage: true },
+    });
+    if (!user) return;
+    const locale = isLocale(user.preferredLanguage)
+      ? user.preferredLanguage
+      : defaultLocale;
+    const templateData = buildGuestOrdersClaimedMailData(locale, orderCount);
+    await this.emailQueue.add("send-template", {
+      to: user.email,
+      subject: templateData.subject,
+      template: GUEST_ORDERS_CLAIMED_TEMPLATE,
+      templateData: { ...templateData, userId },
+      redactTemplateData: true,
+    });
   }
 
   /**

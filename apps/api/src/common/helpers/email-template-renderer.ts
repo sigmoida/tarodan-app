@@ -1244,6 +1244,22 @@ export function renderEmailTemplate(
       data?.title || "Hesabınızın giriş yöntemleri değişti",
     ),
 
+    // Every line comes from the catalog in the recipient's language
+    // (common/helpers/guest-orders-claimed-mail.ts); no copy here.
+    "guest-orders-claimed": wrapEmail(
+      `
+      ${titleBlock(data?.title || "")}
+      <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">${data?.greeting || ""}</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${data?.message || ""}</p>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">${data?.warning || ""}</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton(data?.resetLabel || "", data?.resetUrl || `${frontendUrl}/forgot-password`)}
+      </div>
+      <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">${data?.help || ""}</p>
+    `,
+      data?.title || "",
+    ),
+
     "site-access-invite": wrapEmail(
       `
       ${titleBlock("Tarodan Erken Erişim Davetiniz")}

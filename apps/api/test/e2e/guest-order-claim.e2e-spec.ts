@@ -169,6 +169,19 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
     expect(list.body.data).toEqual([]);
   }
 
+  /** The newest mail to the address with this subject (delivery is queued). */
+  async function waitForMail(address: string, subject: string) {
+    const deadline = Date.now() + 20_000;
+    for (;;) {
+      const mail = await getLastEmailTo(address);
+      if (mail.subject === subject) return mail;
+      if (Date.now() > deadline) {
+        throw new Error(`no "${subject}" mail (last: "${mail.subject}")`);
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
   scenario("ORD-245", async () => {
     const email = `claim-register-${Date.now()}@example.test`;
     const groupId = await guestCheckout(email);
@@ -230,6 +243,17 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       packages: [guestId],
       orders: [guestId],
     });
+
+    // The owner is told, in their language, with the password reset as the
+    // way out if someone else created the account.
+    const notice = await waitForMail(
+      email,
+      "Misafir siparişleriniz hesabınıza eklendi",
+    );
+    // The text part (the reset link itself is pinned by the unit spec).
+    expect(notice.body).toContain("1 sipariş");
+    expect(notice.body).toContain("Bu hesabı siz oluşturmadıysanız");
+    expect(notice.body).toContain("Şifremi Sıfırla");
 
     const login = await request(server())
       .post("/api/auth/login")

@@ -264,6 +264,11 @@ function setup(initial: State = baseState()) {
     }),
   };
   const sentry = { addBreadcrumb: jest.fn() };
+  const notifications = {
+    sendGuestOrdersClaimedNotice: jest.fn(async () => {
+      fake.events.push("notice");
+    }),
+  };
   const none = undefined as never;
   const service = new OrderGuestClaimService(
     fake.db,
@@ -274,8 +279,9 @@ function setup(initial: State = baseState()) {
     new SellerInvoiceService(none, none, none),
     payments as never,
     sentry as never,
+    notifications as never,
   );
-  return { service, fake, registry, payments, sentry };
+  return { service, fake, registry, payments, sentry, notifications };
 }
 
 /** Lets the fire-and-forget payment check finish. */
@@ -587,6 +593,79 @@ describe("OrderGuestClaimService.claimForUser", () => {
       state.orders.map((o) => o.shippingAddress),
     );
     expect(fake.state.groups[0].isGuest).toBe(true);
+  });
+
+  describe("the owner notice (guest orders added to your account)", () => {
+    it("is sent once, after the commit, with the number of orders moved", async () => {
+      const { service, fake, notifications } = setup();
+
+      await service.claimForUser(BUYER);
+
+      expect(notifications.sendGuestOrdersClaimedNotice).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(notifications.sendGuestOrdersClaimedNotice).toHaveBeenCalledWith(
+        BUYER,
+        2,
+      );
+      expect(fake.events.indexOf("commit")).toBeLessThan(
+        fake.events.indexOf("notice"),
+      );
+    });
+
+    it("is not sent again by a repeat run (an outbox retry moves nothing)", async () => {
+      const { service, notifications } = setup();
+
+      await service.claimForUser(BUYER);
+      await service.claimForUser(BUYER);
+
+      expect(notifications.sendGuestOrdersClaimedNotice).toHaveBeenCalledTimes(
+        1,
+      );
+    });
+
+    it("is not sent when no order moved: no guest orders, a heal only, or not eligible", async () => {
+      const healOnly = baseState();
+      healOnly.orders.forEach((o) => (o.buyerId = BUYER));
+      const unverified = baseState();
+      unverified.users[1].isEmailVerified = false;
+
+      for (const [state, userId] of [
+        [baseState(), OTHER],
+        [healOnly, BUYER],
+        [unverified, BUYER],
+      ] as const) {
+        const { service, notifications } = setup(state);
+        await service.claimForUser(userId);
+        expect(
+          notifications.sendGuestOrdersClaimedNotice,
+        ).not.toHaveBeenCalled();
+      }
+    });
+
+    it("is not sent when the claim rolls back", async () => {
+      const { service, fake, notifications } = setup();
+      fake.db.refundRequest.updateMany.mockRejectedValueOnce(new Error("db"));
+
+      await expect(service.claimForUser(BUYER)).rejects.toThrow("db");
+      expect(notifications.sendGuestOrdersClaimedNotice).not.toHaveBeenCalled();
+    });
+
+    it("a mail failure never fails the claim; it is a warning with ids only", async () => {
+      const state = baseState();
+      const { service, fake, notifications } = setup(state);
+      notifications.sendGuestOrdersClaimedNotice.mockRejectedValueOnce(
+        new Error("queue down"),
+      );
+
+      await expect(service.claimForUser(BUYER)).resolves.toMatchObject({
+        claimedOrderIds: ["o-1", "o-2"],
+      });
+      expect(fake.state.orders.map((o) => o.buyerId)).toEqual([BUYER, BUYER]);
+      const warning = logs.find((l) => l.includes("notice not queued"));
+      expect(warning).toContain(`user=${BUYER}`);
+      expect(warning).not.toMatch(/@/);
+    });
   });
 
   it("rolls everything back and throws when a step fails (the outbox retries)", async () => {
