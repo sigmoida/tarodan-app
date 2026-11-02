@@ -32,6 +32,7 @@ import { createProduct } from "../factories/product.factory";
 import { scenario } from "../test-utils/scenario";
 import { getLastEmailTo, extractCode, clearMailbox } from "../test-utils/mail";
 import { GoogleAuthService } from "../../src/modules/auth/social/google-auth.service";
+import { OrderGuestClaimService } from "../../src/modules/order/claim/order-guest-claim.service";
 
 const SYSTEM_GUEST_EMAIL = "guest@tarodan.system";
 
@@ -77,10 +78,11 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       where: { provider: "surat", status: "active" },
       select: { version: true },
     });
-    const rules = await prisma.commissionRuleSet.findFirstOrThrow({
-      where: { status: "ACTIVE" },
-      select: { id: true, version: true },
-    });
+    // Checkout pins the quoted price: send the quote's hash and rule set.
+    const quote = await request(server())
+      .post("/api/orders/quote")
+      .send({ items: [{ productId: product.id, quantity: 1 }] })
+      .expect(201);
     const res = await request(server())
       .post("/api/orders/checkout/guest")
       .send({
@@ -91,8 +93,9 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
         phone: "+905551234567",
         guestName: "Guest Buyer",
         expectedShippingTariffVersion: tariff?.version ?? 1,
-        expectedCommissionRuleSetId: rules.id,
-        expectedCommissionRuleSetVersion: rules.version,
+        expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
+        expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
+        expectedPricingHash: quote.body.pricingHash,
         shippingAddress: {
           fullName: "Guest Buyer",
           phone: "+905551234567",
@@ -169,6 +172,11 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
   scenario("ORD-245", async () => {
     const email = `claim-register-${Date.now()}@example.test`;
     const groupId = await guestCheckout(email);
+    // Another guest's checkout: the claim must match on the e-mail, not take
+    // every order of the system guest.
+    const bystanderGroupId = await guestCheckout(
+      `claim-bystander-${Date.now()}@example.test`,
+    );
     const guestId = await systemGuestId();
 
     await request(server())
@@ -217,13 +225,26 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       orders: [user.id],
       guestEmails: expect.arrayContaining([email]),
     });
+    expect(await owners(bystanderGroupId)).toMatchObject({
+      group: guestId,
+      packages: [guestId],
+      orders: [guestId],
+    });
 
     const login = await request(server())
       .post("/api/auth/login")
       .send({ email: email.toUpperCase(), password: "SecurePass123!" })
       .expect(200);
-    await expectBuyerSeesGroup(login.body.tokens.accessToken, groupId);
+    const accessToken: string = login.body.tokens.accessToken;
+    await expectBuyerSeesGroup(accessToken, groupId);
     await expectOtherUserRefused(groupId);
+    const list = await request(server())
+      .get("/api/orders/groups")
+      .set(authHeader({ accessToken }))
+      .expect(200);
+    expect(list.body.data.map((g: { id: string }) => g.id)).not.toContain(
+      bystanderGroupId,
+    );
 
     // A second verification attempt with the spent link changes nothing.
     await request(server())
@@ -231,6 +252,28 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       .send({ token: raw })
       .expect(200);
     expect((await owners(groupId)).group).toBe(user.id);
+
+    // The group cancel's buyer check now passes for the claimed group (the
+    // orders still wait for payment, so cancel is allowed); another user is
+    // refused.
+    const other = await createUser(ctx.module);
+    await request(server())
+      .post(`/api/orders/groups/${groupId}/cancel`)
+      .set(authHeader(other))
+      .send({})
+      .expect(403);
+    await request(server())
+      .post(`/api/orders/groups/${groupId}/cancel`)
+      .set(authHeader({ accessToken }))
+      .send({})
+      .expect(201);
+    const cancelled = await prisma.order.findMany({
+      where: { checkoutGroupId: groupId },
+      select: { status: true },
+    });
+    expect(cancelled.map((o) => o.status)).toEqual(
+      cancelled.map(() => "cancelled"),
+    );
   });
 
   scenario("ORD-246", async () => {
@@ -263,11 +306,97 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
     await expectBuyerSeesGroup(accessToken, groupId);
     await expectOtherUserRefused(groupId);
 
-    // The claim request is a completed outbox row (ran inline).
+    // The claim request is a completed outbox row (ran inline). Scoped to
+    // this user: truncateAll does not clear outbox_events.
     const rows = await prisma.outboxEvent.findMany({
-      where: { type: "guest_order.claim" },
+      where: {
+        type: "guest_order.claim",
+        dedupeKey: { startsWith: `guest_order.claim:${userId}:` },
+      },
       select: { status: true, payload: true },
     });
     expect(rows).toEqual([{ status: "completed", payload: { userId } }]);
+  });
+
+  scenario("ORD-247", async () => {
+    const email = `claim-heal-${Date.now()}@example.test`;
+    const groupId = await guestCheckout(email);
+    const guestId = await systemGuestId();
+    // An account the old registration claim served: it moved only
+    // order.buyerId and the e-mail was never verified.
+    const holder = await createUser(ctx.module, {
+      email,
+      isEmailVerified: false,
+    });
+    await prisma.order.updateMany({
+      where: { checkoutGroupId: groupId },
+      data: { buyerId: holder.id },
+    });
+    expect(await owners(groupId)).toMatchObject({
+      group: guestId,
+      packages: [guestId],
+      orders: [holder.id],
+    });
+
+    const raw = crypto.randomBytes(32).toString("hex");
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId: holder.id,
+        token: crypto.createHash("sha256").update(raw).digest("hex"),
+        email,
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+    });
+    await request(server())
+      .post("/api/auth/verify-email")
+      .send({ token: raw })
+      .expect(200);
+
+    // The umbrellas follow the orders the old claim moved.
+    expect(await owners(groupId)).toMatchObject({
+      group: holder.id,
+      packages: [holder.id],
+      orders: [holder.id],
+    });
+    await expectBuyerSeesGroup(holder.accessToken, groupId);
+    await expectOtherUserRefused(groupId);
+  });
+
+  scenario("ORD-248", async () => {
+    const email = `claim-race-${Date.now()}@example.test`;
+    const groupId = await guestCheckout(email);
+    const buyer = await createUser(ctx.module, { email });
+    const claims = ctx.app.get(OrderGuestClaimService);
+
+    // Two claim rows for one user running at once (inline flush and the
+    // drainer on two rows, or two verification paths): the row lock
+    // serialises them and the second moves nothing.
+    const results = await Promise.all([
+      claims.claimForUser(buyer.id, { verifyPendingPayments: false }),
+      claims.claimForUser(buyer.id, { verifyPendingPayments: false }),
+    ]);
+
+    const orderCount = await prisma.order.count({
+      where: { checkoutGroupId: groupId },
+    });
+    const packageCount = await prisma.orderPackage.count({
+      where: { checkoutGroupId: groupId },
+    });
+    const ascending = (values: number[]) => [...values].sort((a, b) => a - b);
+    expect(ascending(results.map((r) => r.claimedOrderIds.length))).toEqual([
+      0,
+      orderCount,
+    ]);
+    expect(ascending(results.map((r) => r.packages))).toEqual([
+      0,
+      packageCount,
+    ]);
+    expect(ascending(results.map((r) => r.checkoutGroups))).toEqual([0, 1]);
+    expect(await owners(groupId)).toMatchObject({
+      group: buyer.id,
+      packages: [buyer.id],
+      orders: [buyer.id],
+    });
+    await expectBuyerSeesGroup(buyer.accessToken, groupId);
   });
 });
