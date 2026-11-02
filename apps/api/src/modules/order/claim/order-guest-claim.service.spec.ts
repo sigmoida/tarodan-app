@@ -675,6 +675,51 @@ describe("OrderGuestClaimService.claimForUser", () => {
       );
     });
 
+    it("a later claim of other orders sends its own notice (an e-mail change to an address with guest orders)", async () => {
+      const state = baseState();
+      // Bought with another address the user moves to later; the guest
+      // checkout ran before that address had an account.
+      state.orders.push({
+        id: "o-0",
+        buyerId: GUEST,
+        sellerId: SELLER,
+        checkoutGroupId: "g-2",
+        packageId: "p-2",
+        status: OrderStatus.delivered,
+        shippingAddress: guestAddress("new.address@example.test"),
+      });
+      state.packages.push({
+        id: "p-2",
+        buyerId: GUEST,
+        checkoutGroupId: "g-2",
+      });
+      state.groups.push({ id: "g-2", buyerId: GUEST, isGuest: true });
+      const { service, fake, notifications } = setup(state);
+
+      await service.claimForUser(BUYER);
+      await settle();
+      fake.state.users[1].email = "new.address@example.test";
+      await service.claimForUser(BUYER);
+      await settle();
+
+      // Distinct keys (each carries the smallest order it claimed), so the
+      // second notice is not swallowed by the first one's dedupe key.
+      expect(noticeRows(fake).map((e) => [e.dedupeKey, e.payload])).toEqual([
+        [
+          `${OUTBOX_GUEST_ORDER_CLAIM_NOTICE}:${BUYER}:o-1`,
+          { userId: BUYER, orderCount: 2 },
+        ],
+        [
+          `${OUTBOX_GUEST_ORDER_CLAIM_NOTICE}:${BUYER}:o-0`,
+          { userId: BUYER, orderCount: 1 },
+        ],
+      ]);
+      expect(notifications.sendGuestOrdersClaimedNotice.mock.calls).toEqual([
+        [BUYER, 2],
+        [BUYER, 1],
+      ]);
+    });
+
     it("is not written when no order moved: no guest orders, a heal only, or not eligible", async () => {
       const healOnly = baseState();
       healOnly.orders.forEach((o) => (o.buyerId = BUYER));

@@ -196,6 +196,27 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
     }
   }
 
+  /**
+   * The user's owner-notice outbox rows once the inline run has settled (it
+   * is fire-and-forget after the claim commits). Scoped to the user:
+   * truncateAll does not clear outbox_events.
+   */
+  async function noticeRows(userId: string) {
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const rows = await prisma.outboxEvent.findMany({
+        where: {
+          type: "guest_order.claim_notice",
+          dedupeKey: { startsWith: `guest_order.claim_notice:${userId}:` },
+        },
+        select: { status: true, payload: true },
+      });
+      if (rows.every((r) => r.status === "completed") || Date.now() > deadline)
+        return rows;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+
   scenario("ORD-245", async () => {
     const email = `claim-register-${Date.now()}@example.test`;
     const groupId = await guestCheckout(email);
@@ -269,6 +290,10 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
     expect(notice.body).toContain("1 sipariş");
     expect(notice.body).toContain("Bu hesabı siz oluşturmadıysanız");
     expect(notice.body).toContain("Şifremi Sıfırla");
+    // One notice row, ids and the count only.
+    expect(await noticeRows(user.id)).toEqual([
+      { status: "completed", payload: { userId: user.id, orderCount: 1 } },
+    ]);
 
     const login = await request(server())
       .post("/api/auth/login")
@@ -291,6 +316,12 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       .send({ token: raw })
       .expect(200);
     expect((await owners(groupId)).group).toBe(user.id);
+    // ...and sends no second notice.
+    expect(await noticeRows(user.id)).toHaveLength(1);
+    expect(
+      (await waitForMail(email, "Misafir siparişleriniz hesabınıza eklendi"))
+        .count,
+    ).toBe(1);
 
     // The group cancel's buyer check now passes for the claimed group (the
     // orders still wait for payment, so cancel is allowed); another user is
@@ -355,6 +386,10 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       select: { status: true, payload: true },
     });
     expect(rows).toEqual([{ status: "completed", payload: { userId } }]);
+    // The social sign-up's claim moved an order, so the owner is told once.
+    expect(await noticeRows(userId)).toEqual([
+      { status: "completed", payload: { userId, orderCount: 1 } },
+    ]);
   });
 
   scenario("ORD-247", async () => {
@@ -399,6 +434,8 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
     });
     await expectBuyerSeesGroup(holder.accessToken, groupId);
     await expectOtherUserRefused(groupId);
+    // A heal moves no order onto the account: no owner notice.
+    expect(await noticeRows(holder.id)).toEqual([]);
   });
 
   scenario("ORD-248", async () => {
@@ -437,5 +474,12 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       orders: [buyer.id],
     });
     await expectBuyerSeesGroup(buyer.accessToken, groupId);
+    // Only the claim that moved the orders wrote a notice.
+    expect(await noticeRows(buyer.id)).toEqual([
+      {
+        status: "completed",
+        payload: { userId: buyer.id, orderCount },
+      },
+    ]);
   });
 });
