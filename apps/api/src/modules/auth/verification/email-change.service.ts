@@ -5,9 +5,11 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import * as crypto from "crypto";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { NotificationService } from "../../notification/notification.service";
 import { i18nMessage } from "../../i18n";
+import { GuestOrderClaimRequestService } from "./guest-order-claim-request.service";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -26,6 +28,7 @@ export class EmailChangeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notification: NotificationService,
+    private readonly guestOrderClaims: GuestOrderClaimRequestService,
   ) {}
 
   private hash(code: string): string {
@@ -150,25 +153,40 @@ export class EmailChangeService {
       );
     }
 
+    // One transaction: the code is spent (compare-and-set, so two
+    // concurrent confirmations change the e-mail once), the new address is
+    // set and verified, and the guest orders bought with it are claimed.
+    let claimKey: string;
     try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        // The user proved control of the new inbox, so it is verified.
-        data: { email: token.newEmail, isEmailVerified: true },
+      claimKey = await this.prisma.$transaction(async (tx) => {
+        const spent = await tx.emailChangeToken.updateMany({
+          where: { id: token.id, usedAt: null },
+          data: { usedAt: new Date() },
+        });
+        if (spent.count === 0) {
+          throw new BadRequestException(
+            i18nMessage("server.auth.noActiveVerificationCode"),
+          );
+        }
+        await tx.user.update({
+          where: { id: userId },
+          // The user proved control of the new inbox, so it is verified.
+          data: { email: token.newEmail, isEmailVerified: true },
+        });
+        return this.guestOrderClaims.request(tx, userId);
       });
-    } catch (error: any) {
-      if (error?.code === "P2002") {
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw new ConflictException(
           i18nMessage("server.auth.emailAlreadyRegistered"),
         );
       }
       throw error;
     }
-
-    await this.prisma.emailChangeToken.update({
-      where: { id: token.id },
-      data: { usedAt: new Date() },
-    });
+    await this.guestOrderClaims.flush(claimKey);
 
     return { email: token.newEmail };
   }

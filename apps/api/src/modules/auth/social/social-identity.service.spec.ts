@@ -36,6 +36,10 @@ import { NewsletterService } from "../../marketing/newsletter.service";
 import { ConsentService } from "../../consent/consent.service";
 import { LegalIdentityService } from "../../legal-identity/legal-identity.service";
 import { SentryService } from "../../sentry/sentry.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
+import { OUTBOX_GUEST_ORDER_CLAIM } from "../../outbox/outbox.types";
+import { GuestOrderClaimRequestService } from "../verification/guest-order-claim-request.service";
 
 type Row = Record<string, any>;
 
@@ -51,6 +55,8 @@ interface State {
   phoneTokens: Row[];
   consents: Row[];
   securityLogs: Row[];
+  /** Outbox rows (the guest order claim requests). */
+  outboxEvents: Row[];
   /** User ids that have an AdminUser row (staff). */
   staff: string[];
 }
@@ -67,6 +73,7 @@ const emptyState = (): State => ({
   phoneTokens: [],
   consents: [],
   securityLogs: [],
+  outboxEvents: [],
   staff: [],
 });
 
@@ -261,6 +268,29 @@ function createFakeDb() {
         return data;
       }),
     },
+    outboxEvent: {
+      upsert: jest.fn(async ({ where, create }: any) => {
+        const existing = state.outboxEvents.find(
+          (e) => e.dedupeKey === where.dedupeKey,
+        );
+        if (existing) return existing;
+        const row = { id: nextId("ob"), status: "pending", ...create };
+        state.outboxEvents.push(row);
+        return row;
+      }),
+      findUnique: jest.fn(
+        async ({ where }: any) =>
+          state.outboxEvents.find((e) => e.dedupeKey === where.dedupeKey) ??
+          null,
+      ),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const rows = state.outboxEvents.filter(
+          (e) => e.dedupeKey === where.dedupeKey && e.status === where.status,
+        );
+        rows.forEach((e) => Object.assign(e, data));
+        return { count: rows.length };
+      }),
+    },
   };
 
   return {
@@ -310,6 +340,9 @@ describe.each<SocialProvider>(["google", "apple"])(
     let auth: AuthService;
     let consents: ConsentService;
     let fake: ReturnType<typeof createFakeDb>;
+    /** User ids the guest order claim handler ran for. */
+    let claims: string[];
+    let failClaim = false;
     const google = { verifyIdToken: jest.fn() };
     const apple = { verifyIdentityToken: jest.fn() };
     const newsletter = { syncUserConsent: jest.fn() };
@@ -444,6 +477,11 @@ describe.each<SocialProvider>(["google", "apple"])(
           { provide: NewsletterService, useValue: newsletter },
           { provide: SentryService, useValue: sentry },
           { provide: LegalIdentityService, useValue: {} },
+          // The real request, outbox and inline run; the order module's
+          // handler is replaced by a recorder.
+          GuestOrderClaimRequestService,
+          OutboxService,
+          OutboxHandlerRegistry,
           {
             provide: getQueueToken(QUEUE_NAMES.EMAIL),
             useValue: { add: jest.fn().mockResolvedValue({ id: "job" }) },
@@ -452,6 +490,14 @@ describe.each<SocialProvider>(["google", "apple"])(
       }).compile();
       auth = moduleRef.get(AuthService);
       consents = moduleRef.get(ConsentService);
+      claims = [];
+      failClaim = false;
+      moduleRef
+        .get(OutboxHandlerRegistry)
+        .register(OUTBOX_GUEST_ORDER_CLAIM, async (payload) => {
+          if (failClaim) throw new Error("claim failed");
+          claims.push((payload as { userId: string }).userId);
+        });
     });
 
     it("an existing link signs in to the linked account and writes nothing", async () => {
@@ -694,6 +740,94 @@ describe.each<SocialProvider>(["google", "apple"])(
         expect(fake.state.securityLogs).toEqual([]);
       },
     );
+
+    describe("guest order claim (the provider proved the e-mail)", () => {
+      const claimRows = () =>
+        fake.state.outboxEvents.filter(
+          (e) => e.type === OUTBOX_GUEST_ORDER_CLAIM,
+        );
+
+      it("a new account requests the claim in its transaction and runs it before the sign-in returns", async () => {
+        const res = await signIn("new@example.com");
+
+        expect(claims).toEqual([res.user.id]);
+        expect(claimRows()).toEqual([
+          expect.objectContaining({
+            payload: { userId: res.user.id },
+            status: "completed",
+          }),
+        ]);
+      });
+
+      it("a take-over of an unverified registrant requests the claim", async () => {
+        const attacker = await addUnverifiedRegistration();
+
+        await signIn();
+
+        expect(claims).toEqual([attacker.id]);
+        expect(claimRows()).toHaveLength(1);
+      });
+
+      it("a legacy-link heal requests the claim", async () => {
+        const row = await addUnverifiedRegistration();
+        fake.state.links.push({
+          provider,
+          providerUserId: SUB,
+          userId: row.id,
+        });
+
+        await signIn();
+
+        expect(claims).toEqual([row.id]);
+      });
+
+      it("a sign-in to an already verified account claims nothing (it claimed when it was verified)", async () => {
+        const owner = addUser({ email: VICTIM_EMAIL });
+
+        await signIn();
+        fake.state.links.push({
+          provider,
+          providerUserId: SUB,
+          userId: owner.id,
+        });
+        await signIn();
+
+        expect(claims).toEqual([]);
+        expect(claimRows()).toEqual([]);
+      });
+
+      it("a failing claim does not fail the sign-in; the row waits for the drainer", async () => {
+        failClaim = true;
+
+        const res = await signIn("new@example.com");
+
+        expect(res.user.id).toBeTruthy();
+        expect(claimRows()).toEqual([
+          expect.objectContaining({
+            status: "pending",
+            lastError: "claim failed",
+          }),
+        ]);
+      });
+
+      it("a sign-in that loses the account race leaves no claim request behind", async () => {
+        fake.db.oAuthAccount.findUnique.mockImplementationOnce(async () => {
+          const winner = addUser({ id: "winner", email: VICTIM_EMAIL });
+          fake.state.links.push({
+            provider,
+            providerUserId: SUB,
+            userId: winner.id,
+          });
+          fake.db.$queryRaw.mockResolvedValueOnce([]);
+          return null;
+        });
+
+        await signIn();
+
+        expect(claimRows()).toEqual([]);
+        expect(claims).toEqual([]);
+      });
+    });
 
     it("a deleted row is never matched: a new account is created instead", async () => {
       addUser({ id: "deleted", email: VICTIM_EMAIL, deletedAt: new Date() });
@@ -1031,6 +1165,7 @@ describe("SocialIdentityService manual link and unlink", () => {
     sendAccountSecurityNotice: jest.fn().mockResolvedValue(undefined),
   };
   const appleTokens = { requestRevocation: jest.fn().mockResolvedValue(1) };
+  const guestClaims = { request: jest.fn(), flush: jest.fn() };
 
   const OWNER = "owner";
   const GOOGLE: ProviderIdentity = {
@@ -1088,6 +1223,7 @@ describe("SocialIdentityService manual link and unlink", () => {
         { provide: SentryService, useValue: sentry },
         { provide: NotificationService, useValue: notifications },
         { provide: AppleTokenService, useValue: appleTokens },
+        { provide: GuestOrderClaimRequestService, useValue: guestClaims },
       ],
     }).compile();
     identities = moduleRef.get(SocialIdentityService);

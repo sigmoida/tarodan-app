@@ -180,6 +180,15 @@ the spec pins it with `perClientIp`.
   consent failure rolls back the account. `acceptedConsents`, `birthDate` and
   legal identity are optional so old mobile versions keep working.
 - Password rules come from `packages/types/src/password-policy.ts` (`@IsPassword`).
+- **Guest orders are claimed when the e-mail becomes verified, never at
+  registration** (an unproven registrant must not hold another person's
+  orders). Every site that sets `isEmailVerified = true` (verification link,
+  corporate activation, social sign-up, take-over and heal, e-mail change,
+  admin "verify e-mail") calls `GuestOrderClaimRequestService.request(tx, id)`
+  in that transaction and `flush(key)` after commit: an outbox event
+  (`guest_order.claim`) that `order/claim/order-guest-claim.service.ts`
+  handles, inline first, the drainer as backstop. A new verifying site does
+  the same; test-lane and staff creation do not.
 
 ## Legal identity (`modules/legal-identity/`, `docs/IDENTITY.md`)
 

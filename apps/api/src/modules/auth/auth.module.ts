@@ -28,6 +28,7 @@ import { AppleTokenModule } from "./social/apple-token.module";
 import { RolesGuard } from "./guards/roles.guard";
 import { PhoneVerificationService } from "./verification/phone-verification.service";
 import { EmailChangeService } from "./verification/email-change.service";
+import { GuestOrderClaimRequestService } from "./verification/guest-order-claim-request.service";
 import { SecurityModule } from "../security/security.module";
 import { MarketingModule } from "../marketing/marketing.module";
 import { ConsentModule } from "../consent/consent.module";
@@ -89,6 +90,9 @@ import { SignInMethodsService } from "./sign-in-methods/sign-in-methods.service"
     RolesGuard,
     PhoneVerificationService,
     EmailChangeService,
+    // Every "e-mail is now verified" site requests the guest order claim
+    // (an outbox event the order module handles: no Auth -> Order import).
+    GuestOrderClaimRequestService,
     // Step-up (re-authentication) and the sign-in methods read model. They
     // live here, not in SecurityModule: AuthModule imports SecurityModule,
     // so the other way round would be a cycle.

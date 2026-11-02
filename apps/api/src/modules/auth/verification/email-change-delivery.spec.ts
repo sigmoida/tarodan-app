@@ -23,7 +23,11 @@ describe("EmailChangeService delivery failure", () => {
         error: "provider unavailable",
       }),
     };
-    const service = new EmailChangeService(prisma as any, notification as any);
+    const service = new EmailChangeService(
+      prisma as any,
+      notification as any,
+      undefined as never,
+    );
 
     await expect(
       service.requestChange("user-1", "new@example.com"),

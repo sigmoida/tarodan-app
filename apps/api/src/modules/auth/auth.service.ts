@@ -71,6 +71,13 @@ export class AuthService {
     return this.registration.verifyEmail(token);
   }
 
+  /** Admin "verify e-mail": the link's outcome, including the guest claim. */
+  markEmailVerifiedByAdmin(
+    userId: string,
+  ): Promise<{ isEmailVerified: boolean }> {
+    return this.registration.markEmailVerifiedByAdmin(userId);
+  }
+
   resendEmailVerification(
     userId: string,
   ): Promise<EmailVerificationSendResult> {

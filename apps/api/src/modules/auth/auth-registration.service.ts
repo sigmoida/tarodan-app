@@ -5,7 +5,6 @@ import {
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
-import { ModuleRef } from "@nestjs/core";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { PrismaService } from "../../prisma";
@@ -15,13 +14,7 @@ import {
   CorporateInvitationDto,
   RegisterResponseDto,
 } from "./dto";
-import {
-  ConsentSource,
-  SellerType,
-  OrderStatus,
-  PaymentStatus,
-  Prisma,
-} from "@prisma/client";
+import { ConsentSource, SellerType, Prisma } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { NewsletterService } from "../marketing/newsletter.service";
 import { ConsentService } from "../consent/consent.service";
@@ -31,7 +24,6 @@ import {
   nationalIdUnavailable,
   normalizeLegalIdentityInput,
 } from "../legal-identity/helpers/legal-identity-status";
-import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { isUsernameAllowed, normalizeUsername } from "./utils/username.util";
 import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
@@ -45,6 +37,7 @@ import {
   EMAIL_VERIFICATION_TEMPLATE,
   EMAIL_VERIFICATION_TTL_MS,
 } from "../../common/helpers/email-verification-mail";
+import { GuestOrderClaimRequestService } from "./verification/guest-order-claim-request.service";
 
 /** Aktivasyon mailinin gönderim sonucu (NotificationAccountService sözleşmesi). */
 export interface EmailVerificationSendResult {
@@ -57,9 +50,11 @@ type EntityUserPrefix =
   typeof ENTITY_PREFIX.individualUser | typeof ENTITY_PREFIX.corporateUser;
 
 /**
- * Hesap açılışı: bireysel ve kurumsal kayıt, kurumsal davet aktivasyonu,
- * e-posta doğrulaması ve misafir siparişlerinin yeni hesaba devri.
- * AuthService'ten birebir taşındı.
+ * Account opening: individual and corporate registration, corporate
+ * invitation activation and e-mail verification. Moved from AuthService as
+ * is. Guest orders are claimed when the e-mail becomes verified (link,
+ * corporate activation, admin), never at registration: an unproven
+ * registrant must not hold another person's orders.
  *
  * Hepsi aynı anı paylaşıyor — kullanıcı satırının ilk kez yazıldığı an. O
  * satır tek yerde kurulmazsa kullanıcı adı ayırma, entity kodu (B/K) ve
@@ -74,10 +69,10 @@ export class AuthRegistrationService {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly newsletterService: NewsletterService,
-    private readonly moduleRef: ModuleRef,
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
     private readonly consents: ConsentService,
     private readonly legalIdentity: LegalIdentityService,
+    private readonly guestOrderClaims: GuestOrderClaimRequestService,
   ) {}
 
   /**
@@ -266,71 +261,6 @@ export class AuthRegistrationService {
       await this.newsletterService.syncUserConsent(user.email, true);
     }
 
-    // Check if there are guest orders with this email and link them to the new user
-    try {
-      // Get system guest user
-      const systemGuestUser = await this.prisma.user.findUnique({
-        where: { email: "guest@tarodan.system" },
-      });
-
-      if (systemGuestUser) {
-        // Get all orders from system guest user
-        const guestOrders = await this.prisma.order.findMany({
-          where: {
-            buyerId: systemGuestUser.id,
-          },
-        });
-
-        // Filter orders where guestEmail in shippingAddress matches the new user's email
-        const matchingOrders = guestOrders.filter((order: any) => {
-          try {
-            const shippingAddress = order.shippingAddress as any;
-            const guestEmail = shippingAddress?.guestEmail
-              ?.toLowerCase()
-              ?.trim();
-            const userEmail = dto.email.toLowerCase().trim();
-            return guestEmail === userEmail;
-          } catch {
-            return false;
-          }
-        });
-
-        if (matchingOrders.length > 0) {
-          // Link guest orders to the new user
-          await this.prisma.order.updateMany({
-            where: {
-              id: { in: matchingOrders.map((o: any) => o.id) },
-            },
-            data: {
-              buyerId: user.id,
-            },
-          });
-
-          this.logger.log(
-            `Linked ${matchingOrders.length} guest order(s) to new user ${user.id} (${user.email})`,
-          );
-
-          // Misafir, ödeme sonrası success sayfasına ulaşamadıysa (eski guest
-          // redirect bug'ı) ödeme yakalanmamış olabilir → sahiplenilen pending
-          // siparişleri PayTR'da DOĞRULA. Bloklamadan, arka planda; PayTR'da
-          // gerçekten ödenmişse sipariş tamamlanır.
-          const pendingOrders = matchingOrders.filter(
-            (o: any) => o.status === OrderStatus.pending_payment,
-          );
-          if (pendingOrders.length > 0) {
-            void this.verifyClaimedGuestPayments(pendingOrders).catch(
-              () => undefined,
-            );
-          }
-        }
-      }
-    } catch (error) {
-      // Don't fail registration if linking guest orders fails
-      this.logger.error(
-        `Failed to link guest orders for ${user.email}: ${errorMessage(error)}`,
-      );
-    }
-
     // Send email verification
     await this.sendEmailVerification(user.id, user.email);
 
@@ -340,7 +270,7 @@ export class AuthRegistrationService {
         await this.notificationService.sendWelcomeEmail(user.id);
       } catch (error) {
         this.logger.error(
-          `Failed to send welcome email to ${user.email}: ${errorMessage(error)}`,
+          `Failed to send welcome email to user ${user.id}: ${errorMessage(error)}`,
         );
       }
     }
@@ -368,54 +298,6 @@ export class AuthRegistrationService {
       // #224: mesaj artık AuthController.register() tarafından locale'e göre kuruluyor
       // (server.auth.registerSuccess) — servis burada sabit metin döndürmüyor.
     };
-  }
-
-  /**
-   * Sahiplenilen pending misafir siparişlerinin ödemesini PayTR'da doğrula.
-   * Misafir, ödeme sonrası success sayfasına ulaşamamış (verify çağrısı hiç
-   * çalışmamış) ve callback de gelmemişse sipariş pending kalır; burada PayTR
-   * durum-sorgusuyla gerçekten ödenmişse sipariş tamamlanır. ModuleRef ile tembel
-   * çözüm (Auth↔Payment modül döngüsünü önler). Asla register'ı bloklamaz/patlatmaz.
-   */
-  private async verifyClaimedGuestPayments(
-    orders: { id: string; checkoutGroupId: string | null }[],
-  ): Promise<void> {
-    let paymentService: PaymentService;
-    try {
-      paymentService = this.moduleRef.get(PaymentService, { strict: false });
-    } catch {
-      return;
-    }
-    for (const order of orders) {
-      try {
-        const payment = await this.prisma.payment.findFirst({
-          where: {
-            status: PaymentStatus.pending,
-            OR: [
-              { orderId: order.id },
-              ...(order.checkoutGroupId
-                ? [{ checkoutGroupId: order.checkoutGroupId }]
-                : []),
-            ],
-          },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        });
-        if (!payment) continue;
-        const res = await paymentService.verifyPaymentFromClient(payment.id, {
-          internal: true,
-        });
-        if (res.completed) {
-          this.logger.log(
-            `Recovered guest payment ${payment.id} for claimed order ${order.id}`,
-          );
-        }
-      } catch (e: any) {
-        this.logger.warn(
-          `verifyClaimedGuestPayments failed for order ${order.id}: ${e?.message}`,
-        );
-      }
-    }
   }
 
   /**
@@ -574,21 +456,57 @@ export class AuthRegistrationService {
       );
     }
 
-    // Mark email as verified
-    await this.prisma.user.update({
-      where: { id: verificationToken.userId },
-      data: { isEmailVerified: true },
+    // One transaction: the token is spent (compare-and-set, so a double
+    // click or a mail client's link preview verifies once), the e-mail is
+    // verified and the guest order claim is requested.
+    const claimKey = await this.prisma.$transaction(async (tx) => {
+      const spent = await tx.emailVerificationToken.updateMany({
+        where: { id: verificationToken.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      if (spent.count === 0) return null;
+      await tx.user.update({
+        where: { id: verificationToken.userId },
+        data: { isEmailVerified: true },
+      });
+      return this.guestOrderClaims.request(tx, verificationToken.userId);
     });
+    // A concurrent request spent the link first and verified the e-mail.
+    if (claimKey === null) return { alreadyVerified: true };
+    await this.guestOrderClaims.flush(claimKey);
 
-    // Mark token as used
-    await this.prisma.emailVerificationToken.update({
-      where: { id: verificationToken.id },
-      data: { usedAt: new Date() },
-    });
-
-    // #224: başarı mesajı AuthController.verifyEmail() tarafından locale'e göre
-    // kuruluyor (server.auth.emailVerificationSuccess).
+    // #224: the success message is built per locale by
+    // AuthController.verifyEmail() (server.auth.emailVerificationSuccess).
     return { alreadyVerified: false };
+  }
+
+  /**
+   * Admin "verify e-mail": as if the user had clicked the link (decision D2
+   * of the guest claim plan). The e-mail is verified, open links are spent
+   * and the guest order claim is requested, in one transaction; the claim
+   * runs after commit. The admin caller checks the account and writes the
+   * audit log.
+   */
+  async markEmailVerifiedByAdmin(
+    userId: string,
+  ): Promise<{ isEmailVerified: boolean }> {
+    const { updated, claimKey } = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.user.update({
+        where: { id: userId },
+        data: { isEmailVerified: true },
+        select: { isEmailVerified: true },
+      });
+      await tx.emailVerificationToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      return {
+        updated: row,
+        claimKey: await this.guestOrderClaims.request(tx, userId),
+      };
+    });
+    await this.guestOrderClaims.flush(claimKey);
+    return { isEmailVerified: updated.isEmailVerified };
   }
 
   /**
@@ -720,8 +638,9 @@ export class AuthRegistrationService {
     ]);
     const now = new Date();
     let user;
+    let claimKey: string;
     try {
-      user = await this.prisma.$transaction(async (tx) => {
+      ({ user, claimKey } = await this.prisma.$transaction(async (tx) => {
         const created = await tx.user.create({
           data: {
             adminCode,
@@ -759,11 +678,16 @@ export class AuthRegistrationService {
             },
           },
         });
-        return created;
-      });
+        // The invitation went to the company e-mail, so it is verified here.
+        return {
+          user: created,
+          claimKey: await this.guestOrderClaims.request(tx, created.id),
+        };
+      }));
     } catch (error) {
       this.rethrowUserUniqueConstraint(error);
     }
+    await this.guestOrderClaims.flush(claimKey);
 
     return {
       userId: user.id,

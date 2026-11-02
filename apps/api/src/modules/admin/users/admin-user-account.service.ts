@@ -15,16 +15,16 @@ import { runBulk, type BulkResult } from "../common/run-bulk";
 import { UserService } from "../../user/user.service";
 
 /**
- * Hesap aktivasyonu (e-posta doğrulama) admin işlemleri + kullanıcı toplu
- * işlemleri.
+ * Admin account activation (e-mail verification) and bulk user actions.
  *
- * Aktivasyon maili kayıt akışındaki AYNI token/şablon yolundan gider
- * (AuthService → AuthRegistrationService.sendEmailVerification); burada ikinci
- * bir token üretimi yok. Manuel aktivasyon, kullanıcının linke tıklamasıyla
- * aynı sonucu üretir: `isEmailVerified=true` + açık token'lar kullanıldı.
+ * The activation mail goes through the SAME token and template path as
+ * registration (AuthService -> AuthRegistrationService.sendEmailVerification);
+ * no second token is minted here. Manual activation has the link's outcome
+ * (AuthService.markEmailVerifiedByAdmin): `isEmailVerified=true`, open links
+ * spent and the guest order claim requested.
  *
- * Toplu yollar tekil yolları sarmalar (runBulk) — audit/cache/bildirim yan
- * etkileri tek yerde kalır.
+ * Bulk paths wrap the single paths (runBulk), so the audit, cache and
+ * notification side effects stay in one place.
  */
 @Injectable()
 export class AdminUserAccountService {
@@ -160,21 +160,15 @@ export class AdminUserAccountService {
     return { queued: true, userId };
   }
 
-  /** E-postayı admin adına doğrulanmış sayar (kullanıcı linke tıklamış gibi). */
+  /**
+   * Marks the e-mail verified on the user's behalf, as if they had clicked
+   * the link: the write (and the guest order claim it requests) goes through
+   * the auth domain; the audit log stays here.
+   */
   async verifyEmailByAdmin(adminId: string, userId: string) {
     const user = await this.loadActivatableUser(userId);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.user.update({
-        where: { id: userId },
-        data: { isEmailVerified: true },
-      });
-      await tx.emailVerificationToken.updateMany({
-        where: { userId, usedAt: null },
-        data: { usedAt: new Date() },
-      });
-      return result;
-    });
+    const updated = await this.authService.markEmailVerifiedByAdmin(userId);
 
     await this.audit.createAuditLog(
       adminId,
