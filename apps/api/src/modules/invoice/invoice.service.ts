@@ -78,7 +78,7 @@ export class InvoiceService {
       throw new BadRequestException(i18nMessage("server.invoice.partyMissing"));
     }
 
-    const pay = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
+    const pay = order.payment ?? order.checkoutGroup?.payment ?? null;
     if (!pay || String(pay.status) !== "completed") {
       throw new BadRequestException(i18nMessage("server.invoice.orderNotPaid"));
     }
@@ -142,12 +142,12 @@ export class InvoiceService {
       items: [
         {
           description: order.product?.title || "Ürün",
-          quantity: (order as any).quantity ?? 1,
+          quantity: order.quantity ?? 1,
           unitPrice:
-            (order as any).unitPrice != null
-              ? Number((order as any).unitPrice)
-              : (order as any).quantity > 1
-                ? subtotal / (order as any).quantity
+            order.unitPrice != null
+              ? Number(order.unitPrice)
+              : order.quantity > 1
+                ? subtotal / order.quantity
                 : subtotal,
           total: subtotal,
         },

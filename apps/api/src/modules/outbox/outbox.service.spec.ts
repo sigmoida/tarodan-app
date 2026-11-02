@@ -7,8 +7,8 @@ describe("OutboxService.enqueue", () => {
   it("dedupeKey YOKken create eder (para tx client'ında)", async () => {
     const tx = {
       outboxEvent: { create: jest.fn(), upsert: jest.fn() },
-    } as any;
-    await svc.enqueue(tx, {
+    };
+    await svc.enqueue(tx as never, {
       type: "invoice.generate",
       payload: { orderId: "o1" },
     });
@@ -25,8 +25,8 @@ describe("OutboxService.enqueue", () => {
   it("dedupeKey VARken upsert eder (tx-güvenli idempotency, update no-op)", async () => {
     const tx = {
       outboxEvent: { create: jest.fn(), upsert: jest.fn() },
-    } as any;
-    await svc.enqueue(tx, {
+    };
+    await svc.enqueue(tx as never, {
       type: "refund.paytr",
       payload: { orderId: "o1", amount: 10 },
       dedupeKey: "refund:o1:10",
@@ -51,10 +51,10 @@ describe("OutboxService.enqueue", () => {
         create: jest.fn().mockRejectedValue(new Error("db down")),
         upsert: jest.fn(),
       },
-    } as any;
-    await expect(svc.enqueue(tx, { type: "x", payload: {} })).rejects.toThrow(
-      "db down",
-    );
+    };
+    await expect(
+      svc.enqueue(tx as never, { type: "x", payload: {} }),
+    ).rejects.toThrow("db down");
   });
 });
 
