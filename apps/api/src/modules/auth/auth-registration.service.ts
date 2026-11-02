@@ -56,10 +56,10 @@ type EntityUserPrefix =
  * corporate activation, admin), never at registration: an unproven
  * registrant must not hold another person's orders.
  *
- * Hepsi aynı anı paylaşıyor — kullanıcı satırının ilk kez yazıldığı an. O
- * satır tek yerde kurulmazsa kullanıcı adı ayırma, entity kodu (B/K) ve
- * benzersizlik çakışmasının hangi hataya dönüştüğü yollara göre ayrışır;
- * kurumsal kayıt bireyselden farklı bir kod şeması üretmeye başlar.
+ * They share one moment, the first write of the user row. If that row were
+ * built in more than one place, username allocation, the entity code (B/K)
+ * and the error a uniqueness conflict maps to would drift between the paths,
+ * and corporate registration would start producing another code scheme.
  */
 @Injectable()
 export class AuthRegistrationService {

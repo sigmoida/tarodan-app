@@ -713,8 +713,9 @@ export class SocialIdentityService {
     resolution: Resolved,
   ): Promise<void> {
     const { userId, outcome } = resolution.result;
-    // Awaited, so the claimed orders are there in the first session; the
-    // flush never throws (the outbox drainer is the backstop).
+    // Awaited, so the claimed orders are normally there in the first
+    // session (unless the drainer took the row first and is still running
+    // it); the flush never throws (the outbox drainer is the backstop).
     if (resolution.claimKey) {
       await this.guestOrderClaims.flush(resolution.claimKey);
     }

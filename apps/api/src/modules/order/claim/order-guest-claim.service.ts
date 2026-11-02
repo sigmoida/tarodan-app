@@ -169,10 +169,15 @@ export class OrderGuestClaimService implements OnModuleInit {
     ) {
       // After commit, fire and forget: a PayTR status check never fails or
       // delays the claim.
+      // The PayTR reconcile cron is the backstop if this never runs.
       void this.verifyClaimedGuestPayments(
         userId,
         result.pendingPaymentOrderIds,
-      ).catch(() => undefined);
+      ).catch((e: unknown) =>
+        this.logger.warn(
+          `Guest claim payment check failed (user=${userId}): ${errorMessage(e)}`,
+        ),
+      );
     }
     return result;
   }
@@ -322,15 +327,19 @@ export class OrderGuestClaimService implements OnModuleInit {
     return { moved: updated.count, skipped };
   }
 
-  /** Ids and counts only: never the e-mail. */
+  /**
+   * Ids and counts only: never the e-mail. A skipped umbrella is an alarm
+   * (`error`, one per entity): the buyer cannot see that order until someone
+   * looks at the data.
+   */
   private report(userId: string, result: GuestOrderClaimResult): void {
     for (const id of result.skippedCheckoutGroupIds) {
-      this.logger.warn(
+      this.logger.error(
         `Guest order claim left checkout group ${id} on the system guest: it holds another buyer's order (user=${userId})`,
       );
     }
     for (const id of result.skippedPackageIds) {
-      this.logger.warn(
+      this.logger.error(
         `Guest order claim left package ${id} on the system guest: it holds another buyer's order (user=${userId})`,
       );
     }
