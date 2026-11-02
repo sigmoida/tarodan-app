@@ -78,7 +78,7 @@ describe("guest orders claimed notice", () => {
       "1 order you placed as a guest",
     );
     expect(enJob.templateData.warning).toContain(
-      "If you did not create this account, reset your password",
+      "If you did not create this account",
     );
 
     const unknown = build({ email: EMAIL, preferredLanguage: "xx" });
@@ -132,4 +132,18 @@ describe("guest orders claimed notice", () => {
       expect(mail.html).not.toMatch(/\{\{|\{count/);
     },
   );
+
+  it("shows the default-locale catalog copy in an admin preview without lines", () => {
+    const fallback = buildGuestOrdersClaimedMailData("tr", 1);
+    const mail = renderManagedEmailTemplate(
+      GUEST_ORDERS_CLAIMED_TEMPLATE,
+      { name: "Sample", to: EMAIL },
+      null,
+      "https://tarodan.com.tr",
+    );
+
+    expect(mail.subject).toBe(fallback.subject);
+    expect(mail.html).toContain(fallback.message);
+    expect(mail.html).toContain(fallback.resetLabel);
+  });
 });

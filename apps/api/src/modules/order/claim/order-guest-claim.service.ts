@@ -4,8 +4,12 @@ import { PrismaService } from "../../../prisma";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import { PermanentOutboxError } from "../../outbox/outbox-errors";
+import { OutboxService } from "../../outbox/outbox.service";
 import {
   OUTBOX_GUEST_ORDER_CLAIM,
+  OUTBOX_GUEST_ORDER_CLAIM_NOTICE,
+  guestOrderClaimNoticeDedupeKey,
+  type GuestOrderClaimNoticePayload,
   type GuestOrderClaimPayload,
 } from "../../outbox/outbox.types";
 import { SYSTEM_GUEST_EMAIL } from "../../invoicing/invoice/guest-recipient";
@@ -141,6 +145,7 @@ export class OrderGuestClaimService implements OnModuleInit {
     private readonly payments: PaymentService,
     private readonly sentry: SentryService,
     private readonly notifications: NotificationService,
+    private readonly outbox: OutboxService,
   ) {}
 
   onModuleInit(): void {
@@ -154,6 +159,10 @@ export class OrderGuestClaimService implements OnModuleInit {
       }
       await this.claimForUser(userId);
     });
+    this.outboxHandlers.register(
+      OUTBOX_GUEST_ORDER_CLAIM_NOTICE,
+      async (payload) => this.sendNotice(payload),
+    );
   }
 
   async claimForUser(
@@ -164,10 +173,8 @@ export class OrderGuestClaimService implements OnModuleInit {
       this.claimInTransaction(tx, userId),
     );
     this.report(userId, result);
-    // Only a run that moved orders tells the owner: a repeat (an outbox
-    // retry, a second verification) moves nothing and sends nothing.
     if (result.claimedOrderIds.length > 0) {
-      await this.noticeOwner(userId, result.claimedOrderIds.length);
+      this.flushNotice(userId, result);
     }
 
     if (
@@ -248,6 +255,17 @@ export class OrderGuestClaimService implements OnModuleInit {
         data: { buyerId: user.id },
       });
       result.claimedOrderIds = toClaim.map((o) => o.id);
+      // The owner notice commits with the claim. Only a run that moved
+      // orders writes it: a repeat (an outbox retry, a second verification)
+      // moves nothing and writes none.
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_GUEST_ORDER_CLAIM_NOTICE,
+        payload: {
+          userId: user.id,
+          orderCount: toClaim.length,
+        } satisfies GuestOrderClaimNoticePayload,
+        dedupeKey: guestOrderClaimNoticeDedupeKey(user.id, toClaim[0].id),
+      });
       result.pendingPaymentOrderIds = toClaim
         .filter((o) => o.status === OrderStatus.pending_payment)
         .map((o) => o.id);
@@ -375,17 +393,43 @@ export class OrderGuestClaimService implements OnModuleInit {
   }
 
   /**
-   * The "guest orders added to your account" mail, after commit. Never
-   * fails the claim: the orders are already the account's.
+   * The "guest orders added to your account" mail, run inline after commit
+   * without holding the caller (verification, sign-up); if it fails, the
+   * notice row stays pending and the drainer retries it. Never fails the
+   * claim: the orders are already the account's.
    */
-  private async noticeOwner(userId: string, orderCount: number): Promise<void> {
-    try {
-      await this.notifications.sendGuestOrdersClaimedNotice(userId, orderCount);
-    } catch (e: unknown) {
-      this.logger.warn(
-        `Guest order claim notice not queued (user=${userId}, orders=${orderCount}): ${errorMessage(e)}`,
+  private flushNotice(userId: string, result: GuestOrderClaimResult): void {
+    const payload: GuestOrderClaimNoticePayload = {
+      userId,
+      orderCount: result.claimedOrderIds.length,
+    };
+    void this.outbox
+      .runInline(
+        this.prisma,
+        guestOrderClaimNoticeDedupeKey(userId, result.claimedOrderIds[0]),
+        () => this.sendNotice(payload),
+      )
+      .catch((e: unknown) =>
+        this.logger.warn(
+          `Guest order claim notice deferred to the outbox (user=${userId}, orders=${payload.orderCount}): ${errorMessage(e)}`,
+        ),
+      );
+  }
+
+  /** Outbox handler: queue the mail; a failure throws so the row retries. */
+  private async sendNotice(payload: unknown): Promise<void> {
+    const { userId, orderCount } =
+      (payload as Partial<GuestOrderClaimNoticePayload> | null) ?? {};
+    if (
+      typeof userId !== "string" ||
+      typeof orderCount !== "number" ||
+      orderCount < 1
+    ) {
+      throw new PermanentOutboxError(
+        `${OUTBOX_GUEST_ORDER_CLAIM_NOTICE} payload without a user or count`,
       );
     }
+    await this.notifications.sendGuestOrdersClaimedNotice(userId, orderCount);
   }
 
   /**

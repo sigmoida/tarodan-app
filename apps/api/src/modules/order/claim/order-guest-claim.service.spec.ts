@@ -3,7 +3,11 @@ import { OrderStatus } from "@prisma/client";
 import { OrderGuestClaimService } from "./order-guest-claim.service";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import { PermanentOutboxError } from "../../outbox/outbox-errors";
-import { OUTBOX_GUEST_ORDER_CLAIM } from "../../outbox/outbox.types";
+import {
+  OUTBOX_GUEST_ORDER_CLAIM,
+  OUTBOX_GUEST_ORDER_CLAIM_NOTICE,
+} from "../../outbox/outbox.types";
+import { OutboxService } from "../../outbox/outbox.service";
 import { RefundService } from "../../refund/refund.service";
 import { InvoicingService } from "../../invoicing/invoicing.service";
 import { InvoiceService } from "../../invoice/invoice.service";
@@ -59,6 +63,7 @@ interface State {
   payments: Row[];
   ledgerEntries: Row[];
   consentRecords: Row[];
+  outboxEvents: Row[];
 }
 
 function createFakeDb(initial: State) {
@@ -118,6 +123,19 @@ function createFakeDb(initial: State) {
     payment: table("payments"),
     ledgerEntry: table("ledgerEntries"),
     consentRecord: table("consentRecords"),
+    outboxEvent: {
+      ...table("outboxEvents"),
+      upsert: jest.fn(async ({ where, create }: any) => {
+        const existing = state.outboxEvents.find(
+          (e) => e.dedupeKey === where.dedupeKey,
+        );
+        if (existing) return existing;
+        const row = { status: "pending", ...create };
+        state.outboxEvents.push(row);
+        events.push("write:outboxEvents");
+        return row;
+      }),
+    },
   };
 
   /** The candidate lock query, evaluated in JS. */
@@ -251,6 +269,7 @@ function baseState(): State {
         checkoutGroupId: "g-1",
       },
     ],
+    outboxEvents: [],
   };
 }
 
@@ -280,6 +299,7 @@ function setup(initial: State = baseState()) {
     payments as never,
     sentry as never,
     notifications as never,
+    new OutboxService(registry),
   );
   return { service, fake, registry, payments, sentry, notifications };
 }
@@ -560,6 +580,7 @@ describe("OrderGuestClaimService.claimForUser", () => {
     const { service, fake } = setup(state);
 
     await service.claimForUser(BUYER);
+    await settle();
     const after = structuredClone(fake.state);
     fake.events.length = 0;
 
@@ -596,11 +617,24 @@ describe("OrderGuestClaimService.claimForUser", () => {
   });
 
   describe("the owner notice (guest orders added to your account)", () => {
-    it("is sent once, after the commit, with the number of orders moved", async () => {
+    const noticeRows = (fake: ReturnType<typeof setup>["fake"]) =>
+      fake.state.outboxEvents.filter(
+        (e) => e.type === OUTBOX_GUEST_ORDER_CLAIM_NOTICE,
+      );
+
+    it("commits one notice row with the claim and sends it once, after the commit", async () => {
       const { service, fake, notifications } = setup();
 
       await service.claimForUser(BUYER);
+      await settle();
 
+      expect(noticeRows(fake)).toEqual([
+        expect.objectContaining({
+          payload: { userId: BUYER, orderCount: 2 },
+          dedupeKey: `${OUTBOX_GUEST_ORDER_CLAIM_NOTICE}:${BUYER}:o-1`,
+          status: "completed",
+        }),
+      ]);
       expect(notifications.sendGuestOrdersClaimedNotice).toHaveBeenCalledTimes(
         1,
       );
@@ -613,18 +647,35 @@ describe("OrderGuestClaimService.claimForUser", () => {
       );
     });
 
-    it("is not sent again by a repeat run (an outbox retry moves nothing)", async () => {
+    it("does not hold the claim while the mail is queued", async () => {
       const { service, notifications } = setup();
+      let release: () => void = () => undefined;
+      notifications.sendGuestOrdersClaimedNotice.mockImplementationOnce(
+        () => new Promise<void>((r) => (release = r)),
+      );
+
+      await expect(service.claimForUser(BUYER)).resolves.toMatchObject({
+        claimedOrderIds: ["o-1", "o-2"],
+      });
+      release();
+      await settle();
+    });
+
+    it("is not written or sent again by a repeat run (an outbox retry moves nothing)", async () => {
+      const { service, fake, notifications } = setup();
 
       await service.claimForUser(BUYER);
+      await settle();
       await service.claimForUser(BUYER);
+      await settle();
 
+      expect(noticeRows(fake)).toHaveLength(1);
       expect(notifications.sendGuestOrdersClaimedNotice).toHaveBeenCalledTimes(
         1,
       );
     });
 
-    it("is not sent when no order moved: no guest orders, a heal only, or not eligible", async () => {
+    it("is not written when no order moved: no guest orders, a heal only, or not eligible", async () => {
       const healOnly = baseState();
       healOnly.orders.forEach((o) => (o.buyerId = BUYER));
       const unverified = baseState();
@@ -635,25 +686,28 @@ describe("OrderGuestClaimService.claimForUser", () => {
         [healOnly, BUYER],
         [unverified, BUYER],
       ] as const) {
-        const { service, notifications } = setup(state);
+        const { service, fake, notifications } = setup(state);
         await service.claimForUser(userId);
+        await settle();
+        expect(noticeRows(fake)).toEqual([]);
         expect(
           notifications.sendGuestOrdersClaimedNotice,
         ).not.toHaveBeenCalled();
       }
     });
 
-    it("is not sent when the claim rolls back", async () => {
+    it("is rolled back with a failed claim and never sent", async () => {
       const { service, fake, notifications } = setup();
       fake.db.refundRequest.updateMany.mockRejectedValueOnce(new Error("db"));
 
       await expect(service.claimForUser(BUYER)).rejects.toThrow("db");
+      await settle();
+      expect(noticeRows(fake)).toEqual([]);
       expect(notifications.sendGuestOrdersClaimedNotice).not.toHaveBeenCalled();
     });
 
-    it("a mail failure never fails the claim; it is a warning with ids only", async () => {
-      const state = baseState();
-      const { service, fake, notifications } = setup(state);
+    it("a mail failure never fails the claim: a warning with ids only, the row waits for the drainer", async () => {
+      const { service, fake, notifications } = setup();
       notifications.sendGuestOrdersClaimedNotice.mockRejectedValueOnce(
         new Error("queue down"),
       );
@@ -661,8 +715,13 @@ describe("OrderGuestClaimService.claimForUser", () => {
       await expect(service.claimForUser(BUYER)).resolves.toMatchObject({
         claimedOrderIds: ["o-1", "o-2"],
       });
+      await settle();
+
       expect(fake.state.orders.map((o) => o.buyerId)).toEqual([BUYER, BUYER]);
-      const warning = logs.find((l) => l.includes("notice not queued"));
+      expect(noticeRows(fake)).toEqual([
+        expect.objectContaining({ status: "pending", lastError: "queue down" }),
+      ]);
+      const warning = logs.find((l) => l.includes("notice deferred"));
       expect(warning).toContain(`user=${BUYER}`);
       expect(warning).not.toMatch(/@/);
     });
@@ -792,6 +851,28 @@ describe("OrderGuestClaimService outbox handler", () => {
     await handler!({ userId: BUYER }, {} as never);
 
     expect(claim).toHaveBeenCalledWith(BUYER);
+  });
+
+  it(`registers ${OUTBOX_GUEST_ORDER_CLAIM_NOTICE}, which queues the mail and throws so a failure retries`, async () => {
+    const { service, registry, notifications } = setup();
+    service.onModuleInit();
+    const handler = registry.get(OUTBOX_GUEST_ORDER_CLAIM_NOTICE)!;
+
+    await handler({ userId: BUYER, orderCount: 2 }, {} as never);
+    expect(notifications.sendGuestOrdersClaimedNotice).toHaveBeenCalledWith(
+      BUYER,
+      2,
+    );
+
+    notifications.sendGuestOrdersClaimedNotice.mockRejectedValueOnce(
+      new Error("queue down"),
+    );
+    await expect(
+      handler({ userId: BUYER, orderCount: 2 }, {} as never),
+    ).rejects.toThrow("queue down");
+    await expect(
+      handler({ userId: BUYER }, {} as never),
+    ).rejects.toBeInstanceOf(PermanentOutboxError);
   });
 
   it("refuses a payload without a user id permanently (no retries)", async () => {

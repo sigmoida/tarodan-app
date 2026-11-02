@@ -11532,9 +11532,9 @@
         "subject": "Your guest orders were added to your account",
         "greeting": "Hello,",
         "message": "{count, plural, one {# order you placed as a guest with this e-mail address was added to your account.} other {# orders you placed as a guest with this e-mail address were added to your account.}} You can see them under My orders.",
-        "warning": "If you did not create this account, reset your password now. A password reset signs out every session on the account.",
+        "warning": "If you did not create this account or do not recognise this change, reset your password now. A password reset signs out every session on the account.",
         "resetButton": "Reset my password",
-        "help": "If you created the account, there is nothing to do."
+        "help": "If this was you, there is nothing to do."
       }
     },
     "payment": {

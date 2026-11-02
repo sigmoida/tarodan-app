@@ -278,3 +278,24 @@ export const guestOrderClaimDedupeKey = (
   userId: string,
   nonce: string,
 ): string => `${OUTBOX_GUEST_ORDER_CLAIM}:${userId}:${nonce}`;
+
+/**
+ * Tell the account owner that a guest order claim added orders to the
+ * account ("if you did not create this account, reset your password").
+ * Written in the claim's transaction only when it moved orders, so a repeat
+ * claim writes none; run inline after commit, the drainer is the backstop.
+ * One row per claim: the key carries the smallest claimed order id, which
+ * moves only once.
+ */
+export const OUTBOX_GUEST_ORDER_CLAIM_NOTICE = "guest_order.claim_notice";
+
+export interface GuestOrderClaimNoticePayload {
+  userId: string;
+  orderCount: number;
+}
+
+export const guestOrderClaimNoticeDedupeKey = (
+  userId: string,
+  firstClaimedOrderId: string,
+): string =>
+  `${OUTBOX_GUEST_ORDER_CLAIM_NOTICE}:${userId}:${firstClaimedOrderId}`;

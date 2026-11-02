@@ -25,7 +25,7 @@ import {
   buildGuestOrdersClaimedMailData,
   GUEST_ORDERS_CLAIMED_TEMPLATE,
 } from "../../common/helpers/guest-orders-claimed-mail";
-import { defaultLocale, isLocale } from "@tarodan/i18n";
+import { resolveLocale } from "@tarodan/i18n";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
 import {
   buildEmailVerificationTemplateData,
@@ -253,10 +253,10 @@ export class NotificationAccountService {
       select: { email: true, preferredLanguage: true },
     });
     if (!user) return;
-    const locale = isLocale(user.preferredLanguage)
-      ? user.preferredLanguage
-      : defaultLocale;
-    const templateData = buildGuestOrdersClaimedMailData(locale, orderCount);
+    const templateData = buildGuestOrdersClaimedMailData(
+      resolveLocale(user.preferredLanguage),
+      orderCount,
+    );
     await this.emailQueue.add("send-template", {
       to: user.email,
       subject: templateData.subject,

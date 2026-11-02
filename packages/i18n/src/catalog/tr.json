@@ -11532,9 +11532,9 @@
         "subject": "Misafir siparişleriniz hesabınıza eklendi",
         "greeting": "Merhaba,",
         "message": "Bu e-posta adresiyle misafir olarak verdiğiniz {count} sipariş hesabınıza eklendi. Siparişlerinizi Siparişlerim sayfasında görebilirsiniz.",
-        "warning": "Bu hesabı siz oluşturmadıysanız hemen şifrenizi sıfırlayın. Şifre sıfırlama, hesaptaki tüm oturumları kapatır.",
+        "warning": "Bu hesabı siz oluşturmadıysanız ya da bu değişikliği tanımıyorsanız hemen şifrenizi sıfırlayın. Şifre sıfırlama, hesaptaki tüm oturumları kapatır.",
         "resetButton": "Şifremi Sıfırla",
-        "help": "Hesabı siz oluşturduysanız bir şey yapmanıza gerek yok."
+        "help": "Bu siz idiyseniz bir şey yapmanıza gerek yok."
       }
     },
     "payment": {

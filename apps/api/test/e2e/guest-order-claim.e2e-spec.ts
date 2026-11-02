@@ -169,15 +169,29 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
     expect(list.body.data).toEqual([]);
   }
 
-  /** The newest mail to the address with this subject (delivery is queued). */
+  /**
+   * The mails to the address with this subject (delivery is queued), found
+   * by a Mailpit search, so another mail landing later does not hide them.
+   */
   async function waitForMail(address: string, subject: string) {
+    const mailbox =
+      process.env.MAILPIT_URL ??
+      process.env.MAILHOG_URL ??
+      "http://localhost:8025";
+    const query = encodeURIComponent(`to:"${address}" subject:"${subject}"`);
     const deadline = Date.now() + 20_000;
     for (;;) {
-      const mail = await getLastEmailTo(address);
-      if (mail.subject === subject) return mail;
-      if (Date.now() > deadline) {
-        throw new Error(`no "${subject}" mail (last: "${mail.subject}")`);
+      const res = await fetch(`${mailbox}/api/v1/search?query=${query}`);
+      const found = res.ok
+        ? ((await res.json()) as { messages?: Array<{ ID: string }> })
+        : {};
+      const ids = (found.messages ?? []).map((m) => m.ID);
+      if (ids.length > 0) {
+        const detail = await fetch(`${mailbox}/api/v1/message/${ids[0]}`);
+        const message = (await detail.json()) as { Text?: string };
+        return { count: ids.length, body: message.Text ?? "" };
       }
+      if (Date.now() > deadline) throw new Error(`no "${subject}" mail`);
       await new Promise((r) => setTimeout(r, 500));
     }
   }
@@ -250,7 +264,8 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       email,
       "Misafir siparişleriniz hesabınıza eklendi",
     );
-    // The text part (the reset link itself is pinned by the unit spec).
+    // One mail; its text part (the reset link is pinned by the unit spec).
+    expect(notice.count).toBe(1);
     expect(notice.body).toContain("1 sipariş");
     expect(notice.body).toContain("Bu hesabı siz oluşturmadıysanız");
     expect(notice.body).toContain("Şifremi Sıfırla");
