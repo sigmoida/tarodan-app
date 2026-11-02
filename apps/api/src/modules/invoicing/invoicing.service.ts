@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { type GuestInvoiceRecipient } from "./invoice/guest-recipient";
+import {
+  reassignGuestInvoiceLinks,
+  type GuestInvoiceLinkReassignment,
+  type GuestInvoiceLinkResult,
+} from "./invoice/guest-claim-links";
 import { InvoiceQueryService } from "./invoice-query.service";
 import { InvoiceDeliveryService } from "./invoice-delivery.service";
 import { InvoiceIssuingService } from "./invoice-issuing.service";
@@ -126,6 +132,19 @@ export class InvoicingService {
 
   handleTradeCashRefund(tradeCashPaymentId: string): Promise<void> {
     return this.reversals.handleTradeCashRefund(tradeCashPaymentId);
+  }
+
+  // ───────────────────────── guest order claim ─────────────────────────
+
+  /**
+   * Moves the guest links of a claimed guest order's documents to the
+   * account, in the claim's transaction (`invoice/guest-claim-links.ts`).
+   */
+  reassignGuestInvoiceLinks(
+    tx: Pick<Prisma.TransactionClient, "fiscalInvoice">,
+    input: GuestInvoiceLinkReassignment,
+  ): Promise<GuestInvoiceLinkResult> {
+    return reassignGuestInvoiceLinks(tx, input);
   }
 
   // ───────────────────────── cron: gönderim kurtarma ─────────────────────────
