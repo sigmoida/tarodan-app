@@ -151,6 +151,64 @@ describe("parsePaytrInstallmentRates", () => {
     expect(ignored).toEqual([]);
   });
 
+  it("ignores count 0 and keeps count 1 when PayTR lists it", () => {
+    const { rates, ignored } = parsePaytrInstallmentRates({
+      axess: { taksit_0: "0", taksit_1: "1.5", taksit_12: "21.9" },
+    });
+    expect(rates).toEqual({ axess: { "1": "1.5", "12": "21.9" } });
+    expect(ignored).toEqual(["oranlar.axess.taksit_0"]);
+  });
+
+  it.each([
+    ["taksit-2", "2"],
+    ["taksit2", "2"],
+    ["2-taksit", "2"],
+    ["TAKSIT_3", "3"],
+    ["02", "2"],
+  ])("reads the count key %p as count %p", (key, count) => {
+    const { rates, ignored } = parsePaytrInstallmentRates({
+      bonus: { [key]: "2.5" },
+    });
+    expect(rates).toEqual({ bonus: { [count]: "2.5" } });
+    expect(ignored).toEqual([]);
+  });
+
+  it.each([
+    ["0", "0"],
+    ["0.0", "0.0"],
+    ["99.99", "99.99"],
+    [" 4,25 ", "4.25"],
+    [0, "0"],
+  ])("keeps the boundary rate %p as %p", (raw, expected) => {
+    const { rates, ignored } = parsePaytrInstallmentRates({
+      combo: { taksit_2: raw },
+    });
+    expect(rates).toEqual({ combo: { "2": expected } });
+    expect(ignored).toEqual([]);
+  });
+
+  it("does not let a third entry bring back a conflicted count", () => {
+    const { rates } = parsePaytrInstallmentRates([
+      { world: { taksit_2: "2.9" } },
+      { world: { taksit_2: "3.1" } },
+      { world: { taksit_2: "2.9" } },
+    ]);
+    expect(rates).toEqual({});
+  });
+
+  it("ignores prototype keys from a JSON answer", () => {
+    const { rates, ignored } = parsePaytrInstallmentRates(
+      JSON.parse(
+        '{"__proto__":{"taksit_2":"1"},"axess":{"__proto__":"1","taksit_2":"2.8"}}',
+      ),
+    );
+    expect(rates).toEqual({ axess: { "2": "2.8" } });
+    expect(ignored.sort()).toEqual(
+      ["oranlar.__proto__", "oranlar.axess.__proto__"].sort(),
+    );
+    expect(({} as Record<string, unknown>).taksit_2).toBeUndefined();
+  });
+
   it.each([[undefined], [null], ["[]"], [42]])(
     "returns an empty table for a missing or scalar oranlar: %p",
     (value) => {
@@ -175,6 +233,17 @@ describe("parsePaytrInstallmentCount", () => {
     ["", undefined],
     ["6.5", undefined],
     [null, undefined],
+    // Boundaries and number inputs: 1 is a single payment PayTR may report,
+    // 2 and 12 are the installment range ends.
+    ["1", 1],
+    ["2", 2],
+    ["12", 12],
+    [13, undefined],
+    [2.5, undefined],
+    [-1, undefined],
+    [Number.NaN, undefined],
+    ["012", undefined],
+    [undefined, undefined],
   ])("count %p -> %p", (raw, expected) => {
     expect(parsePaytrInstallmentCount(raw)).toBe(expected);
   });

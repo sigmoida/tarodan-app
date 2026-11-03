@@ -162,6 +162,41 @@ describe("PayTRService.queryPaymentStatus — returns + kesinti alanları", () =
     expect(r.paymentType).toBe("eft");
   });
 
+  it("prefers the documented taksit over a callback-style installment_count", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "100,00",
+          taksit: "0",
+          installment_count: "6",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(0);
+  });
+
+  it("falls back to installment_count when taksit is absent", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "100,00",
+          installment_count: "1",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(1);
+  });
+
   it.each([["13"], ["abc"], ["2.5"], [""], [-1]])(
     "leaves installmentCount undefined for an invalid taksit %p",
     async (taksit) => {

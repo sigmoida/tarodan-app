@@ -157,9 +157,91 @@ describe("PayTRService installment signing (single payment pins)", () => {
         }),
       );
     });
+
+    // The whole form, names, order and values, of the three live shapes.
+    // Written to pass unchanged on `development` before the installment
+    // work: any new or reordered field on a single payment fails here.
+    const singlePaymentHead = () => [
+      ["merchant_id", MID],
+      ["user_ip", buyer.ip],
+      ["merchant_oid", "ORDSINGLE1"],
+      ["email", buyer.email],
+      ["payment_amount", "1234.50"],
+      ["payment_type", "card"],
+      ["installment_count", "0"],
+      ["currency", "TL"],
+      ["test_mode", "1"],
+      ["non_3d", "0"],
+      [
+        "paytr_token",
+        tokenOf({
+          oid: "ORDSINGLE1",
+          amount: "1234.50",
+          installment: "0",
+          non3d: "0",
+        }),
+      ],
+      ["merchant_ok_url", "https://app.test/payment/success"],
+      ["merchant_fail_url", "https://app.test/payment/fail"],
+      ["user_name", "Ada Lovelace"],
+      ["user_address", buyer.address],
+      ["user_phone", buyer.phone],
+      ["user_basket", JSON.stringify([["Model car", "1234.50", 1]])],
+      ["debug_on", "1"],
+      ["client_lang", "tr"],
+    ];
+
+    it.each([
+      ["a new card", undefined, []],
+      [
+        "a new card that is stored",
+        { storeCard: true, utoken: "UT0" },
+        [
+          ["store_card", "1"],
+          ["utoken", "UT0"],
+        ],
+      ],
+      [
+        "a saved card",
+        { savedCard: { utoken: "UT1", ctoken: "CT1", requireCvv: true } },
+        [
+          ["utoken", "UT1"],
+          ["ctoken", "CT1"],
+          ["require_cvv", "1"],
+        ],
+      ],
+    ] as const)(
+      "sends exactly the pre-installment form for %s",
+      async (_label, options, tail) => {
+        const result = await service.createDirectPaymentForm(
+          "ORDSINGLE1",
+          1234.5,
+          buyer,
+          basket,
+          options as Parameters<PayTRService["createDirectPaymentForm"]>[4],
+        );
+        expect(result.fields.map(({ name, value }) => [name, value])).toEqual([
+          ...singlePaymentHead(),
+          ...tail,
+        ]);
+      },
+    );
   });
 
   describe("createDirectPaymentForm, installments (no caller yet)", () => {
+    it("signs the lowest installment count, 2", async () => {
+      const fields = await formFields({ installmentCount: 2 });
+      expect(fields.installment_count).toBe("2");
+      expect(fields.paytr_token).toBe(
+        tokenOf({
+          oid: "ORDSINGLE1",
+          amount: "1234.50",
+          installment: "2",
+          non3d: "0",
+        }),
+      );
+    });
+
     it("signs installment_count and sends card_type outside the token", async () => {
       const fields = await formFields({
         installmentCount: 6,
