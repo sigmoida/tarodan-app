@@ -1,0 +1,196 @@
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
+import { PayTRService, PayTRBuyer } from "./paytr.service";
+import { PayTRCredentials } from "./paytr-credentials.service";
+import { PayTRReportService } from "./paytr-report.service";
+import { PayTRTransferService } from "./paytr-transfer.service";
+
+/**
+ * Pins how the installment fields are signed and sent today, before the
+ * installment work (hub plan 2026-11-03, task A1) changes the provider layer.
+ *
+ * - Direct API 1. Adim (https://dev.paytr.com/direkt-api/direkt-api-1-adim):
+ *   `installment_count` is required, "0" is a single payment, 2-12 are
+ *   installments, and it is part of the token:
+ *   merchant_id + user_ip + merchant_oid + email + payment_amount +
+ *   payment_type + installment_count + currency + test_mode + non_3d (+ salt).
+ * - Every live payment is a single payment: no caller passes an installment
+ *   count, so the form must keep `installment_count = "0"` and the same token.
+ * - Recurring renewals (non-3D, membership store) are never installments.
+ */
+describe("PayTRService installment signing (single payment pins)", () => {
+  const MID = "merchant_id_1";
+  const KEY = "merchant_key_xx";
+  const SALT = "merchant_salt_yy";
+  let service: PayTRService;
+  let fetchSpy: jest.SpyInstance;
+
+  const buyer: PayTRBuyer = {
+    name: "Ada",
+    surname: "Lovelace",
+    email: "ada@example.com",
+    phone: "5550001122",
+    address: "Analytical Engine Sok. 1",
+    city: "Istanbul",
+    country: "Turkey",
+    ip: "88.77.66.55",
+  };
+  const basket = [{ name: "Model car", price: 1234.5, quantity: 1 }];
+
+  const tokenOf = (parts: {
+    oid: string;
+    amount: string;
+    installment: string;
+    non3d: "0" | "1";
+  }) =>
+    crypto
+      .createHmac("sha256", KEY)
+      .update(
+        MID +
+          buyer.ip +
+          parts.oid +
+          buyer.email +
+          parts.amount +
+          "card" +
+          parts.installment +
+          "TL" +
+          "1" + // PAYTR_TEST_MODE=true in this harness
+          parts.non3d +
+          SALT,
+      )
+      .digest("base64");
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PayTRCredentials,
+        PayTRReportService,
+        PayTRTransferService,
+        PayTRService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "PAYTR_MERCHANT_ID") return MID;
+              if (key === "PAYTR_MERCHANT_KEY") return KEY;
+              if (key === "PAYTR_MERCHANT_SALT") return SALT;
+              if (key === "PAYTR_TEST_MODE") return "true";
+              if (key === "FRONTEND_URL") return "https://app.test";
+              return undefined;
+            }),
+          },
+        },
+      ],
+    }).compile();
+    service = module.get(PayTRService);
+    fetchSpy = jest.spyOn(
+      global,
+      "fetch" as never,
+    ) as unknown as jest.SpyInstance;
+  });
+
+  afterEach(() => fetchSpy.mockRestore());
+
+  const formFields = async (
+    options?: Parameters<PayTRService["createDirectPaymentForm"]>[4],
+  ) => {
+    const result = await service.createDirectPaymentForm(
+      "ORDSINGLE1",
+      1234.5,
+      buyer,
+      basket,
+      options,
+    );
+    return Object.fromEntries(
+      result.fields.map(({ name, value }) => [name, value]),
+    );
+  };
+
+  describe("createDirectPaymentForm, single payment (every live payment today)", () => {
+    it("sends installment_count 0, no card_type, and signs the single payment", async () => {
+      const fields = await formFields();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(fields.installment_count).toBe("0");
+      expect(fields.payment_amount).toBe("1234.50");
+      expect(fields.non_3d).toBe("0");
+      expect(fields).not.toHaveProperty("card_type");
+      expect(fields.paytr_token).toBe(
+        tokenOf({
+          oid: "ORDSINGLE1",
+          amount: "1234.50",
+          installment: "0",
+          non3d: "0",
+        }),
+      );
+    });
+
+    it.each([0, 1])(
+      "maps installmentCount %p to a single payment (installment_count 0)",
+      async (installmentCount) => {
+        const fields = await formFields({ installmentCount });
+        expect(fields.installment_count).toBe("0");
+        expect(fields.paytr_token).toBe(
+          tokenOf({
+            oid: "ORDSINGLE1",
+            amount: "1234.50",
+            installment: "0",
+            non3d: "0",
+          }),
+        );
+      },
+    );
+
+    it("keeps a saved-card payment single, with no card_type", async () => {
+      const fields = await formFields({
+        savedCard: { utoken: "UT1", ctoken: "CT1", requireCvv: false },
+      });
+      expect(fields.installment_count).toBe("0");
+      expect(fields).not.toHaveProperty("card_type");
+      expect(fields.paytr_token).toBe(
+        tokenOf({
+          oid: "ORDSINGLE1",
+          amount: "1234.50",
+          installment: "0",
+          non3d: "0",
+        }),
+      );
+    });
+  });
+
+  describe("chargeRecurring (membership renewals)", () => {
+    it("always sends and signs installment_count 0, with no card_type", async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () => JSON.stringify({ status: "success" }),
+      });
+
+      const r = await service.chargeRecurring({
+        utoken: "UT1",
+        ctoken: "CT1",
+        amount: 249.9,
+        merchantOid: "MEMRENEW1",
+        buyer,
+        basketItems: [{ name: "Membership", price: 249.9, quantity: 1 }],
+      });
+
+      expect(r.status).toBe("success");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const body = new URLSearchParams(
+        (fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+      );
+      expect(body.get("installment_count")).toBe("0");
+      expect(body.get("recurring_payment")).toBe("1");
+      expect(body.get("non_3d")).toBe("1");
+      expect(body.has("card_type")).toBe(false);
+      expect(body.get("paytr_token")).toBe(
+        tokenOf({
+          oid: "MEMRENEW1",
+          amount: "249.90",
+          installment: "0",
+          non3d: "1",
+        }),
+      );
+    });
+  });
+});
