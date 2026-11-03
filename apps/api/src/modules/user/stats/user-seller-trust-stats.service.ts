@@ -8,6 +8,18 @@ export interface TrustEligibleUser {
 }
 
 /**
+ * One account as the admin trust lab shows it: the name admin user detail
+ * shows too, and why the batch would leave it out. No e-mail, no contact data.
+ */
+export interface TrustLabSubject {
+  id: string;
+  username: string;
+  deleted: boolean;
+  banned: boolean;
+  testLane: boolean;
+}
+
+/**
  * Account-side inputs of the seller trust score (ADR 0014,
  * `docs/SELLER_TRUST.md`). Read-only; the batch never writes the `users` row.
  */
@@ -33,6 +45,49 @@ export class UserSellerTrustStatsService {
         AND u."is_banned" = false
         AND u."is_test_account" = false
       ORDER BY u."id"`;
+  }
+
+  /**
+   * The account behind one lab request, or null for an unknown id. The flags
+   * are the same three rules as `trustEligibleUsers`. Primary-key lookup on
+   * the caller's read-only snapshot.
+   */
+  async trustLabSubject(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<TrustLabSubject | null> {
+    const u = await tx.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        deletedAt: true,
+        isBanned: true,
+        isTestAccount: true,
+      },
+    });
+    return u
+      ? {
+          id: u.id,
+          username: u.username,
+          deleted: u.deletedAt !== null,
+          banned: u.isBanned,
+          testLane: u.isTestAccount,
+        }
+      : null;
+  }
+
+  /** Usernames of `ids` in one query (the lab's top movers, at most 40). */
+  async usernames(
+    tx: Prisma.TransactionClient,
+    ids: string[],
+  ): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await tx.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, username: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.username]));
   }
 
   /**

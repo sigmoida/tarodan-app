@@ -15,7 +15,10 @@ import { SellerTrustService } from "../seller-trust.service";
 import { computeSellerTrust } from "../helpers/trust-formula";
 import { TRUST_FORMULA_V1 as F } from "../helpers/trust-formula.constants";
 import { hasTrustActivity } from "../helpers/trust-inputs";
-import { SellerTrustInputsReader } from "../inputs/seller-trust-inputs.reader";
+import {
+  SellerTrustInputsReader,
+  type GuestBuyerRef,
+} from "../inputs/seller-trust-inputs.reader";
 
 /** Bull job name = cron catalog key = Sentry monitor slug. Renaming is an ops step. */
 export const SELLER_TRUST_REFRESH_JOB = "seller-trust-refresh";
@@ -146,12 +149,12 @@ export class SellerTrustSchedulerService implements OnModuleInit {
     asOf: Date,
   ): Promise<CronRunSummary> {
     const started = Date.now();
-    const { candidates, guestBuyerId } = await inReadOnlySnapshot(
+    const { candidates, guestBuyer } = await inReadOnlySnapshot(
       this.prisma,
       READ_LIMITS,
       async (tx) => ({
         candidates: await this.inputs.candidateIds(tx, asOf),
-        guestBuyerId: await this.inputs.guestBuyerId(tx),
+        guestBuyer: await this.inputs.guestBuyerId(tx),
       }),
     );
 
@@ -182,7 +185,7 @@ export class SellerTrustSchedulerService implements OnModuleInit {
         break;
       }
       try {
-        const result = await this.runBatch(batches[i], asOf, guestBuyerId);
+        const result = await this.runBatch(batches[i], asOf, guestBuyer);
         stats.eligible += result.eligible;
         stats.scored += result.scored;
         stats.notEnoughData += result.notEnoughData;
@@ -223,10 +226,10 @@ export class SellerTrustSchedulerService implements OnModuleInit {
   private async runBatch(
     ids: string[],
     asOf: Date,
-    guestBuyerId: string | null,
+    guestBuyer: GuestBuyerRef,
   ): Promise<BatchResult> {
     const assembled = await inReadOnlySnapshot(this.prisma, READ_LIMITS, (tx) =>
-      this.inputs.readInputs(tx, ids, asOf, guestBuyerId),
+      this.inputs.readInputs(tx, ids, asOf, guestBuyer),
     );
 
     const rows = assembled

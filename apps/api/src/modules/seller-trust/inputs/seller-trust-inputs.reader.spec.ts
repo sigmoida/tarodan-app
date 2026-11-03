@@ -62,7 +62,7 @@ function build() {
         { id: "s2", createdAt: asOf },
       ]),
     ),
-    guestBuyerId: jest.fn(track("guestBuyerId", "guest-user")),
+    guestBuyerId: jest.fn(track<string | null>("guestBuyerId", "guest-user")),
   };
   const reader = new SellerTrustInputsReader(
     orderStats as never,
@@ -111,15 +111,45 @@ describe("SellerTrustInputsReader", () => {
 
   it("reads the guest buyer through the user domain", async () => {
     const t = build();
-    await expect(t.reader.guestBuyerId(t.txc)).resolves.toBe("guest-user");
+    await expect(t.reader.guestBuyerId(t.txc)).resolves.toMatchObject({
+      id: "guest-user",
+    });
     expect(t.userStats.guestBuyerId).toHaveBeenCalledWith(t.txc);
+  });
+
+  it("brands a missing guest account too, as a null id", async () => {
+    const t = build();
+    t.userStats.guestBuyerId.mockResolvedValue(null);
+    const guest = await t.reader.guestBuyerId(t.txc);
+    expect(guest.id).toBeNull();
+    await t.reader.readInputs(t.txc, ["s1"], asOf, guest);
+    expect(t.orderStats.salesCounterparties).toHaveBeenCalledWith(
+      t.txc,
+      ["s1", "s2"],
+      t.reader.windowsAt(asOf).volume,
+      null,
+    );
+  });
+
+  it.each([
+    ["null", null],
+    ["a bare id", "guest-user"],
+    ["a hand-made look-alike", { id: "guest-user" }],
+  ])("refuses %s as the guest buyer before any read", async (_name, forged) => {
+    const t = build();
+    await expect(
+      t.reader.readInputs(t.txc, ["s1"], asOf, forged as never),
+    ).rejects.toThrow(TypeError);
+    expect(t.calls).toEqual([]);
   });
 
   it("reads each domain once, fault refunds before the order query, on the caller's tx", async () => {
     const t = build();
     const windows = t.reader.windowsAt(asOf);
+    const guest = await t.reader.guestBuyerId(t.txc);
+    t.calls.length = 0;
 
-    await t.reader.readInputs(t.txc, ["s1", "s2", "x"], asOf, "g");
+    await t.reader.readInputs(t.txc, ["s1", "s2", "x"], asOf, guest);
 
     expect(t.calls).toEqual([
       "trustEligibleUsers",
@@ -151,7 +181,7 @@ describe("SellerTrustInputsReader", () => {
       t.txc,
       eligibleIds,
       windows.volume,
-      "g",
+      "guest-user",
     );
     expect(t.tradeStats.tradeCounterparties).toHaveBeenCalledWith(
       t.txc,
@@ -173,7 +203,12 @@ describe("SellerTrustInputsReader", () => {
 
   it("joins the rows into formula inputs, one per eligible user, in eligible order", async () => {
     const t = build();
-    const out = await t.reader.readInputs(t.txc, ["s1", "s2"], asOf, null);
+    const out = await t.reader.readInputs(
+      t.txc,
+      ["s1", "s2"],
+      asOf,
+      await t.reader.guestBuyerId(t.txc),
+    );
     expect(out).toEqual([
       {
         userId: "s1",
@@ -211,7 +246,12 @@ describe("SellerTrustInputsReader", () => {
     const t = build();
     t.userStats.trustEligibleUsers.mockResolvedValue([]);
 
-    const out = await t.reader.readInputs(t.txc, ["banned"], asOf, null);
+    const out = await t.reader.readInputs(
+      t.txc,
+      ["banned"],
+      asOf,
+      await t.reader.guestBuyerId(t.txc),
+    );
 
     expect(out).toEqual([]);
     expect(t.refundStats.sellerFaultOrderIds).not.toHaveBeenCalled();

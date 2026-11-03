@@ -12687,6 +12687,11 @@
         "title": "Sipariş Süresi Doldu",
         "message": "{productTitle} siparişinizin ödeme süresi doldu ve iptal edildi."
       }
+    },
+    "sellerTrustLab": {
+      "invalidParams": "Aday parametreler geçersiz: {field}",
+      "invalidInputs": "Senaryo girdileri geçersiz: {field}",
+      "populationTooLarge": "Eşleşen kayıt sayısı sınırı aşıyor ({limit}). Filtreleri daraltın."
     }
   },
   "status": {

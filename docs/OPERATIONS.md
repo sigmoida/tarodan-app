@@ -447,6 +447,13 @@ at 02:30 Europe/Istanbul in the worker role and writes only its own table,
 - **A failed run** keeps every existing row (no cleanup) and fails the Bull
   job, which retries three times. The job log names the failed batch index
   and the error class.
+- **Lab** (read-only, every environment): Admin > System > "Güven skoru
+  laboratuvarı" explains one seller, recomputes it against the stored row and
+  runs candidate weights over the stored scores; it writes only audit rows.
+  Reference: `docs/SELLER_TRUST.md`, "Lab". After the release that adds it,
+  an environment that already stores a role matrix keeps it closed to
+  `admin` until a super admin ticks "Güven skoru laboratuvarı" for `admin`
+  on Hesaplar > Roller (staging first; production with the user's approval).
 - **Calibration** (read-only, on staging after a run):
 
   ```sql

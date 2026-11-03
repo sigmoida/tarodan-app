@@ -12687,6 +12687,11 @@
         "title": "Order Timed Out",
         "message": "The payment period for your {productTitle} order expired and the order was cancelled."
       }
+    },
+    "sellerTrustLab": {
+      "invalidParams": "Invalid candidate parameters: {field}",
+      "invalidInputs": "Invalid scenario inputs: {field}",
+      "populationTooLarge": "Too many matching rows (limit {limit}). Narrow the filters."
     }
   },
   "status": {

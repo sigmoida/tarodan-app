@@ -1,9 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type {
-  AdminSellerTrustView,
-  SellerTrustComponentsV1,
-  SellerTrustView,
+import {
+  SELLER_TRUST_LEVEL_MIN_X100,
+  type AdminSellerTrustView,
+  type SellerTrustComponentsV1,
+  type SellerTrustLevel,
+  type SellerTrustView,
 } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import {
@@ -37,10 +39,70 @@ const SCORE_SELECT = {
   formulaVersion: true,
 } as const satisfies Prisma.SellerTrustScoreSelect;
 
+const STORED_ROW_SELECT = {
+  userId: true,
+  scoreX100: true,
+  formulaVersion: true,
+  components: true,
+  computedAt: true,
+} as const satisfies Prisma.SellerTrustScoreSelect;
+
+/** A whole stored row, as read-only tools read it. */
+export type StoredSellerTrustRow = Prisma.SellerTrustScoreGetPayload<{
+  select: typeof STORED_ROW_SELECT;
+}>;
+
+/** Narrows stored rows by their stored level and counted transactions. */
+export interface StoredSellerTrustFilter {
+  levels?: readonly SellerTrustLevel[];
+  minTransactions?: number;
+}
+
+/** `score_x100` range of each level, the same thresholds as `sellerTrustLevel`. */
+function levelWhere(
+  level: SellerTrustLevel,
+): Prisma.SellerTrustScoreWhereInput {
+  const min = SELLER_TRUST_LEVEL_MIN_X100;
+  switch (level) {
+    case "excellent":
+      return { scoreX100: { gte: min.excellent } };
+    case "trusted":
+      return { scoreX100: { gte: min.trusted, lt: min.excellent } };
+    case "fair":
+      return { scoreX100: { gte: min.fair, lt: min.trusted } };
+    case "developing":
+      // `lt` never matches NULL, so `new` rows stay out.
+      return { scoreX100: { lt: min.fair } };
+    case "new":
+      return { scoreX100: null };
+  }
+}
+
+/** The `where` of a filter; exported for its spec. */
+export function storedFilterWhere(
+  filter: StoredSellerTrustFilter,
+): Prisma.SellerTrustScoreWhereInput {
+  const and: Prisma.SellerTrustScoreWhereInput[] = [];
+  // An empty level list means every level, like an absent one.
+  if (filter.levels && filter.levels.length > 0) {
+    and.push({ OR: [...new Set(filter.levels)].map(levelWhere) });
+  }
+  if (filter.minTransactions !== undefined) {
+    and.push({
+      components: {
+        path: ["volume", "transactions"],
+        gte: filter.minTransactions,
+      },
+    });
+  }
+  return and.length > 0 ? { AND: and } : {};
+}
+
 /**
  * Owner of `seller_trust_scores` (ADR 0014). A leaf: Prisma only, so every
  * domain that reads the score can import it without a cycle. Only the nightly
- * batch writes; reads are primary-key lookups and never compute.
+ * batch writes; reads are primary-key lookups (the admin lab also pages the
+ * table in primary-key order, on its read-only snapshot) and never compute.
  */
 @Injectable()
 export class SellerTrustService {
@@ -79,6 +141,51 @@ export class SellerTrustService {
       select: { ...SCORE_SELECT, components: true, computedAt: true },
     });
     return toAdminSellerTrustView(row);
+  }
+
+  /**
+   * One seller's whole row, on the caller's read-only snapshot (the admin
+   * lab). Primary-key lookup.
+   */
+  readStoredRow(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<StoredSellerTrustRow | null> {
+    return tx.sellerTrustScore.findUnique({
+      where: { userId },
+      select: STORED_ROW_SELECT,
+    });
+  }
+
+  /** Rows matching `filter`, on the caller's read-only snapshot. */
+  countStored(
+    tx: Prisma.TransactionClient,
+    filter: StoredSellerTrustFilter,
+  ): Promise<number> {
+    return tx.sellerTrustScore.count({ where: storedFilterWhere(filter) });
+  }
+
+  /**
+   * One page of rows matching `filter`, in primary-key order after
+   * `afterUserId` (keyset paging: each page is one primary-key range scan),
+   * on the caller's read-only snapshot.
+   */
+  readStoredPage(
+    tx: Prisma.TransactionClient,
+    filter: StoredSellerTrustFilter,
+    afterUserId: string | null,
+    take: number,
+  ): Promise<StoredSellerTrustRow[]> {
+    const where = storedFilterWhere(filter);
+    return tx.sellerTrustScore.findMany({
+      where:
+        afterUserId === null
+          ? where
+          : { AND: [where, { userId: { gt: afterUserId } }] },
+      orderBy: { userId: "asc" },
+      take,
+      select: STORED_ROW_SELECT,
+    });
   }
 
   /** True when the table has no row at all (first deploy: enqueue a run). */
