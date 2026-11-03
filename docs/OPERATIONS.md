@@ -525,6 +525,15 @@ off until a super admin turns on `installments_enabled` (no row = off).
   under a SHARE lock: reads continue, payment writes wait for one scan.
   Existing rows read as single payments: fee 0, `charged_amount` NULL (read as
   `amount`).
+- **Lock waits are bounded (3 s).** The first and third migrations set
+  `lock_timeout = '3s'`: a waiting ACCESS EXCLUSIVE (or SHARE) request queues
+  every later read (or write) of the table behind it, so an open transaction
+  would otherwise stall checkout for as long as it runs. The payment -> order
+  alter order avoids deadlocks with payment writers only: a transaction that
+  touched `orders` (even a plain read) and then reads `payments` can still
+  deadlock with the first migration, and Postgres aborts one side (a user
+  request or the migration). A lock timeout or a deadlock of a migration is
+  the expected safe failure; see "If a migration fails".
 - **Before the deploy (dry run, read-only).** On the environment about to be
   deployed (staging before the push; production only with the user's
   approval), check the table sizes and that no long transaction would hold
@@ -542,8 +551,9 @@ off until a super admin turns on `installments_enabled` (no row = off).
          to_regclass('public.installment_rate_snapshots');
   ```
 
-  Expect no long transactions and three NULLs. Deploy at a quiet time if the
-  tables are large or a long transaction is open.
+  Expect no long transactions and three NULLs. Deploy at a quiet time (low
+  checkout traffic, no reports or exports running), always, and wait if a
+  long transaction is open.
 
 - **After the deploy.** All five constraints are validated, and no payment
   carries a charged amount yet:
@@ -558,12 +568,14 @@ off until a super admin turns on `installments_enabled` (no row = off).
   ```
 
 - **If a migration fails.** Each migration is one transaction and rolls back
-  completely; Prisma then refuses later deploys (P3009) until the failed one
-  is marked rolled back:
-  `npx prisma migrate resolve --rolled-back <migration_name>` in the API
-  container (in production only with the user's approval), then redeploy.
-  A failed validation means a row breaks a money invariant: inspect it and
-  do not drop the constraint.
+  completely (nothing is half applied); Prisma then refuses later deploys
+  (P3009) until the failed one is marked rolled back. The boot log names it
+  and the cause: `canceling statement due to lock timeout` (55P03) or
+  `deadlock detected` (40P01) is the expected safe outcome of a busy moment.
+  Run `npx prisma migrate resolve --rolled-back <migration_name>` in the API
+  container (in production only with the user's approval), then redeploy at
+  a quieter time. A failed validation (the second migration) is different: a
+  row breaks a money invariant; inspect it and do not drop the constraint.
 - **DB guards to know about.** Rule versions and the pricing columns of a
   charge attempt cannot be updated, and neither can be deleted (edit = archive
   plus new version); a rate snapshot cannot be updated; an attempt and its

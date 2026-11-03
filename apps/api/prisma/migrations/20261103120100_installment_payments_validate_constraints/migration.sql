@@ -10,6 +10,11 @@
 -- only SHARE UPDATE EXCLUSIVE (reads and writes continue) and ROW SHARE on
 -- the referenced table for the FK.
 --
+-- No `lock_timeout` here, unlike the other two: SHARE UPDATE EXCLUSIVE does
+-- not conflict with reads or writes, so neither the wait nor the scan queues
+-- app traffic. It only waits behind other DDL, VACUUM or an index build
+-- (autovacuum yields to it); a timeout would only add a failed-deploy path.
+--
 -- Safe on live data: the columns are new, so every existing row has
 -- installment_fee_amount = 0 and charged_amount / charge_attempt_id NULL,
 -- which satisfies all five. If this migration fails, a row was written in

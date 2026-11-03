@@ -1,4 +1,6 @@
 import { Prisma } from "@prisma/client";
+import { TestLaneService } from "../../src/modules/admin-test-tools/test-lane.service";
+import type { PrismaService } from "../../src/prisma";
 import { disconnectPrisma, getPrisma } from "../test-utils/db";
 import {
   createChargeAttempt,
@@ -341,6 +343,60 @@ describe("installment schema DB guarantees (E2E)", () => {
       });
     });
 
+    // Every change below keeps the row's own CHECKs satisfied, so only the
+    // guard trigger can refuse it. The callback, the inquiry and the
+    // statement match compare PayTR's amount with this row: a C, T, F, store,
+    // oid or payment that moves after signing breaks that comparison.
+    it.each<[string, Prisma.PaymentChargeAttemptUncheckedUpdateInput]>([
+      [
+        "goods total and charged amount (C = T + F still holds)",
+        { baseAmount: d("1001.00"), chargedAmount: d("1067.38") },
+      ],
+      [
+        "fee and charged amount (C = T + F still holds)",
+        { installmentFeeAmount: d("70.00"), chargedAmount: d("1070.00") },
+      ],
+      ["installment count", { installmentCount: 6 }],
+      ["platform cost", { platformCostAmount: d("12.34") }],
+      ["fee VAT rate", { feeVatRatePct: d("10.00") }],
+      ["merchant oid", { merchantOid: "TG-REWRITTEN" }],
+      ["card family", { cardFamily: "bonus" }],
+      ["BIN", { bin6: "540061" }],
+    ])("freezes the attempt's %s", async (_label, data) => {
+      const { paymentId } = await createGroupPayment();
+      const attempt = await createChargeAttempt(
+        paymentId,
+        (await createRateSnapshot()).id,
+        { bin6: "435508" },
+      );
+      await expect(
+        prisma.paymentChargeAttempt.update({ where: { id: attempt.id }, data }),
+      ).rejects.toThrow(/pricing snapshot of attempt .* is immutable/);
+    });
+
+    it("freezes the attempt's payment, store, rule and rate snapshot", async () => {
+      const { paymentId } = await createGroupPayment();
+      const other = await createGroupPayment();
+      const snapshot = await createRateSnapshot();
+      const attempt = await createChargeAttempt(paymentId, snapshot.id);
+      const rule = await createInstallmentRule();
+      const freshSnapshot = await createRateSnapshot();
+
+      for (const data of [
+        { paymentId: other.paymentId },
+        { paytrMerchant: "membership" as const },
+        { installmentRuleId: rule.id, platformSharePct: d("100.00") },
+        { rateSnapshotId: freshSnapshot.id },
+      ] satisfies Prisma.PaymentChargeAttemptUncheckedUpdateInput[]) {
+        await expect(
+          prisma.paymentChargeAttempt.update({
+            where: { id: attempt.id },
+            data,
+          }),
+        ).rejects.toThrow(/pricing snapshot of attempt .* is immutable/);
+      }
+    });
+
     it("refuses DELETE, also through the purge gate for a live payment", async () => {
       const { paymentId } = await createGroupPayment();
       const snapshot = await createRateSnapshot();
@@ -361,7 +417,12 @@ describe("installment schema DB guarantees (E2E)", () => {
       await createChargeAttempt(paymentId, (await createRateSnapshot()).id);
       await expect(
         prisma.payment.delete({ where: { id: paymentId } }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        code: "P2003",
+        meta: {
+          field_name: expect.stringContaining("payment_charge_attempts"),
+        },
+      });
     });
   });
 
@@ -485,6 +546,98 @@ describe("installment schema DB guarantees (E2E)", () => {
       await expect(capture(paymentId, attempt)).rejects.toThrow(
         /payments_charged_amount_check/,
       );
+    });
+
+    // The two cases below satisfy `payments_charged_amount_check` (C = T + F
+    // on the payment row), so only the trigger's own comparison with the
+    // attempt can refuse them: PayTR charged the attempt's C, not the
+    // payment's.
+    it("refuses a charged amount other than the attempt's, even when C = T + F holds on the payment", async () => {
+      const { paymentId } = await createGroupPayment({ amount: "900.00" });
+      const attempt = await createChargeAttempt(
+        paymentId,
+        (await createRateSnapshot()).id,
+      );
+      await expect(
+        prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            chargeAttemptId: attempt.id,
+            chargedAmount: d("966.38"),
+            installmentFeeAmount: attempt.installmentFeeAmount,
+            installmentCount: 3,
+          },
+        }),
+      ).rejects.toThrow(/does not match charge attempt/);
+    });
+
+    it("refuses a fee other than the attempt's, even when the charged amounts match", async () => {
+      const { paymentId } = await createGroupPayment({ amount: "1010.00" });
+      const attempt = await createChargeAttempt(
+        paymentId,
+        (await createRateSnapshot()).id,
+      );
+      await expect(
+        prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            chargeAttemptId: attempt.id,
+            chargedAmount: attempt.chargedAmount,
+            installmentFeeAmount: d("56.38"),
+            installmentCount: 3,
+          },
+        }),
+      ).rejects.toThrow(/does not match charge attempt/);
+    });
+
+    it("refuses a capture after the payment moved to another PayTR store", async () => {
+      // The attempt's store is checked at INSERT; the payment's store can
+      // still change while it is uncaptured, so the capture checks it again.
+      const { paymentId } = await createGroupPayment();
+      const attempt = await createChargeAttempt(
+        paymentId,
+        (await createRateSnapshot()).id,
+      );
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: { paytrMerchant: "membership" },
+      });
+      await expect(capture(paymentId, attempt)).rejects.toThrow(
+        /does not match charge attempt/,
+      );
+    });
+
+    it.each<[string, Prisma.PaymentUncheckedUpdateInput, RegExp]>([
+      [
+        "the installment count",
+        { installmentCount: 6 },
+        /does not match charge attempt/,
+      ],
+      [
+        "the PayTR store",
+        { paytrMerchant: "membership" },
+        /does not match charge attempt/,
+      ],
+      [
+        "the fee and charged amount together (C = T + F still holds)",
+        { installmentFeeAmount: d("66.37"), chargedAmount: d("1066.37") },
+        /does not match charge attempt/,
+      ],
+      [
+        "the goods total",
+        { amount: d("999.99") },
+        /payments_charged_amount_check/,
+      ],
+    ])("keeps a captured payment's %s final", async (_label, data, error) => {
+      const { paymentId } = await createGroupPayment();
+      const attempt = await createChargeAttempt(
+        paymentId,
+        (await createRateSnapshot()).id,
+      );
+      await capture(paymentId, attempt);
+      await expect(
+        prisma.payment.update({ where: { id: paymentId }, data }),
+      ).rejects.toThrow(error);
     });
 
     it("makes the capture final: no re-pointing, no clearing", async () => {
@@ -659,6 +812,26 @@ describe("installment schema DB guarantees (E2E)", () => {
       ).rejects.toThrow(/is final/);
     });
 
+    // Each value is valid on its own (the CHECKs pass), so only the guard
+    // trigger refuses it: a charge attempt points at this version as the
+    // rule it was priced with.
+    it.each<[string, Prisma.InstallmentRuleUncheckedUpdateInput]>([
+      ["lowest count", { minCount: 3 }],
+      ["highest count", { maxCount: 6 }],
+      ["segment", { segment: "business" }],
+      ["allowed flag", { allowed: false, platformSharePct: d("0") }],
+      ["priority", { priority: 10 }],
+      ["validity window", { validFrom: new Date("2026-12-01T00:00:00Z") }],
+      ["open end", { validUntil: new Date("2027-01-01T00:00:00Z") }],
+      ["name", { name: "Renamed rule" }],
+      ["version", { version: 2 }],
+    ])("keeps a live version's %s immutable", async (_label, data) => {
+      const rule = await createInstallmentRule();
+      await expect(
+        prisma.installmentRule.update({ where: { id: rule.id }, data }),
+      ).rejects.toThrow(/is immutable \(insert a new version\)/);
+    });
+
     it("refuses a second live version of one lineage", async () => {
       const v1 = await createInstallmentRule();
       await expect(
@@ -729,7 +902,10 @@ describe("installment schema DB guarantees (E2E)", () => {
       await createChargeAttempt(paymentId, used.id);
       await expect(
         prisma.installmentRateSnapshot.delete({ where: { id: used.id } }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        code: "P2003",
+        meta: { field_name: expect.stringContaining("rate_snapshot_id_fkey") },
+      });
     });
   });
 
@@ -781,6 +957,64 @@ describe("installment schema DB guarantees (E2E)", () => {
       await expect(
         refundAttempt(await paidOrder(), "10.00", "-0.01"),
       ).rejects.toThrow(/refund_attempts_installment_fee_amount_check/);
+    });
+  });
+
+  describe("test-lane reset (TestLaneService.resetLane on the real guards)", () => {
+    it("purges test-lane attempts and their captured payments, and keeps live ones", async () => {
+      const snapshot = await createRateSnapshot();
+      const capturePayment = async (paymentId: string) => {
+        const attempt = await createChargeAttempt(paymentId, snapshot.id);
+        await prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            status: "completed",
+            chargeAttemptId: attempt.id,
+            chargedAmount: attempt.chargedAmount,
+            installmentFeeAmount: attempt.installmentFeeAmount,
+            installmentCount: attempt.installmentCount,
+          },
+        });
+        return attempt;
+      };
+
+      const test = await createGroupPayment({ testLane: true });
+      const testCaptured = await capturePayment(test.paymentId);
+      // A superseded form of the same payment (never captured).
+      const testSuperseded = await createChargeAttempt(
+        test.paymentId,
+        snapshot.id,
+      );
+      const live = await createGroupPayment();
+      const liveCaptured = await capturePayment(live.paymentId);
+
+      const service = new TestLaneService(
+        prisma as unknown as PrismaService,
+        { invalidate: jest.fn() } as never,
+      );
+      const result = await service.resetLane();
+
+      expect(result.deleted.paymentChargeAttempts).toBeGreaterThanOrEqual(2);
+      expect(
+        await prisma.paymentChargeAttempt.count({
+          where: { id: { in: [testCaptured.id, testSuperseded.id] } },
+        }),
+      ).toBe(0);
+      expect(
+        await prisma.payment.findUnique({ where: { id: test.paymentId } }),
+      ).toBeNull();
+
+      // The live lane is untouched: payment still captured by its attempt.
+      const livePayment = await prisma.payment.findUniqueOrThrow({
+        where: { id: live.paymentId },
+      });
+      expect(livePayment.chargeAttemptId).toBe(liveCaptured.id);
+      expect(livePayment.chargedAmount?.toFixed(2)).toBe("1066.38");
+      expect(
+        await prisma.paymentChargeAttempt.count({
+          where: { id: liveCaptured.id },
+        }),
+      ).toBe(1);
     });
   });
 });

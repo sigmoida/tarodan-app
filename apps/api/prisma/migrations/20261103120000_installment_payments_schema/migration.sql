@@ -18,12 +18,25 @@
 --   (no scan under the ACCESS EXCLUSIVE lock); the next migration,
 --   20261103120100_installment_payments_validate_constraints, validates them
 --   under SHARE UPDATE EXCLUSIVE, which does not block reads or writes.
--- * Existing tables are altered in the application's lock order (payments,
---   then orders, then refund_attempts; `payment/helpers/payment-order-lock.ts`)
---   so the migration cannot deadlock with a running payment transaction. The
---   locks are held only for this short, scan-free transaction. The unique
---   index on `payments.charge_attempt_id` is built by its own migration
+-- * Lock waits are bounded: `lock_timeout` is 3 s for this transaction. A
+--   waiting ACCESS EXCLUSIVE request queues every later read and write of the
+--   table behind it, so without a bound one long transaction would stall
+--   checkout for as long as it runs. Once granted, the locks are held only for
+--   this short, scan-free transaction. The unique index on
+--   `payments.charge_attempt_id` is built by its own migration
 --   (20261103120200), under a SHARE lock on `payments` only.
+-- * Existing tables are altered in the application's lock order (payments,
+--   then orders, then refund_attempts; `payment/helpers/payment-order-lock.ts`).
+--   That avoids a deadlock with payment writers that lock payment before
+--   order, but NOT with every transaction: one that touched `orders` (even a
+--   plain SELECT) and then reads `payments` can still deadlock with this
+--   migration. Postgres then aborts one side: a user request fails, or this
+--   migration fails.
+-- * A lock timeout or a deadlock is the expected safe failure: the whole
+--   transaction rolls back and nothing changes, but Prisma records the
+--   migration as failed and refuses later deploys (P3009) until it is marked
+--   rolled back. Recovery is in docs/OPERATIONS.md, "Installment payments:
+--   schema"; deploy at a quiet time.
 -- * New enum values are not used in this transaction (PostgreSQL 12+ rule).
 -- * New tables are empty. Old code never writes the new columns: their
 --   defaults satisfy every CHECK and trigger, and the payments trigger does
@@ -36,6 +49,11 @@
 -- `payments_charge_attempt_id_fkey`, the three tables, the new columns and
 -- the `InstallmentSegment` type; enum values cannot be dropped from
 -- `LedgerAccount` / `ElogoInvoiceType` and stay unused.
+
+-- Bounds the wait for each lock of this transaction (see above). LOCAL: it
+-- ends with Prisma's migration transaction and never reaches the next
+-- migration or the app's connections.
+SET LOCAL lock_timeout = '3s';
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -50,7 +68,8 @@ ALTER TYPE "LedgerAccount" ADD VALUE IF NOT EXISTS 'installment_fee';
 ALTER TYPE "LedgerAccount" ADD VALUE IF NOT EXISTS 'installment_platform_cost';
 
 -- ---------------------------------------------------------------------------
--- Existing tables, in lock order: payments -> orders -> refund_attempts
+-- Existing tables, in payment -> order lock order (does not rule out every
+-- deadlock, see the header): payments -> orders -> refund_attempts
 -- ---------------------------------------------------------------------------
 ALTER TABLE "payments"
   ADD COLUMN "installment_fee_amount" DECIMAL(10,2) NOT NULL DEFAULT 0,
