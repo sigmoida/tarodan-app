@@ -5,6 +5,7 @@ import {
   type SellerTrustFormulaParams,
   type SellerTrustParamField,
   type SellerTrustParamIssue,
+  type SellerTrustParamLimit,
 } from "@tarodan/types";
 import type { Translate } from "@/lib/statusLabels";
 import { fmtDecimal } from "@/lib/format";
@@ -98,6 +99,18 @@ export function paramIssueMessage(
       });
     case "aboveTransactions":
       return t("admin.system.sellerTrustLab.params.errors.counterparties");
+    case "invalidNumber":
+      return t("admin.system.sellerTrustLab.scenario.errors.invalidNumber", {
+        field: label,
+      });
+    case "tooManyDecimals": {
+      const limit: SellerTrustParamLimit | undefined =
+        SELLER_TRUST_PARAM_LIMITS[field];
+      return t("admin.system.sellerTrustLab.params.errors.decimals", {
+        field: label,
+        max: String(limit?.maxDecimals ?? 0),
+      });
+    }
     default: {
       const limit = SELLER_TRUST_PARAM_LIMITS[field];
       return t("admin.system.sellerTrustLab.params.errors.range", {

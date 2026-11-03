@@ -62,6 +62,23 @@ describe("candidate parameter form", () => {
     expect(message).toContain('"max":"5,00"');
   });
 
+  it("asks for fewer decimals, not a range, for an in-range weight with too many", () => {
+    const form = paramsToForm(V1_PARAMS);
+    form.weights.rating = "0.12345";
+    const message = errors(form)["weights.rating"];
+    expect(message).toContain("params.errors.decimals");
+    expect(message).toContain('"max":"4"');
+    expect(message).not.toContain("params.errors.range");
+  });
+
+  it("asks for a number, not a range, for an empty field", () => {
+    const form = paramsToForm(V1_PARAMS);
+    form.rating.priorMean = "";
+    expect(errors(form)["rating.priorMean"]).toContain(
+      "scenario.errors.invalidNumber",
+    );
+  });
+
   it("asks for a whole number where the limit is an integer", () => {
     const form = paramsToForm(V1_PARAMS);
     form.volume.saturation = "50.5";

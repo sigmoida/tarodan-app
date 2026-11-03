@@ -5403,6 +5403,7 @@
             "weightsSum": "Weights must total 1 (now {sum}).",
             "range": "{field} must be between {min} and {max}.",
             "integer": "{field} must be a whole number.",
+            "decimals": "{field} can have at most {max} decimal places.",
             "counterparties": "Distinct counterparties cannot exceed the transaction count."
           }
         },

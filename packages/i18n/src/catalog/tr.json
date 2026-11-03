@@ -5403,6 +5403,7 @@
             "weightsSum": "Ağırlıkların toplamı 1 olmalı (şu an {sum}).",
             "range": "{field}, {min} ile {max} arasında olmalı.",
             "integer": "{field} tam sayı olmalı.",
+            "decimals": "{field} en fazla {max} ondalık basamak içerebilir.",
             "counterparties": "Farklı karşı taraf sayısı işlem sayısını aşamaz."
           }
         },
