@@ -13,6 +13,7 @@ stored; a profile read is a primary-key lookup. Decision record: tarodan-ops
 | Version, levels, thresholds, read shapes, formatter | `packages/types/src/seller-trust.ts`                                                                                |
 | Table owner                                         | `seller-trust/seller-trust.service.ts` (`seller_trust_scores`)                                                      |
 | Batch                                               | `seller-trust/jobs/seller-trust-scheduler.service.ts` (`seller-trust-refresh`)                                      |
+| Input read (one path for the batch and read tools)  | `seller-trust/inputs/seller-trust-inputs.reader.ts` (`SellerTrustInputsReader`)                                     |
 | Aggregates, one per owning domain                   | `order/stats/`, `refund/stats/`, `rating/stats/`, `trade/stats/`, `user/stats/` (`*-seller-trust-stats.service.ts`) |
 
 Any change to a definition or a constant below is a product decision and bumps

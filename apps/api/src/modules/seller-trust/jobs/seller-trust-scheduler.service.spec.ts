@@ -8,6 +8,7 @@ import {
   SELLER_TRUST_REFRESH_JOB,
   SellerTrustSchedulerService,
 } from "./seller-trust-scheduler.service";
+import { SellerTrustInputsReader } from "../inputs/seller-trust-inputs.reader";
 import * as environment from "../../../config/environment";
 
 const asOf = new Date("2026-10-21T23:30:00.000Z");
@@ -93,11 +94,15 @@ function build(candidates: string[]) {
     prisma as never,
     cache as never,
     sellerTrust as never,
-    orderStats as never,
-    refundStats as never,
-    ratingStats as never,
-    tradeStats as never,
-    userStats as never,
+    // The real reader over the mocked domain services: the assertions below
+    // pin the batch's whole read, as they did before the read moved there.
+    new SellerTrustInputsReader(
+      orderStats as never,
+      refundStats as never,
+      ratingStats as never,
+      tradeStats as never,
+      userStats as never,
+    ),
     queue as unknown as Queue,
   );
   const pause = jest
@@ -406,6 +411,33 @@ describe("SellerTrustSchedulerService.runRefresh", () => {
       "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
       "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
     ]);
+    // Every domain read, the guest buyer lookup included, ran once on the
+    // snapshot's tx: none went to the plain client outside a snapshot.
+    const reads = Object.entries({
+      ...t.orderStats,
+      ...t.refundStats,
+      ...t.ratingStats,
+      ...t.tradeStats,
+      ...t.userStats,
+    }) as Array<[string, jest.Mock]>;
+    expect(reads.map(([name]) => name).sort()).toEqual([
+      "activeSellerIds",
+      "activeTraderIds",
+      "fulfilmentStats",
+      "guestBuyerId",
+      "salesCounterparties",
+      "sellerFaultOrderIds",
+      "sellerRatingStats",
+      "tradeCounterparties",
+      "trustEligibleUsers",
+    ]);
+    expect(
+      reads.map(([name, read]) => ({
+        name,
+        calls: read.mock.calls.length,
+        onSnapshotTx: read.mock.calls.every((c) => c[0] === t.prisma.tx),
+      })),
+    ).toEqual(reads.map(([name]) => ({ name, calls: 1, onSnapshotTx: true })));
   });
 });
 
