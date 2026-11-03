@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npx --no -- lint-staged
+sh scripts/check-partial-staging.sh
+# --no-stash: the git stash stack is shared by every worktree of this clone, and
+# the hub rules forbid git stash. Partially staged files are refused above.
+npx --no -- lint-staged --no-stash
