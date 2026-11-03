@@ -45,7 +45,7 @@ describe("AdminSellerTrustLabService", () => {
       expect(t.audit.createRequiredAuditLog).toHaveBeenCalledWith(
         "admin-user",
         "seller_trust_lab_seller",
-        "user",
+        "User",
         "u1",
         null,
         {
@@ -111,7 +111,7 @@ describe("AdminSellerTrustLabService", () => {
       expect(t.audit.createRequiredAuditLog).toHaveBeenCalledWith(
         "admin-user",
         "seller_trust_lab_population",
-        "seller_trust_scores",
+        "SellerTrustScore",
         "population",
         null,
         { params: v1(), filters: { minTransactions: 5 }, rowsRead: 12 },

@@ -67,7 +67,7 @@ export class AdminSellerTrustLabService {
     await this.audit.createRequiredAuditLog(
       actorUserId,
       SELLER_TRUST_LAB_AUDIT.seller,
-      "user",
+      "User",
       userId,
       null,
       {
@@ -89,7 +89,7 @@ export class AdminSellerTrustLabService {
     await this.audit.createRequiredAuditLog(
       actorUserId,
       SELLER_TRUST_LAB_AUDIT.population,
-      "seller_trust_scores",
+      "SellerTrustScore",
       "population",
       null,
       { params: candidate, filters, rowsRead: result.summary.rowsRead },

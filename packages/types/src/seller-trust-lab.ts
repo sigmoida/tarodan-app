@@ -585,7 +585,8 @@ export interface SellerTrustLabStoredRow {
   level: SellerTrustLevel;
   formulaVersion: number;
   computedAt: string;
-  components: SellerTrustComponentsV1;
+  /** The stored breakdown; null for a row of another formula version. */
+  components: SellerTrustComponentsV1 | null;
 }
 
 /**

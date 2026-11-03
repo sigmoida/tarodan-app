@@ -327,6 +327,16 @@ describe("SellerTrustLabService (collaborators mocked)", () => {
       expect(r.live?.comparison).toBeNull();
     });
 
+    it("never relabels a stored row of another formula version as v1", async () => {
+      const t = build({
+        stored: { scoreX100: 420, formulaVersion: 2, components: { v2: true } },
+        live,
+      });
+      const r = await t.service.seller("u1", "stored", null);
+      expect(r.stored).toMatchObject({ formulaVersion: 2, components: null });
+      expect(r.live?.comparison).toBeNull();
+    });
+
     it("shows a candidate through explainSellerTrust, without a formula version", async () => {
       const t = build({ live });
       const r = await t.service.seller("u1", "now", candidateParams());

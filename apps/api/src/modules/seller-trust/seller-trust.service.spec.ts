@@ -190,5 +190,6 @@ describe("SellerTrustService lab reads", () => {
       ],
     });
     expect(storedFilterWhere({})).toEqual({});
+    expect(storedFilterWhere({ levels: [] })).toEqual({});
   });
 });

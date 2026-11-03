@@ -83,7 +83,8 @@ export function storedFilterWhere(
   filter: StoredSellerTrustFilter,
 ): Prisma.SellerTrustScoreWhereInput {
   const and: Prisma.SellerTrustScoreWhereInput[] = [];
-  if (filter.levels) {
+  // An empty level list means every level, like an absent one.
+  if (filter.levels && filter.levels.length > 0) {
     and.push({ OR: [...new Set(filter.levels)].map(levelWhere) });
   }
   if (filter.minTransactions !== undefined) {

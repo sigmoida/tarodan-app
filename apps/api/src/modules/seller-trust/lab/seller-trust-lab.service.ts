@@ -79,7 +79,11 @@ function toStoredRow(row: StoredSellerTrustRow): SellerTrustLabStoredRow {
     level: sellerTrustLevel(row.scoreX100),
     formulaVersion: row.formulaVersion,
     computedAt: row.computedAt.toISOString(),
-    components: row.components as unknown as SellerTrustComponentsV1,
+    // Only a v1 row has the v1 breakdown shape; never relabel another one.
+    components:
+      row.formulaVersion === F.version
+        ? (row.components as unknown as SellerTrustComponentsV1)
+        : null,
   };
 }
 
@@ -292,8 +296,9 @@ export class SellerTrustLabService {
               userId: row.userId,
               computedAt: row.computedAt,
               storedX100: row.scoreX100,
+              // Scores only: nothing of the breakdown is shown here.
               v1X100: computeSellerTrust(inputs).scoreX100,
-              candidateX100: explainSellerTrust(inputs, candidate).scoreX100,
+              candidateX100: computeSellerTrust(inputs, candidate).scoreX100,
             });
           }
         }

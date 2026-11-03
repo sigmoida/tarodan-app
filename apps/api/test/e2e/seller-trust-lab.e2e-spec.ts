@@ -349,6 +349,24 @@ describe("seller trust lab (E2E)", () => {
         action: "seller_trust_lab_population",
         entityId: "population",
       });
+
+      // The transactions filter reads the stored breakdown in SQL.
+      const [{ busy }] = await prisma.$queryRaw<Array<{ busy: number }>>`
+        SELECT count(*)::int AS "busy" FROM "seller_trust_scores"
+        WHERE ("components"->'volume'->>'transactions')::int >= 5`;
+      const byTransactions = await request(server())
+        .post(`${BASE}/population`)
+        .set(as)
+        .send({ params: v1(), filters: { minTransactions: 5 } });
+      expect(byTransactions.status).toBe(200);
+      expect(busy).toBeGreaterThan(0);
+      expect(busy).toBeLessThan(await prisma.sellerTrustScore.count());
+      expect(byTransactions.body.summary.rowsRead).toBe(busy);
+      audited.push({
+        actor,
+        action: "seller_trust_lab_population",
+        entityId: "population",
+      });
     }
 
     // AC-A9: nothing changed but the audit log.
@@ -370,28 +388,43 @@ describe("seller trust lab (E2E)", () => {
     expect((await prisma.auditLog.count()) - auditBefore).toBe(audited.length);
     const rows = await prisma.auditLog.findMany({
       where: { action: { startsWith: "seller_trust_lab_" } },
-      orderBy: { createdAt: "asc" },
     });
+    // Order-insensitive: two rows can share a millisecond.
+    const key = (r: object) => JSON.stringify(r);
     expect(
-      rows.map((r) => ({
-        adminUserId: r.adminUserId,
-        action: r.action,
-        entityId: r.entityId,
-      })),
+      rows
+        .map((r) => ({
+          adminUserId: r.adminUserId,
+          action: r.action,
+          entityType: r.entityType,
+          entityId: r.entityId,
+        }))
+        .map(key)
+        .sort(),
     ).toEqual(
-      audited.map((a) => ({
-        adminUserId: adminIds.get(a.actor.id),
-        action: a.action,
-        entityId: a.entityId,
-      })),
+      audited
+        .map((a) => ({
+          adminUserId: adminIds.get(a.actor.id),
+          action: a.action,
+          entityType:
+            a.action === "seller_trust_lab_seller"
+              ? "User"
+              : "SellerTrustScore",
+          entityId: a.entityId,
+        }))
+        .map(key)
+        .sort(),
     );
-    const populationRow = rows.find(
-      (r) => r.action === "seller_trust_lab_population",
-    )!;
-    expect(populationRow.newValue).toEqual({
+    // The audit row holds the numeric params and the filters, nothing else.
+    expect(rows.map((r) => r.newValue)).toContainEqual({
       params: extreme(),
       filters: {},
       rowsRead: await prisma.sellerTrustScore.count(),
+    });
+    expect(rows.map((r) => r.newValue)).toContainEqual({
+      asOf: "stored",
+      candidate: false,
+      paramsHash: null,
     });
   });
 
