@@ -122,13 +122,31 @@ describe("InstallmentRatesService", () => {
     },
   );
 
-  it("reports unavailable when the on-demand fetch fails, and releases the lock", async () => {
-    const { service, cache } = setup({
-      latest: null,
+  it("keeps the lock after a failed on-demand fetch: one PayTR call per lock period, not per request", async () => {
+    const { service, cache, provider } = setup({
+      latest: snapshot(40),
       rates: { ok: false, errMsg: "timeout" },
     });
     expect(await service.freshSnapshot()).toBeNull();
-    expect(cache.del).toHaveBeenCalled();
+    expect(cache.del).not.toHaveBeenCalled();
+    cache.claimKey.mockResolvedValueOnce("held");
+    expect(await service.freshSnapshot()).toBeNull();
+    expect(provider.getInstallmentRates).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the lock after an incomplete answer too (no single rate before S0)", async () => {
+    const { service, cache } = setup({
+      latest: null,
+      rates: {
+        ok: true,
+        requestId: "x",
+        rates: { world: { "3": "8" } },
+        ignored: [],
+        raw: {},
+      },
+    });
+    expect(await service.freshSnapshot()).toBeNull();
+    expect(cache.del).not.toHaveBeenCalled();
   });
 
   it("uses the snapshot id without hyphens as request_id and stores the answer", async () => {
@@ -200,9 +218,22 @@ describe("InstallmentRatesService", () => {
       ).toBe(true);
     });
 
-    it("does not alarm while yesterday's snapshot is younger than 24 h", async () => {
+    it("alarms on the first missed run even when it failed faster than yesterday's fetch", async () => {
+      // Yesterday's snapshot is just under 24 h old when today's run fails.
       const { service } = setup({
-        latest: snapshot(20),
+        latest: snapshot(23.99),
+        rates: { ok: false, errMsg: "down" },
+        enabled: true,
+      });
+      await service.runDailyRefresh();
+      expect(String(error.mock.calls[0]?.[0])).toContain(
+        "INSTALLMENT_RATES_STALE",
+      );
+    });
+
+    it("does not alarm while a snapshot is younger than 20 h (e.g. an on-demand refresh)", async () => {
+      const { service } = setup({
+        latest: snapshot(19),
         rates: { ok: false, errMsg: "down" },
         enabled: true,
       });

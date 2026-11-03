@@ -36,10 +36,13 @@ export const INSTALLMENT_KEEP_GUARD_ENABLED = true;
 export const INSTALLMENT_RATES_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
 /**
- * No snapshot younger than this: the daily alarm `INSTALLMENT_RATES_STALE`
- * (the cron runs once a day, so one missed run trips it).
+ * The daily rate run alarms `INSTALLMENT_RATES_STALE` when no snapshot is
+ * younger than this. Less than a day on purpose: the check runs right after
+ * the daily fetch, so the newest snapshot of a run that failed is about 24 h
+ * old (a little less when today's failure answered faster than yesterday's
+ * success). 20 h trips on the first missed run and never after a stored one.
  */
-export const INSTALLMENT_RATES_STALE_ALERT_MS = 24 * 60 * 60 * 1000;
+export const INSTALLMENT_RATES_STALE_ALERT_MS = 20 * 60 * 60 * 1000;
 
 /** Single flight of the on-demand rate fetch (Redis lock), seconds. */
 export const INSTALLMENT_RATES_FETCH_LOCK_SECONDS = 30;

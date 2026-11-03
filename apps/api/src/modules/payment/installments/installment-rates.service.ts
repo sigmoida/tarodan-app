@@ -73,7 +73,7 @@ export class InstallmentRatesService {
     now: Date = new Date(),
   ): Promise<InstallmentRateSource | null> {
     const latest = await this.latest();
-    if (latest && isFresh(latest, now)) return latest;
+    if (latest && isRateSnapshotFresh(latest, now)) return latest;
 
     const lockKey = `installments:rates:refresh:${RATES_MERCHANT}`;
     const claim = await this.cache.claimKey(
@@ -81,16 +81,19 @@ export class InstallmentRatesService {
       INSTALLMENT_RATES_FETCH_LOCK_SECONDS,
     );
     if (claim !== "claimed") return null;
-    try {
-      const outcome = await this.refresh({
-        timeoutMs: INSTALLMENT_PAYTR_USER_PATH_TIMEOUT_MS,
-      });
-      if (outcome !== "stored") return null;
-    } finally {
-      await this.cache.del(lockKey);
-    }
+    const outcome = await this.refresh({
+      timeoutMs: INSTALLMENT_PAYTR_USER_PATH_TIMEOUT_MS,
+    });
+    // The lock is released only after a stored snapshot. A failed or
+    // incomplete fetch keeps it until it expires: at most one PayTR call per
+    // lock period from the buyer path while PayTR is down (no 3 s wait on
+    // every options call).
+    if (outcome !== "stored") return null;
+    await this.cache.del(lockKey);
     const refreshed = await this.latest();
-    return refreshed && isFresh(refreshed, new Date()) ? refreshed : null;
+    return refreshed && isRateSnapshotFresh(refreshed, new Date())
+      ? refreshed
+      : null;
   }
 
   /**
@@ -162,7 +165,7 @@ export class InstallmentRatesService {
   /**
    * The daily cron (`paytr-installment-rates`). A failed fetch does not fail
    * the run: the alarm is `INSTALLMENT_RATES_STALE` once no snapshot is
-   * younger than 24 h, an error while installments are on (buyers are
+   * younger than `INSTALLMENT_RATES_STALE_ALERT_MS`, an error while installments are on (buyers are
    * falling back to single payments), a warning while they are off.
    */
   async runDailyRefresh(log: (msg: string) => void = () => {}) {
@@ -188,7 +191,11 @@ export class InstallmentRatesService {
   }
 }
 
-function isFresh(snapshot: { fetchedAt: Date }, now: Date): boolean {
+/** Younger than 36 h: the one freshness rule (pricing and the admin badge). */
+export function isRateSnapshotFresh(
+  snapshot: { fetchedAt: Date },
+  now: Date = new Date(),
+): boolean {
   return (
     now.getTime() - snapshot.fetchedAt.getTime() < INSTALLMENT_RATES_MAX_AGE_MS
   );
