@@ -1,6 +1,15 @@
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { PERMISSION_MAP, RolesGuard, declaredPermissions } from "./roles.guard";
+import {
+  PERMISSION_MAP,
+  ROLE_ONLY_ADMIN_SEGMENTS,
+  RolesGuard,
+  declaredPermissions,
+} from "./roles.guard";
+import {
+  ADMIN_PERMISSION_KEYS,
+  DEFAULT_ROLE_PERMISSIONS,
+} from "../../admin/dto/role-permissions.dto";
 import { Roles, ROLES_KEY } from "../decorators/roles.decorator";
 import {
   PERMISSION_KEY,
@@ -684,6 +693,100 @@ describe("RolesGuard — URL map entries stay any-of", () => {
         i18nKey: "server.auth.permissionRequired",
         i18nParams: { perms: "users, seller_performance" },
       },
+    });
+  });
+});
+
+/**
+ * The seller trust lab (`/api/admin/seller-trust-lab/*`): super admin and
+ * admin through the `seller_trust_lab` permission; a moderator is refused by
+ * the controller's @Roles even when the matrix grants the key (decision D1,
+ * AC-A1 to AC-A5).
+ */
+describe("RolesGuard — seller trust lab permission", () => {
+  @Roles("super_admin", "admin")
+  class Lab {
+    params() {}
+  }
+
+  const guard = (perms: Record<string, string[]> | null) =>
+    new RolesGuard(new Reflector(), {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            perms ? { settingValue: JSON.stringify(perms) } : null,
+          ),
+      },
+    } as never);
+
+  const ctx = (role: string): ExecutionContext =>
+    ({
+      getHandler: () => Lab.prototype.params,
+      getClass: () => Lab,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { isAdmin: true, role },
+          method: "POST",
+          originalUrl: "/api/admin/seller-trust-lab/population",
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
+  it("maps the segment to its own key, not to a role-only exception", () => {
+    expect(PERMISSION_MAP["seller-trust-lab"]).toEqual(["seller_trust_lab"]);
+    expect(ROLE_ONLY_ADMIN_SEGMENTS.has("seller-trust-lab")).toBe(false);
+  });
+
+  it("is a permission key held by super admin and admin by default, not moderator", () => {
+    expect(ADMIN_PERMISSION_KEYS).toContain("seller_trust_lab");
+    expect(DEFAULT_ROLE_PERMISSIONS.super_admin).toContain("seller_trust_lab");
+    expect(DEFAULT_ROLE_PERMISSIONS.admin).toContain("seller_trust_lab");
+    expect(DEFAULT_ROLE_PERMISSIONS.moderator).not.toContain(
+      "seller_trust_lab",
+    );
+  });
+
+  it.each(["super_admin", "admin"])(
+    "lets %s in with the default matrix",
+    async (role) => {
+      await expect(guard(null).canActivate(ctx(role))).resolves.toBe(true);
+    },
+  );
+
+  it("lets admin in when a stored matrix grants the key", async () => {
+    await expect(
+      guard({ admin: ["seller_trust_lab"] }).canActivate(ctx("admin")),
+    ).resolves.toBe(true);
+  });
+
+  it("refuses admin with permissionRequired when the stored matrix lacks the key", async () => {
+    await expect(
+      guard({ admin: ["users", "orders"] }).canActivate(ctx("admin")),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: {
+        i18nKey: "server.auth.permissionRequired",
+        i18nParams: { perms: "seller_trust_lab", role: "admin" },
+      },
+    });
+  });
+
+  it("lets super admin in even when the stored matrix lacks the key", async () => {
+    await expect(
+      guard({ super_admin: [] }).canActivate(ctx("super_admin")),
+    ).resolves.toBe(true);
+  });
+
+  it.each([
+    ["the default matrix", null],
+    ["a matrix that grants it the key", { moderator: ["seller_trust_lab"] }],
+  ])("refuses moderator with roleRequired under %s", async (_name, perms) => {
+    await expect(
+      guard(perms).canActivate(ctx("moderator")),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { i18nKey: "server.auth.roleRequired" },
     });
   });
 });

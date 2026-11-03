@@ -16,7 +16,7 @@ export class SetRolePermissionsDto {
   permissions: Record<string, string[]>;
 }
 
-/** Her sidebar nav öğesi için bir izin — 36 adet. */
+/** One permission per admin sidebar item (the Roles page lists them). */
 export const ADMIN_PERMISSION_KEYS = [
   // Dashboard & Analitik
   "dashboard",
@@ -63,11 +63,14 @@ export const ADMIN_PERMISSION_KEYS = [
   "settings",
   "logs",
   "audit_logs",
+  // Read-only seller trust lab (super admin and admin; never moderator, which
+  // the lab's @Roles refuses even if the matrix grants the key).
+  "seller_trust_lab",
 ] as const;
 
 export type AdminPermissionKey = (typeof ADMIN_PERMISSION_KEYS)[number];
 
-/** Varsayılan rol → izin eşleşmesi. */
+/** Default role -> permission matrix, used while no stored matrix exists. */
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: [...ADMIN_PERMISSION_KEYS],
   admin: [
@@ -101,6 +104,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     "email_templates",
     "pages",
     "ai_moderation",
+    "seller_trust_lab",
   ],
   moderator: [
     "dashboard",

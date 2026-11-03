@@ -104,6 +104,9 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   "audit-logs": ["audit_logs"],
   moderation: ["ai_moderation"],
   "membership-tiers": ["membership_tiers"],
+  // Read-only seller trust lab. The controller also has
+  // @Roles(super_admin, admin), so a moderator is refused by role first.
+  "seller-trust-lab": ["seller_trust_lab"],
   staff: ["staff"],
   // Genel admin yükleme ucu (üretici logosu + geriye dönük banner). Reklam
   // banner'ı için `ads` izniyle açılan uç `/admin/ads/upload`'dur.
