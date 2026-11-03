@@ -15,6 +15,14 @@ import { resolveUpdatedStatus } from "../helpers/product-update-status";
 import { assertListingMayReopen } from "../helpers/product-reopen-gate";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
+import {
+  catalogReferenceLookups,
+  catalogReferenceUpdateData,
+  catalogReferenceViolation,
+  invalidCatalogReferenceError,
+  loadCatalogReferenceRows,
+  resolveCatalogReferenceChange,
+} from "../helpers/catalog-reference-rule";
 import { CacheService } from "../../cache/cache.service";
 import { SearchService } from "../../search/search.service";
 import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
@@ -29,6 +37,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../../common/helpers/email-template-renderer";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
 import {
@@ -298,40 +307,23 @@ export class ProductUpdateService {
       }
     }
 
-    if (
-      dto.brandId !== undefined ||
-      dto.carModelId !== undefined ||
-      dto.manufacturerId !== undefined
-    ) {
-      const nextBrandId = dto.brandId ?? product.brandId;
-      const nextCarModelId =
-        dto.carModelId !== undefined ? dto.carModelId : product.carModelId;
-      const nextManufacturerId = dto.manufacturerId ?? product.manufacturerId;
-      const [brand, carModel, manufacturer] = await Promise.all([
-        nextBrandId
-          ? this.prisma.brand.findUnique({ where: { id: nextBrandId } })
-          : null,
-        nextCarModelId
-          ? this.prisma.carModel.findUnique({ where: { id: nextCarModelId } })
-          : null,
-        nextManufacturerId
-          ? this.prisma.manufacturer.findUnique({
-              where: { id: nextManufacturerId },
-            })
-          : null,
-      ]);
-      if (
-        !brand ||
-        !brand.isActive ||
-        (nextCarModelId &&
-          (!carModel || !carModel.isActive || carModel.brandId !== brand.id)) ||
-        !manufacturer ||
-        !manufacturer.isActive
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.product.invalidBrandModelManufacturer"),
-        );
-      }
+    // Only the references this edit changes are validated: clients send the
+    // record's own references on every save, and a listing keeps a brand,
+    // model or manufacturer the catalog has deactivated since. The write below
+    // reads the same resolved values.
+    const catalogReferences = resolveCatalogReferenceChange(product, dto);
+    const catalogViolation = catalogReferenceViolation(
+      catalogReferences,
+      await loadCatalogReferenceRows(
+        this.prisma,
+        catalogReferenceLookups(catalogReferences),
+      ),
+    );
+    if (catalogViolation) {
+      this.logger.warn(
+        `Catalog reference refused on edit: product=${id} reason=${catalogViolation}`,
+      );
+      throw invalidCatalogReferenceError();
     }
 
     // NOT: Statü politikası resolveUpdatedStatus()'te merkezi olarak uygulanır.
@@ -556,15 +548,16 @@ export class ProductUpdateService {
       modelCode:
         dto.modelCode !== undefined ? dto.modelCode?.trim() || null : undefined,
       color:
-        // `dto.colors` geldiyse `resolvedAttributes` doludur — `attributesChanged`
-        // aynı koşulu kapsıyor. İkinci kontrol derleyici içindir.
+        // When `dto.colors` is sent, `resolvedAttributes` is set
+        // (`attributesChanged` covers the same condition); the second check is
+        // for the compiler.
         dto.colors !== undefined && resolvedAttributes
           ? colorColumnValue(resolvedAttributes.colorLabels, dto.color)
           : dto.color?.trim(),
       isBoxed: dto.isBoxed,
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
-      // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
+      // An edited rejected listing goes back to review (re-submit -> pending).
       status: resolvedStatus,
       isTradeEnabled:
         dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
@@ -582,27 +575,13 @@ export class ProductUpdateService {
             ? null
             : Number(dto.quantity)
           : undefined,
-      // Boyut gönderilmediyse kargo alanlarına DOKUNULMAZ (kısmi güncelleme).
+      // Without a size in the body the shipping fields stay as they are
+      // (partial update).
       ...productShippingTierData(dto.shippingPackageTier, { partial: true }),
       category: dto.categoryId
         ? { connect: { id: dto.categoryId } }
         : undefined,
-      brand: dto.brandId
-        ? { connect: { id: dto.brandId } }
-        : dto.brandId === null
-          ? { disconnect: true }
-          : undefined,
-      carModel: dto.carModelId
-        ? { connect: { id: dto.carModelId } }
-        : dto.carModelId === null
-          ? { disconnect: true }
-          : undefined,
-      manufacturer:
-        dto.manufacturerId !== undefined
-          ? dto.manufacturerId
-            ? { connect: { id: dto.manufacturerId } }
-            : { disconnect: true }
-          : undefined,
+      ...catalogReferenceUpdateData(catalogReferences),
       version: { increment: 1 },
       ...(releaseDateUpdate !== undefined
         ? { releaseDate: releaseDateUpdate }
@@ -715,6 +694,9 @@ export class ProductUpdateService {
                 },
               },
             },
+            // Same as the re-read below: without it a manufacturer-only edit
+            // answered `manufacturer: null`.
+            manufacturer: { select: { id: true, name: true, slug: true } },
             productAttributes: {
               include: { attribute: { include: { group: true } } },
             },
@@ -927,10 +909,9 @@ export class ProductUpdateService {
       },
     });
 
-    // Filter users who accept marketing emails for email notifications
-    const usersToNotify = wishlistItems
-      .map((item) => (item as any).wishlist?.user)
-      .filter((user: any) => user !== null && user !== undefined);
+    // Everyone with this listing in a wishlist; the e-mail leg below checks
+    // acceptsMarketingEmails per user.
+    const usersToNotify = wishlistItems.map((item) => item.wishlist.user);
 
     if (usersToNotify.length === 0) {
       return;
@@ -996,14 +977,14 @@ export class ProductUpdateService {
               template: "wishlist-price-change",
             });
           }
-        } catch (emailError: any) {
+        } catch (emailError) {
           // Email failure shouldn't stop in-app notification
           this.logger.warn(
             `Failed to send price change email for user ${user.id}:`,
             emailError,
           );
         }
-      } catch (error: any) {
+      } catch (error) {
         this.logger.error(
           `Failed to send price change notification for user ${user.id}:`,
           error,
@@ -1097,16 +1078,16 @@ export class ProductUpdateService {
           // edildi" okuyordu.
           await this.notificationService
             .notifyOfferCancelledListingRemoved(offer.buyerId, id)
-            .catch((err: any) =>
+            .catch((err: unknown) =>
               this.logger.warn(
-                `offer-cancelled bildirimi başarısız (${offer.id}): ${err?.message}`,
+                `offer-cancelled notification failed (${offer.id}): ${errorMessage(err)}`,
               ),
             );
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `silinen ilanın teklifleri kapatılamadı (${id}): ${err?.message}`,
+        `could not close the offers of the removed listing (${id}): ${errorMessage(err)}`,
       );
     }
 
