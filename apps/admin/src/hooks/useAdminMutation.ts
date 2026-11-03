@@ -47,9 +47,12 @@ interface AdminMutationContext {
 
 /**
  * Toast id derived from the message. react-hot-toast replaces a toast that has
- * the same id instead of stacking another one, so a double submit (a second
- * click or Enter before the pending state re-renders) that fails twice with
- * the same message shows ONE toast, for every admin form.
+ * the same id instead of stacking another one, so two writes through this hook
+ * that end with the same message show ONE toast (its timer restarts). This
+ * covers only the hook's own toasts. It does not stop a double submit from
+ * sending a second request: the hook runs concurrent per-row writes, so a
+ * screen that must send one request per submit guards its own submit
+ * (see the product edit form).
  */
 const toastId = (kind: "success" | "error", message: string) =>
   `admin-mutation:${kind}:${message}`;

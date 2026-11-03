@@ -73,6 +73,7 @@ describe("useAdminMutation toasts", () => {
       />,
     );
     await submitTwice();
+    expect(h.toast.error).toHaveBeenCalledTimes(2);
     const [a, b] = ids(h.toast.error);
     expect(a).not.toBe(b);
     view.unmount();
