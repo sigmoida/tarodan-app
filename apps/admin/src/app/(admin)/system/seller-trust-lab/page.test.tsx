@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { focusManager, onlineManager } from "@tanstack/react-query";
 import type { SellerTrustLabSeller } from "@tarodan/types";
 
 const h = vi.hoisted(() => ({
@@ -375,6 +377,26 @@ describe("seller", () => {
     expect(input("userId").value).toBe(USER_ID);
   });
 
+  it("calls the audited endpoint once per click, never on its own", async () => {
+    await open();
+    await run();
+    expect(h.seller).toHaveBeenCalledTimes(1);
+
+    // Focus and a network reconnect must not re-run a real-seller read.
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      onlineManager.setOnline(false);
+      onlineManager.setOnline(true);
+    });
+    await flush();
+    expect(h.seller).toHaveBeenCalledTimes(1);
+
+    // The same request again is an explicit re-run: one more call.
+    await click(button(`${L}.seller.run`));
+    expect(h.seller).toHaveBeenCalledTimes(2);
+  });
+
   it("ignores a deep link that is not a UUID", async () => {
     h.search = new URLSearchParams({ userId: "nope" });
     await open();
@@ -473,6 +495,18 @@ describe("population", () => {
     expect(text).toContain("0,0 - 0,5");
     expect(text).not.toContain(`${L}.population.inProgress`);
     expect(text).not.toContain(`${L}.population.consistency.warning`);
+  });
+
+  it("does not re-run the audited population read on a reconnect", async () => {
+    await open();
+    await run();
+    expect(h.population).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      onlineManager.setOnline(false);
+      onlineManager.setOnline(true);
+    });
+    await flush();
+    expect(h.population).toHaveBeenCalledTimes(1);
   });
 
   it("sends the filters", async () => {
