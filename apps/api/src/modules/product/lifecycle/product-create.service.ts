@@ -260,11 +260,10 @@ export class ProductCreateService {
         ? new Date(dto.year, 0, 1)
         : undefined;
 
-    // The write uses the values the rule validated (an empty id is already
-    // resolved to "none"; `undefined` leaves the column to its null default).
-    const brandId = catalogReferences.next.brandId ?? undefined;
+    // The write uses the values the rule validated: brand and manufacturer are
+    // set by now; an absent model leaves the column to its null default.
+    const { brandId, manufacturerId } = catalogReferences.next;
     const carModelId = catalogReferences.next.carModelId ?? undefined;
-    const manufacturerId = catalogReferences.next.manufacturerId ?? undefined;
 
     // Yeni ilan: rankTier'ı (premium satıcı → 1) ve başlangıç popülerlik baseline'ını inline ver.
     // Böylece recompute (best-effort) başarısız olsa bile kademe doğru başlar; baseline ise
@@ -436,9 +435,9 @@ export class ProductCreateService {
       }
       return await this.common.formatProductResponse(productWithAttrs);
     } catch (err: unknown) {
-      const { code, status } = (
+      const { code, status, message } = (
         typeof err === "object" && err !== null ? err : {}
-      ) as { code?: unknown; status?: unknown };
+      ) as { code?: unknown; status?: unknown; message?: unknown };
       if (code === "P2003") {
         throw invalidCatalogReferenceError();
       }
@@ -457,9 +456,9 @@ export class ProductCreateService {
         "Product create failed",
         err instanceof Error ? errorStack(err) : errorMessage(err),
       );
-      if (isDevelopment() && err instanceof Error && err.message) {
+      if (isDevelopment() && typeof message === "string" && message) {
         throw new InternalServerErrorException(
-          i18nMessage("server.product.createFailed", { reason: err.message }),
+          i18nMessage("server.product.createFailed", { reason: message }),
         );
       }
       throw new InternalServerErrorException(

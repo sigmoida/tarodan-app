@@ -14,10 +14,13 @@ import { i18nMessage } from "../../i18n";
  * edit. Moving TO an invalid reference, or clearing a required one, is refused.
  *
  * Rules (a new listing counts every reference as changed):
- * 1. `undefined` keeps the current value, `null` or `""` clears it, a string
- *    sets it.
- * 2. A brand change without `carModelId` clears the model: a model cannot
- *    outlive its brand (mobile 1.0.5-1.1.1 omit the model after a brand change).
+ * 1. `undefined` keeps the current value, `null` clears it, a string sets
+ *    it. (`""` also counts as a clear here, defensively only: the DTOs'
+ *    `@IsUUID` refuses it before the service, so it is not a supported API.)
+ * 2. A brand change without `carModelId` clears the model, even one that
+ *    already belongs to the new brand: a model cannot outlive its brand, and
+ *    mobile 1.0.5-1.1.1 omit the model after a brand change. To keep a model
+ *    across a brand change, send it.
  * 3. A changed brand must be set, exist and be active.
  * 4. A changed manufacturer must be set, exist and be active.
  * 5. A set model whose model or brand changed must exist and belong to the next
@@ -63,7 +66,11 @@ export type CatalogReferenceViolation =
   | "carModelInactive"
   | "carModelBrandMismatch";
 
-/** `""` and whitespace clear like `null`; ids are compared trimmed. */
+/**
+ * `""` and whitespace clear like `null` (defensive; see rule 1). Ids are
+ * compared as stored text: they are not lower-cased, because the id columns
+ * are text and an id in another case does not match the row either.
+ */
 function requestedId(value: string | null): string | null {
   return value?.trim() || null;
 }
@@ -105,6 +112,14 @@ export function resolveCatalogReferenceChange(
   };
 }
 
+/** Rule 5 applies: a model is set and the model or the brand changed. */
+function carModelNeedsCheck({
+  next,
+  changed,
+}: CatalogReferenceChange): boolean {
+  return Boolean(next.carModelId) && (changed.carModel || changed.brand);
+}
+
 /** The ids `catalogReferenceViolation` needs rows for; `null` = do not load. */
 export function catalogReferenceLookups(
   change: CatalogReferenceChange,
@@ -112,10 +127,7 @@ export function catalogReferenceLookups(
   const { next, changed } = change;
   return {
     brandId: changed.brand ? next.brandId : null,
-    carModelId:
-      next.carModelId && (changed.carModel || changed.brand)
-        ? next.carModelId
-        : null,
+    carModelId: carModelNeedsCheck(change) ? next.carModelId : null,
     manufacturerId: changed.manufacturer ? next.manufacturerId : null,
   };
 }
@@ -136,7 +148,7 @@ export function catalogReferenceViolation(
     if (!rows.manufacturer) return "manufacturerNotFound";
     if (!rows.manufacturer.isActive) return "manufacturerInactive";
   }
-  if (next.carModelId && (changed.carModel || changed.brand)) {
+  if (carModelNeedsCheck(change)) {
     if (!rows.carModel) return "carModelNotFound";
     if (rows.carModel.brandId !== next.brandId) return "carModelBrandMismatch";
     if (changed.carModel && !rows.carModel.isActive) return "carModelInactive";

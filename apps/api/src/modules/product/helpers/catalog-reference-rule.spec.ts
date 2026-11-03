@@ -87,6 +87,19 @@ describe("catalog reference rule", () => {
       });
     });
 
+    it("clears an omitted model on a brand change even when it belongs to the new brand", () => {
+      // The rule does not look at the row: a client that wants to keep the
+      // model across a brand change sends it.
+      const change = resolveCatalogReferenceChange(STORED, {
+        brandId: "brand-b",
+      });
+
+      expect(change.next.carModelId).toBeNull();
+      expect(catalogReferenceUpdateData(change).carModel).toEqual({
+        disconnect: true,
+      });
+    });
+
     it("keeps an explicit model sent with a brand change", () => {
       const change = resolveCatalogReferenceChange(STORED, {
         brandId: "brand-b",
