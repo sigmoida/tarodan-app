@@ -55,10 +55,11 @@ export const INSTALLMENT_BIN_CACHE_TTL_SECONDS = {
 } as const;
 
 /**
- * The BIN lookup timeout in the buyer's path (the PayTR sample uses 20 s): on
- * timeout the options answer `unavailable` and the buyer pays in one.
+ * Timeout of a PayTR call in the buyer's path: the BIN lookup (the PayTR
+ * sample uses 20 s) and the on-demand rate refresh. On timeout the options
+ * answer `unavailable` and the buyer pays in one.
  */
-export const INSTALLMENT_BIN_LOOKUP_TIMEOUT_MS = 3_000;
+export const INSTALLMENT_PAYTR_USER_PATH_TIMEOUT_MS = 3_000;
 
 /** `POST /payments/installment-options` per client IP, per minute. */
 export const INSTALLMENT_OPTIONS_IP_LIMIT_PER_MINUTE = 30;
