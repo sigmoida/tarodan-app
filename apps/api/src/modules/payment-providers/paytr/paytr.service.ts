@@ -168,6 +168,7 @@ import {
   isPaytrInstallmentCount,
   parsePaytrInstallmentRates,
   parsePaytrInstallmentCount,
+  parsePaytrSingleRate,
   type PaytrBinLookupResult,
   type PaytrCardFamily,
   type PaytrInstallmentRatesResult,
@@ -669,7 +670,16 @@ export class PayTRService implements IPaymentProvider {
    * when the query had a problem (also network errors here), not cacheable.
    * Never throws.
    */
-  async lookupBin(binNumber: string): Promise<PaytrBinLookupResult> {
+  async lookupBin(
+    binNumber: string,
+    options?: {
+      /**
+       * Abort after this many ms (the buyer's path uses 3 s); default: the
+       * global PayTR HTTP timeout. A timeout is an `error` outcome.
+       */
+      timeoutMs?: number;
+    },
+  ): Promise<PaytrBinLookupResult> {
     if (!this.isConfigured) {
       return { ok: false, outcome: "error", errMsg: "PayTR not configured" };
     }
@@ -693,7 +703,7 @@ export class PayTRService implements IPaymentProvider {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: form.toString(),
-          signal: AbortSignal.timeout(this.httpTimeoutMs),
+          signal: AbortSignal.timeout(options?.timeoutMs ?? this.httpTimeoutMs),
         },
       );
       const data = this.parsePaytrJson<Record<string, unknown>>(
@@ -814,6 +824,7 @@ export class PayTRService implements IPaymentProvider {
         maxInstallmentNonBusiness: parsePaytrInstallmentCount(
           data.max_inst_non_bus,
         ),
+        singleRatePct: parsePaytrSingleRate(data),
         rates,
         ignored,
         raw: data,

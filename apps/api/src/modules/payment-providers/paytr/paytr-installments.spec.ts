@@ -3,7 +3,9 @@ import {
   isPaytrInstallmentCount,
   parsePaytrInstallmentRates,
   parsePaytrInstallmentCount,
+  parsePaytrSingleRate,
   PAYTR_CARD_FAMILIES,
+  PAYTR_SINGLE_RATE_FIELDS,
 } from "./paytr-installments";
 
 /**
@@ -217,6 +219,37 @@ describe("parsePaytrInstallmentRates", () => {
       expect(ignored).toEqual(["oranlar"]);
     },
   );
+});
+
+describe("parsePaytrSingleRate", () => {
+  it("reads nothing while no field is configured (S0 names it)", () => {
+    expect(PAYTR_SINGLE_RATE_FIELDS).toEqual([]);
+    expect(
+      parsePaytrSingleRate({ single_ratio: "1", tek_cekim: "2.99" }),
+    ).toBeUndefined();
+  });
+
+  it("reads a rate from the configured fields, as a dot-decimal string", () => {
+    expect(parsePaytrSingleRate({ tek_cekim: "2,99" }, ["tek_cekim"])).toBe(
+      "2.99",
+    );
+    expect(parsePaytrSingleRate({ tek_cekim: 3 }, ["tek_cekim"])).toBe("3");
+  });
+
+  it("fails closed on a value that is not a rate or on two fields that disagree", () => {
+    expect(
+      parsePaytrSingleRate({ tek_cekim: "abc" }, ["tek_cekim"]),
+    ).toBeUndefined();
+    expect(
+      parsePaytrSingleRate({ tek_cekim: "100" }, ["tek_cekim"]),
+    ).toBeUndefined();
+    expect(
+      parsePaytrSingleRate({ a: "2.9", b: "3.1" }, ["a", "b"]),
+    ).toBeUndefined();
+    expect(parsePaytrSingleRate({ a: "2.9", b: "2.90" }, ["a", "b"])).toBe(
+      "2.9",
+    );
+  });
 });
 
 describe("parsePaytrInstallmentCount", () => {

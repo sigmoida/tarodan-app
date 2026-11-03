@@ -270,6 +270,35 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       error.mockRestore();
     });
 
+    it("aborts after the caller's timeout (3 s in the buyer's path), else the global one", async () => {
+      const timeout = jest.spyOn(AbortSignal, "timeout");
+      answer({ status: "success", brand: "none" });
+      await service.lookupBin("45467112", { timeoutMs: 3000 });
+      expect(timeout).toHaveBeenLastCalledWith(3000);
+      await service.lookupBin("45467112");
+      expect(timeout.mock.calls.at(-1)?.[0]).not.toBe(3000);
+      timeout.mockRestore();
+    });
+
+    it("reports a timeout as an `error` outcome (not cacheable)", async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      fetchSpy.mockRejectedValueOnce(
+        new DOMException(
+          "The operation was aborted due to timeout",
+          "TimeoutError",
+        ),
+      );
+      expect(
+        await service.lookupBin("45467112", { timeoutMs: 3000 }),
+      ).toMatchObject({
+        ok: false,
+        outcome: "error",
+      });
+      warn.mockRestore();
+    });
+
     it("refuses fewer than 6 digits without calling PayTR", async () => {
       const r = await service.lookupBin("45467");
       expect(r).toMatchObject({ ok: false, outcome: "error" });
@@ -340,6 +369,23 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
         ignored: [],
         raw,
       });
+    });
+
+    it("does not read a single rate until its field is known (an echoed flag is not a 1% rate)", async () => {
+      answer({
+        status: "success",
+        request_id: "req8",
+        max_inst_non_bus: 12,
+        single_ratio: "1",
+        oranlar: { world: { "2": "5.5" } },
+      });
+      const r = await service.getInstallmentRates("req8", {
+        singleRatio: true,
+      });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.singleRatePct).toBeUndefined();
+      expect(r.raw.single_ratio).toBe("1");
     });
 
     it("never throws on unknown keys inside oranlar", async () => {

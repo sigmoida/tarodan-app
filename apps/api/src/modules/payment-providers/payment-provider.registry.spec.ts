@@ -20,6 +20,12 @@ class StubPaymentProvider implements IPaymentProvider {
   async queryPaymentStatus() {
     return { ok: false } as any;
   }
+  async lookupBin() {
+    return { ok: false as const, outcome: "error" as const, errMsg: "stub" };
+  }
+  async getInstallmentRates() {
+    return { ok: false as const, errMsg: "stub" };
+  }
   verifyCallback() {
     return true;
   }

@@ -83,6 +83,11 @@ export type PaytrInstallmentRatesResult =
       requestId: string;
       /** `max_inst_non_bus`: the store's maximum count for non-business cards. */
       maxInstallmentNonBusiness?: number;
+      /**
+       * The store's single-payment rate (r1) as a dot-decimal string, from
+       * `parsePaytrSingleRate`; undefined until its field is known (S0).
+       */
+      singleRatePct?: string;
       rates: PaytrInstallmentRateTable;
       ignored: string[];
       /** The whole PayTR answer, for the rate snapshot (no credentials in it). */
@@ -237,6 +242,36 @@ export function parsePaytrInstallmentRates(
     if (Object.keys(rates[family] ?? {}).length === 0) delete rates[family];
   }
   return { rates, ignored };
+}
+
+/**
+ * Top-level fields of a `taksit-oranlari` answer that hold the store's
+ * single-payment rate (requested with `single_ratio=1`). EMPTY on purpose:
+ * the doc does not say where the rate is returned, and an echoed "1" flag
+ * must not be read as a 1% rate. The staging capture (hub plan S0) names the
+ * field; adding it here is the one change. Until then every answer has no
+ * single rate, so no rate snapshot is stored and installments stay
+ * unavailable (fail closed to a single payment).
+ */
+export const PAYTR_SINGLE_RATE_FIELDS: readonly string[] = [];
+
+/**
+ * The store's single-payment rate r1 from a `taksit-oranlari` answer, as a
+ * dot-decimal string in [0, 100), read only from `fields`. Undefined when no
+ * field holds a rate, or when two fields disagree (fail closed).
+ */
+export function parsePaytrSingleRate(
+  answer: Record<string, unknown>,
+  fields: readonly string[] = PAYTR_SINGLE_RATE_FIELDS,
+): string | undefined {
+  let found: string | undefined;
+  for (const field of fields) {
+    const rate = rateOf(answer[field]);
+    if (rate === null) continue;
+    if (found !== undefined && Number(found) !== Number(rate)) return undefined;
+    found ??= rate;
+  }
+  return found;
 }
 
 /**

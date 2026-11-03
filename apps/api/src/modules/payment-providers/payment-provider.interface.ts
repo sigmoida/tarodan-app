@@ -13,7 +13,11 @@ import type {
   PaytrSettlementSummaryEntry,
   PaytrSettlementDetailEntry,
 } from "./paytr/paytr.service";
-import type { PaytrCardFamily } from "./paytr/paytr-installments";
+import type {
+  PaytrBinLookupResult,
+  PaytrCardFamily,
+  PaytrInstallmentRatesResult,
+} from "./paytr/paytr-installments";
 
 /**
  * #89: the payment-provider contract. Money-path consumers depend on this
@@ -42,6 +46,25 @@ export interface IPaymentProvider {
   forMerchant(merchant: PaytrMerchant): IPaymentProvider;
 
   queryPaymentStatus(merchantOid: string): Promise<PayTRStatusInquiryResult>;
+
+  /**
+   * Card BIN facts (bank, credit/debit, family, business flag). Never throws;
+   * `failed` = BIN not defined (cacheable), `error` = not answered (never
+   * cached). Only the BIN is sent and it is never logged.
+   */
+  lookupBin(
+    binNumber: string,
+    options?: { timeoutMs?: number },
+  ): Promise<PaytrBinLookupResult>;
+
+  /**
+   * The store's installment rate table (`taksit-oranlari`); `requestId` is
+   * 1-32 characters and echoed. Never throws.
+   */
+  getInstallmentRates(
+    requestId: string,
+    options?: { singleRatio?: boolean; abroadRatio?: boolean },
+  ): Promise<PaytrInstallmentRatesResult>;
 
   verifyCallback(callback: PayTRCallbackData): boolean;
 
