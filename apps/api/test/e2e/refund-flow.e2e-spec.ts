@@ -20,48 +20,10 @@ import {
 } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
-import { signCallback } from "../mocks/paytr.mock";
+import { buyAndPay, buyNow, latestPaymentOfOrder } from "../factories/flows";
+import { resolveTimingValue } from "../../src/common/timing-rules";
 import { RefundService } from "../../src/modules/refund/refund.service";
 import { PaymentService } from "../../src/modules/payment/payment.service";
-
-/**
- * Helper: full purchase + paid order. No automatic shipping happens
- * unless we let processSuccessfulPayment fire.
- */
-async function buyAndPay(
-  ctx: E2ETestApp,
-  buyer: { accessToken: string },
-  productId: string,
-  shippingAddressId: string,
-): Promise<{ orderId: string }> {
-  const buyRes = await request(ctx.app.getHttpServer())
-    .post("/api/orders/buy")
-    .set(authHeader(buyer))
-    .send({ productId, shippingAddressId })
-    .expect(201);
-
-  await request(ctx.app.getHttpServer())
-    .post("/api/payments/initiate")
-    .set(authHeader(buyer))
-    .send({ orderId: buyRes.body.orderId, provider: "paytr" })
-    .expect(201);
-
-  const prisma = getPrisma();
-  const payment = await prisma.payment.findFirst({
-    where: { orderId: buyRes.body.orderId },
-  });
-  await request(ctx.app.getHttpServer())
-    .post("/api/payments/callback/paytr")
-    .send(
-      signCallback({
-        merchantOid: payment!.providerConversationId!,
-        status: "success",
-        totalAmount: Math.round(Number(payment!.amount) * 100),
-      }),
-    );
-
-  return { orderId: buyRes.body.orderId };
-}
 
 describe("Refund flow (E2E)", () => {
   let ctx: E2ETestApp;
@@ -102,7 +64,9 @@ describe("Refund flow (E2E)", () => {
       where: { orderId },
     });
     expect(shipmentBefore?.provider).toBe("surat");
-    expect(shipmentBefore?.status).toBe(ShipmentStatus.pending);
+    // buyAndPay waits for fulfillment, which books the Surat label: the
+    // parcel is labelled but not yet handed to the carrier.
+    expect(shipmentBefore?.status).toBe(ShipmentStatus.label_created);
 
     const res = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
@@ -123,9 +87,14 @@ describe("Refund flow (E2E)", () => {
     expect(shipmentAfter!.status).toBe(ShipmentStatus.cancelled);
 
     expect(ctx.paytr.refundCalls.length).toBe(1);
-    expect(ctx.surat.cancelCalls).toContain(order!.orderNumber);
+    // The Surat shipment is booked per seller package (a3588f12e), so the
+    // cancel goes by the package number, not the order number.
+    const pkg = await prisma.orderPackage.findUniqueOrThrow({
+      where: { id: order!.packageId! },
+    });
+    expect(ctx.surat.cancelCalls).toContain(pkg.packageNumber);
 
-    const payment = await prisma.payment.findFirst({ where: { orderId } });
+    const payment = await latestPaymentOfOrder(orderId);
     expect(payment!.status).toBe(PaymentStatus.refunded);
   });
 
@@ -179,7 +148,9 @@ describe("Refund flow (E2E)", () => {
       quantity: 1,
     });
     const addr = await createAddress({ userId: buyer.id });
-    await createAddress({ userId: seller.id });
+    // A distinct seller address, so the direction check below can fail: the
+    // factory default is the same street for every user.
+    await createAddress({ userId: seller.id, address: "Satıcı Sok. No:2" });
 
     const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
     const prisma = getPrisma();
@@ -246,8 +217,8 @@ describe("Refund flow (E2E)", () => {
     );
     expect(returnCall).toBeDefined();
     expect(returnCall!.isReturn).toBe(true);
-    expect(returnCall!.sender.address).toBeTruthy();
-    expect(returnCall!.sender.address).not.toBe(returnCall!.recipient.address);
+    expect(returnCall!.sender.address).toContain("Atatürk Cad. No:1"); // buyer
+    expect(returnCall!.recipient.address).toContain("Satıcı Sok. No:2"); // seller
   });
 
   it("14-day cooling-off (delivered, ≤14 days) → return shipment opens immediately, no seller approval needed", async () => {
@@ -363,11 +334,7 @@ describe("Refund flow (E2E)", () => {
     });
     const addr = await createAddress({ userId: buyer.id });
 
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: addr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
 
     const res = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${buyRes.body.orderId}/refund-requests`)
@@ -545,85 +512,9 @@ describe("Refund flow (E2E)", () => {
     expect(payouts).toHaveLength(0);
   });
 
-  // ── C. Admin politika & kargo ödeyeni ──────────────────────────────────
-  async function setupWaitForDeliveryRefund() {
-    const buyer = await createUser(ctx.module);
-    const seller = await createUser(ctx.module, { isSeller: true });
-    const product = await createProduct({
-      sellerId: seller.id,
-      categoryId: baseline.categoryId,
-      price: 300,
-      quantity: 1,
-    });
-    const addr = await createAddress({ userId: buyer.id });
-    await createAddress({ userId: seller.id });
-    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
-    const prisma = getPrisma();
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.shipped },
-    });
-    await prisma.shipment.update({
-      where: { orderId },
-      data: {
-        status: ShipmentStatus.in_transit,
-        trackingNumber: "TRK-C",
-        providerTrackingId: "TRK-C",
-      },
-    });
-    const createRes = await request(ctx.app.getHttpServer())
-      .post(`/api/orders/${orderId}/refund-requests`)
-      .set(authHeader(buyer))
-      .send({ reason: "changed_mind" })
-      .expect(201);
-    return { buyer, orderId, refundId: createRes.body.id as string };
-  }
-
-  it("C3: admin override-policy ürün-only seçince iade tutarı = total - shipping - buyerFee olarak yeniden hesaplanır", async () => {
-    const { orderId, refundId } = await setupWaitForDeliveryRefund();
-    const admin = await createAdminUser(ctx.module);
-    const prisma = getPrisma();
-
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
-    const expected =
-      Number(order!.totalAmount) -
-      Number(order!.shippingCost) -
-      Number(order!.buyerFeeAmount);
-
-    await request(ctx.app.getHttpServer())
-      .patch(`/api/admin/refund-requests/${refundId}/override-policy`)
-      .set(authHeader(admin))
-      .send({
-        refundProductAmount: true,
-        refundShippingFee: false,
-        refundBuyerFee: false,
-        refundSellerCommission: false,
-      })
-      .expect(200);
-
-    const rr = await prisma.refundRequest.findUnique({
-      where: { id: refundId },
-    });
-    expect(Number(rr!.amount)).toBeCloseTo(expected, 2);
-    expect(Number(rr!.amount)).toBeLessThan(Number(order!.totalAmount));
-  });
-
-  it("C6: admin set-shipping-payer iade kargo tarafını günceller (seller)", async () => {
-    const { refundId } = await setupWaitForDeliveryRefund();
-    const admin = await createAdminUser(ctx.module);
-    const prisma = getPrisma();
-
-    await request(ctx.app.getHttpServer())
-      .patch(`/api/admin/refund-requests/${refundId}/set-shipping-payer`)
-      .set(authHeader(admin))
-      .send({ payer: "seller" })
-      .expect(200);
-
-    const rr = await prisma.refundRequest.findUnique({
-      where: { id: refundId },
-    });
-    expect(rr!.returnShippingPayer).toBe("seller");
-  });
+  // C3/C6 (admin override-policy, set-shipping-payer) were removed with
+  // their endpoints in ead37893b: one decision flow remains,
+  // decision-preview + approve (component-based policy).
 
   // ── Liste yanıtı iade durumunu yansıtır (sipariş listesi ↔ detay tutarlılığı) ──
   it("LIST: teslim edilmiş siparişte aktif iade açıksa GET /orders yanıtı activeRefundRequest döner", async () => {
@@ -742,7 +633,7 @@ describe("Refund flow (E2E)", () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: "vazgeçtim" })
+      .send({ reasonCode: "changed_mind", reason: "vazgeçtim" })
       .expect(200);
 
     const paymentService = ctx.app.get(PaymentService);
@@ -888,14 +779,24 @@ describe("Refund flow (E2E)", () => {
     rr = await prisma.refundRequest.findUnique({ where: { id: refundId } });
     expect(rr!.status).toBe(RefundRequestStatus.return_delivered);
 
-    // B5: 30dk dolmadan finalize listesinde YOK
+    // B5: not in the finalize list before the inspection window ends
     const early = await refundService.findReturnDeliveredPendingFinalize();
     expect(early).not.toContain(refundId);
 
-    // returnDeliveredAt'i 31 dk geçmişe çek → finalize fallback devreye girsin
+    // Push returnDeliveredAt past the inspection window so finalize is due.
+    // The window is the returnInspectionHours rule (default 24 h) since
+    // 1ded7dcba, no longer a fixed 30 minutes.
+    const inspectionHours = await resolveTimingValue(
+      prisma as any,
+      "returnInspectionHours",
+    );
     await prisma.refundRequest.update({
       where: { id: refundId },
-      data: { returnDeliveredAt: new Date(Date.now() - 31 * 60 * 1000) },
+      data: {
+        returnDeliveredAt: new Date(
+          Date.now() - (inspectionHours * 60 + 1) * 60 * 1000,
+        ),
+      },
     });
     const due = await refundService.findReturnDeliveredPendingFinalize();
     expect(due).toContain(refundId);
@@ -964,7 +865,11 @@ describe("Refund flow (E2E)", () => {
   });
 
   // ── F. Sipariş iptali → iade ────────────────────────────────────────────
-  it("F2: paid sipariş iptali → status=refunded; processRefundedOrders cron PayTR iadesi yapar + order=cancelled", async () => {
+  // Since c418e44f2 (enforce refund settlement policies) a buyer cancel of a
+  // paid order is an instant refund through a refund request (fixed
+  // idempotency key per request); it no longer parks the order in `refunded`
+  // for the processRefundedOrders cron.
+  it("F2: paid sipariş iptali → anında PayTR iadesi, order=cancelled; cron ikinci iade yapmaz", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -979,34 +884,29 @@ describe("Refund flow (E2E)", () => {
     const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
     const prisma = getPrisma();
 
-    // İptal: paid → refunded (PayTR çağrısı henüz YAPILMAZ, cron'a bırakılır)
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: "vazgeçtim" })
+      .send({ reasonCode: "changed_mind", reason: "vazgeçtim" })
       .expect(200);
 
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
     const afterCancel = await prisma.order.findUnique({
       where: { id: orderId },
     });
-    expect(afterCancel!.status).toBe(OrderStatus.refunded);
-    expect(ctx.paytr.refundCalls).toHaveLength(0);
-
-    // Cron: refunded + payment.completed siparişleri bulup PayTR iadesini yapar
-    const paymentService = ctx.app.get(PaymentService);
-    const res = await paymentService.processRefundedOrders();
-    expect(res.refunded).toBeGreaterThanOrEqual(1);
-
-    expect(ctx.paytr.refundCalls).toHaveLength(1);
-    const finalOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-    });
-    expect(finalOrder!.status).toBe(OrderStatus.cancelled);
-    const payment = await prisma.payment.findFirst({ where: { orderId } });
+    expect(afterCancel!.status).toBe(OrderStatus.cancelled);
+    const payment = await latestPaymentOfOrder(orderId);
     expect(payment!.status).toBe(PaymentStatus.refunded);
+    const rr = await prisma.refundRequest.findFirst({ where: { orderId } });
+    expect(rr!.status).toBe(RefundRequestStatus.refunded);
+
+    // The legacy cron finds nothing left to refund: no second PayTR refund.
+    const paymentService = ctx.app.get(PaymentService);
+    await paymentService.processRefundedOrders();
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
   });
 
-  it("F4: PayTR iadesi başarısızsa sipariş refunded kalır; sonraki cron turu retry edip tamamlar", async () => {
+  it("F4: PayTR iadeyi reddederse iptal başarısız olur; para iade edilmiş sayılmaz, talep finans incelemesine düşer", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -1020,35 +920,27 @@ describe("Refund flow (E2E)", () => {
 
     const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
     const prisma = getPrisma();
+    const before = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
 
+    ctx.paytr.nextRefundFails = true;
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: "vazgeçtim" })
-      .expect(200);
+      .send({ reasonCode: "changed_mind", reason: "vazgeçtim" })
+      .expect(400);
 
-    const paymentService = ctx.app.get(PaymentService);
-
-    // 1. tur: PayTR iadesi başarısız → order refunded'da kalır, payment iade EDİLMEZ
-    ctx.paytr.nextRefundFails = true;
-    const first = await paymentService.processRefundedOrders();
-    expect(first.failed).toBeGreaterThanOrEqual(1);
-
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+    // No money moved: the order is not closed and the payment not refunded.
     const afterFail = await prisma.order.findUnique({ where: { id: orderId } });
-    expect(afterFail!.status).toBe(OrderStatus.refunded); // henüz cancelled değil
-    const payAfterFail = await prisma.payment.findFirst({ where: { orderId } });
-    expect(payAfterFail!.status).not.toBe(PaymentStatus.refunded);
-
-    // 2. tur: retry başarılı → PayTR iade yapılır, order cancelled, payment refunded
-    const second = await paymentService.processRefundedOrders();
-    expect(second.refunded).toBeGreaterThanOrEqual(1);
-
-    const finalOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-    });
-    expect(finalOrder!.status).toBe(OrderStatus.cancelled);
-    const finalPay = await prisma.payment.findFirst({ where: { orderId } });
-    expect(finalPay!.status).toBe(PaymentStatus.refunded);
+    expect(afterFail!.status).toBe(before.status);
+    const payAfterFail = await latestPaymentOfOrder(orderId);
+    expect(payAfterFail!.status).toBe(PaymentStatus.completed);
+    // A person decides: the request waits for financial review.
+    const rr = await prisma.refundRequest.findFirst({ where: { orderId } });
+    expect(rr!.status).toBe(RefundRequestStatus.pending_review);
+    expect(rr!.financialReviewRequired).toBe(true);
   });
 
   it("F3: kargoya verildikten (shipped) sonra sipariş iptali reddedilir (400)", async () => {
@@ -1074,7 +966,10 @@ describe("Refund flow (E2E)", () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: "vazgeçtim" })
-      .expect(400);
+      .send({ reasonCode: "changed_mind", reason: "vazgeçtim" })
+      .expect(400)
+      .expect((res) =>
+        expect(res.body.i18nKey).toBe("server.order.cannotCancelShipped"),
+      );
   });
 });

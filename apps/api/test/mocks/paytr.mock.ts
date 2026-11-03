@@ -10,6 +10,7 @@ import type {
   PayTRStatusInquiryResult,
 } from "../../src/modules/payment-providers/paytr/paytr.service";
 import { PaymentProviderRegistry } from "../../src/modules/payment-providers/payment-provider.registry";
+import { ProviderRefundRejectedException } from "../../src/modules/payment-providers/refund-errors";
 
 /**
  * In-memory PayTR mock for E2E tests.
@@ -78,9 +79,20 @@ export class MockPayTRService {
     transferIban: string;
   }> = [];
   public readonly queryResults = new Map<string, PayTRStatusInquiryResult>();
-  /** Set to true to make next createPlatformTransfer return error */
-  public nextTransferFails = false;
-  /** Set to true to make next createRefund throw (gerçek PayTRService gibi) — retry testleri için */
+  /**
+   * Makes the next createPlatformTransfer answer `status: "error"`. `true`
+   * sends a generic rejection (err_no 099), which the payout service treats
+   * as final; pass the PayTR answer to send another one (err_no 010, "more
+   * than the remaining amount", is the only retried rejection since
+   * feff505a9).
+   */
+  public nextTransferFails: boolean | { err_no: string; err_msg: string } =
+    false;
+  /**
+   * Set to true to make the next createRefund fail the way the real
+   * PayTRService does when PayTR refuses a refund: it throws
+   * ProviderRefundRejectedException (no money moved, retryable).
+   */
   public nextRefundFails = false;
 
   // ── CAPI / recurring (kart saklama) mock durumu ──
@@ -250,8 +262,10 @@ export class MockPayTRService {
     });
     if (this.nextRefundFails) {
       this.nextRefundFails = false;
-      // Gerçek PayTRService non-success'te throw eder; mock da aynısını yapsın.
-      throw new Error("Mock refund failure");
+      // Same contract as the real PayTRService since 9d29eb51e: a refused
+      // refund throws ProviderRefundRejectedException. A plain Error reads
+      // as an unknown outcome and sends the attempt to manual review.
+      throw new ProviderRefundRejectedException("Mock refund failure");
     }
     return { status: "success", mock: true };
   }
@@ -274,12 +288,12 @@ export class MockPayTRService {
   }): Promise<{ status: string; err_no?: string; err_msg?: string }> {
     this.transferCalls.push(params);
     if (this.nextTransferFails) {
+      const failure =
+        this.nextTransferFails === true
+          ? { err_no: "099", err_msg: "Mock transfer failure" }
+          : this.nextTransferFails;
       this.nextTransferFails = false;
-      return {
-        status: "error",
-        err_no: "099",
-        err_msg: "Mock transfer failure",
-      };
+      return { status: "error", ...failure };
     }
     return { status: "success" };
   }
