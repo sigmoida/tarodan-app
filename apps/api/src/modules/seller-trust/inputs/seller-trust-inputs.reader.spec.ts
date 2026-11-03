@@ -97,11 +97,7 @@ describe("SellerTrustInputsReader", () => {
 
   it("unions sellers (volume window plus a 30-day margin) and traders, deduplicated and sorted", async () => {
     const t = build();
-    const ids = await t.reader.candidateIds(
-      t.txc,
-      asOf,
-      t.reader.windowsAt(asOf),
-    );
+    const ids = await t.reader.candidateIds(t.txc, asOf);
     expect(ids).toEqual(["both", "s1", "s2", "t1"]);
     expect(t.orderStats.activeSellerIds).toHaveBeenCalledWith(
       t.txc,
@@ -123,7 +119,7 @@ describe("SellerTrustInputsReader", () => {
     const t = build();
     const windows = t.reader.windowsAt(asOf);
 
-    await t.reader.readInputs(t.txc, ["s1", "s2", "x"], asOf, windows, "g");
+    await t.reader.readInputs(t.txc, ["s1", "s2", "x"], asOf, "g");
 
     expect(t.calls).toEqual([
       "trustEligibleUsers",
@@ -167,8 +163,9 @@ describe("SellerTrustInputsReader", () => {
       eligibleIds,
       windows.rating,
     );
-    // The caller owns the snapshot: the reader opens nothing and runs no
-    // statement of its own.
+    // The caller owns the snapshot: the reader itself opens no transaction
+    // and runs no statement on the tx (the domain reads are mocked here; the
+    // e2e proves the real ones run in the caller's snapshot).
     expect(t.tx.$transaction).not.toHaveBeenCalled();
     expect(t.tx.$executeRaw).not.toHaveBeenCalled();
     expect(t.tx.$queryRaw).not.toHaveBeenCalled();
@@ -176,13 +173,7 @@ describe("SellerTrustInputsReader", () => {
 
   it("joins the rows into formula inputs, one per eligible user, in eligible order", async () => {
     const t = build();
-    const out = await t.reader.readInputs(
-      t.txc,
-      ["s1", "s2"],
-      asOf,
-      t.reader.windowsAt(asOf),
-      null,
-    );
+    const out = await t.reader.readInputs(t.txc, ["s1", "s2"], asOf, null);
     expect(out).toEqual([
       {
         userId: "s1",
@@ -220,13 +211,7 @@ describe("SellerTrustInputsReader", () => {
     const t = build();
     t.userStats.trustEligibleUsers.mockResolvedValue([]);
 
-    const out = await t.reader.readInputs(
-      t.txc,
-      ["banned"],
-      asOf,
-      t.reader.windowsAt(asOf),
-      null,
-    );
+    const out = await t.reader.readInputs(t.txc, ["banned"], asOf, null);
 
     expect(out).toEqual([]);
     expect(t.refundStats.sellerFaultOrderIds).not.toHaveBeenCalled();

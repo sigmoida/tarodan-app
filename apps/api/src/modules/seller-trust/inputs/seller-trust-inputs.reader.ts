@@ -39,6 +39,8 @@ export interface TrustWindows {
  *
  * It never opens a transaction: the caller passes the read-only snapshot
  * (`inReadOnlySnapshot`) and owns its limits, and every method here only reads.
+ * Every read takes one `asOf` and derives its windows from it, so tenure and
+ * the windows can never end at different instants.
  */
 @Injectable()
 export class SellerTrustInputsReader {
@@ -67,8 +69,8 @@ export class SellerTrustInputsReader {
   async candidateIds(
     tx: Prisma.TransactionClient,
     asOf: Date,
-    windows: TrustWindows,
   ): Promise<string[]> {
+    const windows = this.windowsAt(asOf);
     const sellers = await this.orderStats.activeSellerIds(
       tx,
       statsWindowEndingAt(asOf, F.windows.volumeDays + CANDIDATE_MARGIN_DAYS)
@@ -95,9 +97,9 @@ export class SellerTrustInputsReader {
     tx: Prisma.TransactionClient,
     ids: string[],
     asOf: Date,
-    windows: TrustWindows,
     guestBuyerId: string | null,
   ): Promise<AssembledTrustInputs[]> {
+    const windows = this.windowsAt(asOf);
     const eligible = await this.userStats.trustEligibleUsers(tx, ids);
     const userIds = eligible.map((u) => u.id);
     if (userIds.length === 0) return [];
