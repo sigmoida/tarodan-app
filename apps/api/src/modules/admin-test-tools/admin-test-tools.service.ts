@@ -10,7 +10,10 @@ import { PrismaService } from "../../prisma";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
 import { PaymentHoldStatus } from "@prisma/client";
-import { appEnv, isLiveProduction, nodeEnv } from "../../config/environment";
+import {
+  deploymentEnvironment,
+  isLiveProduction,
+} from "../../config/environment";
 import { resolveTimingValue } from "../../common/timing-rules";
 import { escrowReleaseAt } from "../order/helpers/order-return-window";
 import { i18nMessage } from "../i18n";
@@ -61,13 +64,12 @@ export class AdminTestToolsService {
 
   // ─────────────────────────── Ortam ───────────────────────────
   /**
-   * `isProd` = CANLI dağıtım. Staging de NODE_ENV=production koşar; eskiden
-   * burada PROD görünüyor ve UAT ekranında yanlış uyarı veriyordu. Ad dağıtımı
-   * (APP_ENV) gösterir, yoksa çalışma modunu.
+   * `isProd` is the LIVE deployment. Staging also runs NODE_ENV=production;
+   * it used to show as PROD here, with a false warning on the UAT screen. The
+   * name is the deployment (APP_ENV), else the run mode.
    */
   getEnvironment(): { env: string; isProd: boolean } {
-    const env = appEnv() ?? nodeEnv() ?? "development";
-    return { env, isProd: isLiveProduction() };
+    return deploymentEnvironment();
   }
 
   // ─────────────────────────── Cron'lar ───────────────────────────

@@ -1,4 +1,9 @@
-import { appEnv, isLiveDeployment, isLiveProduction } from "./environment";
+import {
+  appEnv,
+  deploymentEnvironment,
+  isLiveDeployment,
+  isLiveProduction,
+} from "./environment";
 
 /**
  * Staging, canlıyla AYNI optimize build'i koşar (NODE_ENV=production); ikisini
@@ -46,6 +51,21 @@ describe("deployment predicates", () => {
   it("normalizes a blank APP_ENV to undefined", () => {
     setEnv("development", "  ");
     expect(appEnv()).toBeUndefined();
+  });
+
+  it("names the deployment for staff badges, live only on production", () => {
+    setEnv("production", "staging");
+    expect(deploymentEnvironment()).toEqual({ env: "staging", isProd: false });
+    setEnv("production", "production");
+    expect(deploymentEnvironment()).toEqual({
+      env: "production",
+      isProd: true,
+    });
+    setEnv("development", undefined);
+    expect(deploymentEnvironment()).toEqual({
+      env: "development",
+      isProd: false,
+    });
   });
 });
 

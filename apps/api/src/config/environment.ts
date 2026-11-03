@@ -69,3 +69,15 @@ export function isLiveDeployment(
     nodeEnvValue?.trim() === "production" && appEnvValue?.trim() !== "staging"
   );
 }
+
+/**
+ * The deployment as staff tools show it: its name (`APP_ENV`, else the run
+ * mode) and whether it is the live marketplace. One rule for every admin
+ * environment badge (test tools, the seller trust lab).
+ */
+export function deploymentEnvironment(): { env: string; isProd: boolean } {
+  return {
+    env: appEnv() ?? nodeEnv() ?? "development",
+    isProd: isLiveProduction(),
+  };
+}
