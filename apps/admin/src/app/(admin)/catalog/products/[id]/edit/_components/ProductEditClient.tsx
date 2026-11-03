@@ -142,6 +142,13 @@ export default function ProductEditClient({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record, id]);
 
+  /**
+   * One PATCH per save. RHF validates asynchronously, so a second click or
+   * Enter during validation reaches `onSubmit` before `save.isPending` has
+   * re-rendered the button disabled; every closure still sees `false`. The
+   * ref flips synchronously and is cleared when the request settles.
+   */
+  const savingRef = useRef(false);
   const save = useAdminMutation(
     (values: EditListingValues) =>
       adminApi.updateProduct(id, buildListingUpdatePayload(values, saleData)),
@@ -149,6 +156,11 @@ export default function ProductEditClient({ id }: { id: string }) {
       invalidates: ["products"],
       successMessage: t("admin.catalog.products.updated"),
       onSuccess: () => router.push(`/catalog/products/${id}`),
+      mutation: {
+        onSettled: () => {
+          savingRef.current = false;
+        },
+      },
     },
   );
 
@@ -235,11 +247,12 @@ export default function ProductEditClient({ id }: { id: string }) {
       <Form
         form={form}
         onSubmit={(values: EditListingValues) => {
-          if (submitBlocker) return;
+          if (savingRef.current || submitBlocker) return;
           if (salePriceError) {
             setShowDiscountSection(true);
             return;
           }
+          savingRef.current = true;
           save.mutate(values);
         }}
         className="space-y-4"
