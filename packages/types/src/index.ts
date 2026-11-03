@@ -192,6 +192,10 @@ export * from "./sign-in-methods";
 // (API, web, admin, mobile)
 export * from "./seller-trust";
 
+// Seller trust lab: formula inputs, candidate parameters, their limits and
+// validator, the explanation (API and admin only; mobile does not vendor it)
+export * from "./seller-trust-lab";
+
 // Product search: the GET /products price filter bound (API, web, mobile)
 export * from "./product-search";
 
