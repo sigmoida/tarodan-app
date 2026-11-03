@@ -2,8 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
-  Delete,
   Body,
   Param,
   Query,
@@ -13,7 +11,6 @@ import {
   Req,
   UnauthorizedException,
   Logger,
-  GoneException,
   BadRequestException,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";

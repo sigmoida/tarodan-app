@@ -2,8 +2,14 @@ import { BadRequestException } from "@nestjs/common";
 import { AdminSettingsService } from "./admin-settings.service";
 
 describe("AdminSettingsService warehouse address", () => {
-  let prisma: any;
-  let audit: any;
+  let prisma: {
+    platformSetting: Record<"findUnique" | "upsert", jest.Mock>;
+    address: Record<"findUnique" | "create" | "update", jest.Mock>;
+    user: { findFirst: jest.Mock };
+    adminUser: { findFirst: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let audit: { createAuditLog: jest.Mock };
   let service: AdminSettingsService;
 
   const dto = {
@@ -28,12 +34,16 @@ describe("AdminSettingsService warehouse address", () => {
       },
       user: { findFirst: jest.fn() },
       adminUser: { findFirst: jest.fn().mockResolvedValue({ id: "admin-1" }) },
-      $transaction: jest.fn((fn: any) => fn(prisma)),
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
     audit = { createAuditLog: jest.fn() };
-    service = new AdminSettingsService(prisma, audit, {
-      get: jest.fn(),
-    } as any);
+    service = new AdminSettingsService(
+      prisma as never,
+      audit as never,
+      {
+        get: jest.fn(),
+      } as never,
+    );
   });
 
   it("returns null when the warehouse_address_id setting is unset", async () => {
@@ -125,22 +135,25 @@ describe("AdminSettingsService warehouse address", () => {
  */
 describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
   const makeService = () => {
-    const prisma: any = {
+    const prisma = {
+      $transaction: jest.fn(),
       platformSetting: {
         findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn().mockResolvedValue({ id: "s1" }),
       },
       adminUser: { findFirst: jest.fn().mockResolvedValue({ id: "admin-1" }) },
     };
-    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
+    prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn(prisma),
+    );
     const audit = { createAuditLog: jest.fn() };
     return {
       service: new AdminSettingsService(
-        prisma as any,
-        audit as any,
+        prisma as never,
+        audit as never,
         {
           get: jest.fn(),
-        } as any,
+        } as never,
       ),
       prisma,
     };
@@ -217,7 +230,8 @@ describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
  */
 describe("AdminSettingsService — public price limits", () => {
   const makeService = (limits: Record<string, string | undefined>) => {
-    const prisma: any = {
+    const prisma = {
+      $transaction: jest.fn(),
       platformSetting: {
         // Genel ayarlar TEK sorguda gelir; sınır satırları da bu listededir.
         findMany: jest.fn().mockResolvedValue([
@@ -234,15 +248,17 @@ describe("AdminSettingsService — public price limits", () => {
       },
       adminUser: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
+    prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn(prisma),
+    );
     return {
       service: new AdminSettingsService(
-        prisma as any,
+        prisma as never,
         {
           createAuditLog: jest.fn(),
-        } as any,
+        } as never,
         // MIN_OFFER_PERCENTAGE yok → varsayılan %50.
-        { get: jest.fn() } as any,
+        { get: jest.fn() } as never,
       ),
       prisma,
     };
@@ -389,7 +405,8 @@ describe("AdminSettingsService — public price limits", () => {
  */
 describe("AdminSettingsService.getPublicSettings — min_offer_percentage", () => {
   const makeService = (env: Record<string, string>) => {
-    const prisma: any = {
+    const prisma = {
+      $transaction: jest.fn(),
       platformSetting: {
         findMany: jest
           .fn()
@@ -399,7 +416,11 @@ describe("AdminSettingsService.getPublicSettings — min_offer_percentage", () =
       },
     };
     const config = { get: jest.fn((key: string) => env[key]) };
-    return new AdminSettingsService(prisma, {} as any, config as any);
+    return new AdminSettingsService(
+      prisma as never,
+      {} as never,
+      config as never,
+    );
   };
 
   it("env yoksa varsayılan %50", async () => {
