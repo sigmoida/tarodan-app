@@ -1,16 +1,17 @@
-import * as request from 'supertest';
-import { PaymentStatus, OrderStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { buyNow } from "../factories/flows";
 
 async function buyAndInitiate(
   ctx: E2ETestApp,
@@ -18,15 +19,13 @@ async function buyAndInitiate(
   productId: string,
   shippingAddressId: string,
 ): Promise<{ orderId: string; paymentId: string }> {
-  const buyRes = await request(ctx.app.getHttpServer())
-    .post('/api/orders/buy')
-    .set(authHeader(buyer))
-    .send({ productId, shippingAddressId })
-    .expect(201);
+  const buyRes = await buyNow(ctx, buyer, productId, shippingAddressId).expect(
+    201,
+  );
 
   // Direct API form hazırlığı merchant_oid'i atar; kart alanları API'ye gelmez.
   const payRes = await request(ctx.app.getHttpServer())
-    .post('/api/payments/direct-form')
+    .post("/api/payments/direct-form")
     .set(authHeader(buyer))
     .send({ orderId: buyRes.body.orderId })
     .expect(201);
@@ -34,7 +33,7 @@ async function buyAndInitiate(
   return { orderId: buyRes.body.orderId, paymentId: payRes.body.paymentId };
 }
 
-describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
+describe("Payment misc endpoints (cancel/verify/confirm-failed) (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -57,8 +56,8 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
   // POST /api/payments/:id/cancel
   // ============================================================================
 
-  describe('POST /api/payments/:id/cancel', () => {
-    it('cancels a pending payment and releases the reservation', async () => {
+  describe("POST /api/payments/:id/cancel", () => {
+    it("cancels a pending payment and releases the reservation", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -69,7 +68,12 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const { paymentId, orderId } = await buyAndInitiate(ctx, buyer, product.id, addr.id);
+      const { paymentId, orderId } = await buyAndInitiate(
+        ctx,
+        buyer,
+        product.id,
+        addr.id,
+      );
       const prisma = getPrisma();
 
       await request(ctx.app.getHttpServer())
@@ -78,7 +82,9 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
         .expect(201)
         .then((r) => expect(r.body.success).toBe(true));
 
-      const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+      });
       expect(payment!.status).toBe(PaymentStatus.failed);
 
       // Stock should be released
@@ -92,7 +98,7 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       expect(order!.status).not.toBe(OrderStatus.pending_payment);
     });
 
-    it('forbids stranger from cancelling someone else\'s payment (403)', async () => {
+    it("forbids stranger from cancelling someone else's payment (403)", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const stranger = await createUser(ctx.module);
@@ -104,7 +110,12 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const { paymentId } = await buyAndInitiate(ctx, buyer, product.id, addr.id);
+      const { paymentId } = await buyAndInitiate(
+        ctx,
+        buyer,
+        product.id,
+        addr.id,
+      );
 
       await request(ctx.app.getHttpServer())
         .post(`/api/payments/${paymentId}/cancel`)
@@ -112,7 +123,7 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
         .expect(403);
     });
 
-    it('rejects cancel on already-completed payment (400)', async () => {
+    it("rejects cancel on already-completed payment (400)", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -123,17 +134,24 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const { paymentId } = await buyAndInitiate(ctx, buyer, product.id, addr.id);
+      const { paymentId } = await buyAndInitiate(
+        ctx,
+        buyer,
+        product.id,
+        addr.id,
+      );
       const prisma = getPrisma();
 
       // Force complete the payment
-      const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(
           signCallback({
             merchantOid: payment!.providerConversationId!,
-            status: 'success',
+            status: "success",
             totalAmount: Math.round(Number(payment!.amount) * 100),
           }),
         );
@@ -144,9 +162,9 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
         .expect(400);
     });
 
-    it('rejects unauthenticated cancel (401)', async () => {
+    it("rejects unauthenticated cancel (401)", async () => {
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/some-fake-id/cancel')
+        .post("/api/payments/some-fake-id/cancel")
         .expect(401);
     });
   });
@@ -155,8 +173,8 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
   // POST /api/payments/:id/confirm-failed (public)
   // ============================================================================
 
-  describe('POST /api/payments/:id/confirm-failed', () => {
-    it('releases reservation when payment is still pending', async () => {
+  describe("POST /api/payments/:id/confirm-failed", () => {
+    it("releases reservation when payment is still pending", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -166,7 +184,12 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
         quantity: 1,
       });
       const addr = await createAddress({ userId: buyer.id });
-      const { paymentId } = await buyAndInitiate(ctx, buyer, product.id, addr.id);
+      const { paymentId } = await buyAndInitiate(
+        ctx,
+        buyer,
+        product.id,
+        addr.id,
+      );
 
       const res = await request(ctx.app.getHttpServer())
         .post(`/api/payments/${paymentId}/confirm-failed`)
@@ -179,7 +202,7 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       expect(refreshedProduct!.reservedQuantity).toBe(0);
     });
 
-    it('is idempotent on already-completed payment (released=false)', async () => {
+    it("is idempotent on already-completed payment (released=false)", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -190,15 +213,22 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const { paymentId } = await buyAndInitiate(ctx, buyer, product.id, addr.id);
+      const { paymentId } = await buyAndInitiate(
+        ctx,
+        buyer,
+        product.id,
+        addr.id,
+      );
       const prisma = getPrisma();
-      const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(
           signCallback({
             merchantOid: payment!.providerConversationId!,
-            status: 'success',
+            status: "success",
             totalAmount: Math.round(Number(payment!.amount) * 100),
           }),
         );
@@ -214,8 +244,8 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
   // POST /api/payments/:id/verify (public)
   // ============================================================================
 
-  describe('POST /api/payments/:id/verify', () => {
-    it('returns completed=true when payment already finished', async () => {
+  describe("POST /api/payments/:id/verify", () => {
+    it("returns completed=true when payment already finished", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -226,15 +256,22 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const { paymentId } = await buyAndInitiate(ctx, buyer, product.id, addr.id);
+      const { paymentId } = await buyAndInitiate(
+        ctx,
+        buyer,
+        product.id,
+        addr.id,
+      );
       const prisma = getPrisma();
-      const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(
           signCallback({
             merchantOid: payment!.providerConversationId!,
-            status: 'success',
+            status: "success",
             totalAmount: Math.round(Number(payment!.amount) * 100),
           }),
         );
@@ -243,7 +280,7 @@ describe('Payment misc endpoints (cancel/verify/confirm-failed) (E2E)', () => {
         .post(`/api/payments/${paymentId}/verify`)
         .expect(201);
       expect(res.body.completed).toBe(true);
-      expect(['completed', 'already_completed']).toContain(res.body.status);
+      expect(["completed", "already_completed"]).toContain(res.body.status);
     });
   });
 });

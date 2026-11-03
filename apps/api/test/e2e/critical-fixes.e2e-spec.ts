@@ -24,6 +24,7 @@ import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { PayoutService } from "../../src/modules/payout/payout.service";
 import { TradeService } from "../../src/modules/trade/trade.service";
+import { buyNow, latestPaymentOfOrder } from "../factories/flows";
 
 /**
  * Wave 1 — Kritik para güvenliği regresyon testleri (K1, K2, K3).
@@ -78,11 +79,7 @@ describe("Critical money fixes (E2E)", () => {
       });
     }
 
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: addr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
 
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
@@ -90,9 +87,7 @@ describe("Critical money fixes (E2E)", () => {
       .send({ orderId: buyRes.body.orderId, provider: "paytr" })
       .expect(201);
 
-    const payment = await prisma.payment.findFirst({
-      where: { orderId: buyRes.body.orderId },
-    });
+    const payment = await latestPaymentOfOrder(buyRes.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(
@@ -347,19 +342,13 @@ describe("Critical money fixes (E2E)", () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
 
       // Valid hash, but half the expected amount.
       await request(ctx.app.getHttpServer())
@@ -410,20 +399,14 @@ describe("Critical money fixes (E2E)", () => {
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       const oldOid = payment!.providerConversationId!;
       // Simulate a re-init: providerConversationId moves to a new oid; old one kept in history.
       const newOid = `${oldOid}T999999`;

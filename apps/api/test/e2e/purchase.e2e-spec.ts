@@ -1,19 +1,20 @@
-import * as request from 'supertest';
-import { OrderStatus, PaymentStatus, PaymentHoldStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { OrderStatus, PaymentStatus, PaymentHoldStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { PaymentService } from '../../src/modules/payment/payment.service';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { PaymentService } from "../../src/modules/payment/payment.service";
+import { buyNow, latestPaymentOfOrder } from "../factories/flows";
 
-describe('Purchase Flow (E2E)', () => {
+describe("Purchase Flow (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -32,11 +33,11 @@ describe('Purchase Flow (E2E)', () => {
     ctx.paytr.reset();
   });
 
-  describe('POST /api/orders/buy — Direct Buy Now', () => {
-    it('creates a pending_payment order and reserves the product stock', async () => {
-      const buyer = await createUser(ctx.module, { displayName: 'Buyer' });
+  describe("POST /api/orders/buy — Direct Buy Now", () => {
+    it("creates a pending_payment order and reserves the product stock", async () => {
+      const buyer = await createUser(ctx.module, { displayName: "Buyer" });
       const seller = await createUser(ctx.module, {
-        displayName: 'Seller',
+        displayName: "Seller",
         isSeller: true,
       });
       const product = await createProduct({
@@ -47,19 +48,12 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const res = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({
-          productId: product.id,
-          shippingAddressId: address.id,
-        })
-        .expect(201);
+      const res = await buyNow(ctx, buyer, product.id, address.id).expect(201);
 
       expect(res.body).toMatchObject({
         orderId: expect.any(String),
         orderNumber: expect.any(String),
-        provider: 'paytr',
+        provider: "paytr",
       });
       expect(Number(res.body.totalAmount)).toBeGreaterThan(0);
 
@@ -80,7 +74,7 @@ describe('Purchase Flow (E2E)', () => {
       expect(refreshed?.reservedQuantity).toBe(1);
     });
 
-    it('returns 400 when product is out of stock', async () => {
+    it("returns 400 when product is out of stock", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -90,14 +84,10 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(400);
+      await buyNow(ctx, buyer, product.id, address.id).expect(400);
     });
 
-    it('returns 403 when buyer tries to buy own product', async () => {
+    it("returns 403 when buyer tries to buy own product", async () => {
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
         sellerId: seller.id,
@@ -105,14 +95,10 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: seller.id });
 
-      await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(seller))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(403);
+      await buyNow(ctx, seller, product.id, address.id).expect(403);
     });
 
-    it('returns the existing pending order on retry rather than duplicating', async () => {
+    it("returns the existing pending order on retry rather than duplicating", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -122,17 +108,13 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const first = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const first = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
-      const second = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const second = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
       expect(second.body.orderId).toBe(first.body.orderId);
 
@@ -144,11 +126,13 @@ describe('Purchase Flow (E2E)', () => {
     });
   });
 
-  describe('Full purchase lifecycle: buy → pay → prepare → confirm → hold release', () => {
-    it('walks an order from pending_payment to completed and releases the seller hold', async () => {
-      const buyer = await createUser(ctx.module, { displayName: 'Lifecycle Buyer' });
+  describe("Full purchase lifecycle: buy → pay → prepare → confirm → hold release", () => {
+    it("walks an order from pending_payment to completed and releases the seller hold", async () => {
+      const buyer = await createUser(ctx.module, {
+        displayName: "Lifecycle Buyer",
+      });
       const seller = await createUser(ctx.module, {
-        displayName: 'Lifecycle Seller',
+        displayName: "Lifecycle Seller",
         isSeller: true,
       });
       const product = await createProduct({
@@ -160,29 +144,24 @@ describe('Purchase Flow (E2E)', () => {
       const address = await createAddress({ userId: buyer.id });
 
       // 1) directBuy → pending_payment
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
       const orderId: string = buyRes.body.orderId;
       const totalAmount: number = Number(buyRes.body.totalAmount);
       expect(totalAmount).toBeGreaterThan(0);
 
       // 2) initiate payment → Payment row created with status=pending
       const initRes = await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId, provider: 'paytr' })
+        .send({ orderId, provider: "paytr" })
         .expect(201);
-      expect(initRes.body.provider).toBe('paytr');
+      expect(initRes.body.provider).toBe("paytr");
       expect(initRes.body.paymentId).toBeTruthy();
 
       const prisma = getPrisma();
-      const paymentBefore = await prisma.payment.findFirst({
-        where: { orderId },
-        orderBy: { createdAt: 'desc' },
-      });
+      const paymentBefore = await latestPaymentOfOrder(orderId);
       expect(paymentBefore?.status).toBe(PaymentStatus.pending);
       // PayTR callbacks use providerConversationId (= orderNumber sans dashes)
       // — see payment.service.ts initializePayTRPayment.
@@ -192,20 +171,24 @@ describe('Purchase Flow (E2E)', () => {
       const totalKurus = Math.round(Number(paymentBefore!.amount) * 100);
       const callbackBody = signCallback({
         merchantOid: paymentBefore!.providerConversationId!,
-        status: 'success',
+        status: "success",
         totalAmount: totalKurus,
       });
       const cbRes = await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(callbackBody)
         .expect(200);
-      expect(cbRes.text).toBe('OK');
+      expect(cbRes.text).toBe("OK");
 
-      const orderAfterPay = await prisma.order.findUnique({ where: { id: orderId } });
+      const orderAfterPay = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
       // System behavior: a successful PayTR callback drops the order through
       // `paid` and into `preparing` in a single transaction (preparingDeadline
       // is also started). We accept either terminal state here.
-      expect([OrderStatus.paid, OrderStatus.preparing]).toContain(orderAfterPay?.status);
+      expect([OrderStatus.paid, OrderStatus.preparing]).toContain(
+        orderAfterPay?.status,
+      );
       expect(orderAfterPay?.preparingDeadline).toBeTruthy();
 
       const productAfterPay = await prisma.product.findUnique({
@@ -214,10 +197,7 @@ describe('Purchase Flow (E2E)', () => {
       expect(productAfterPay?.quantity).toBe(0);
       expect(productAfterPay?.reservedQuantity).toBe(0);
 
-      const paymentAfter = await prisma.payment.findFirst({
-        where: { orderId },
-        orderBy: { createdAt: 'desc' },
-      });
+      const paymentAfter = await latestPaymentOfOrder(orderId);
       expect(paymentAfter?.status).toBe(PaymentStatus.completed);
 
       const hold = await prisma.paymentHold.findFirst({
@@ -240,7 +220,9 @@ describe('Purchase Flow (E2E)', () => {
           .set(authHeader(seller))
           .expect(200);
       }
-      const orderPreparing = await prisma.order.findUnique({ where: { id: orderId } });
+      const orderPreparing = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
       expect(orderPreparing?.status).toBe(OrderStatus.preparing);
 
       // 5) Skip the carrier-driven shipped→delivered transitions: force order
@@ -256,7 +238,9 @@ describe('Purchase Flow (E2E)', () => {
         .post(`/api/orders/${orderId}/confirm`)
         .set(authHeader(buyer))
         .expect(200);
-      const orderCompleted = await prisma.order.findUnique({ where: { id: orderId } });
+      const orderCompleted = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
       expect(orderCompleted?.status).toBe(OrderStatus.completed);
 
       // 7) Force releaseAt into the past, then call releaseHoldsDue() directly.
@@ -269,12 +253,14 @@ describe('Purchase Flow (E2E)', () => {
       const releaseResult = await paymentService.releaseHoldsDue();
       expect(releaseResult.count).toBeGreaterThanOrEqual(1);
 
-      const holdAfter = await prisma.paymentHold.findUnique({ where: { id: hold!.id } });
+      const holdAfter = await prisma.paymentHold.findUnique({
+        where: { id: hold!.id },
+      });
       expect(holdAfter?.status).toBe(PaymentHoldStatus.released);
       expect(holdAfter?.releasedAt).toBeTruthy();
     });
 
-    it('rejects markAsPreparing when the order has not been paid', async () => {
+    it("rejects markAsPreparing when the order has not been paid", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -284,11 +270,9 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
       await request(ctx.app.getHttpServer())
         .post(`/api/orders/${buyRes.body.orderId}/prepare`)
@@ -296,7 +280,7 @@ describe('Purchase Flow (E2E)', () => {
         .expect(400);
     });
 
-    it('rejects markAsPreparing from a non-seller user', async () => {
+    it("rejects markAsPreparing from a non-seller user", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const intruder = await createUser(ctx.module, { isSeller: true });
@@ -307,11 +291,9 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
       // Force the order to paid via DB so prepare-step gating is on auth, not status.
       const prisma = getPrisma();
@@ -326,7 +308,7 @@ describe('Purchase Flow (E2E)', () => {
         .expect(403);
     });
 
-    it('rejects confirmDelivery from a non-buyer user', async () => {
+    it("rejects confirmDelivery from a non-buyer user", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -336,11 +318,9 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
       const prisma = getPrisma();
       await prisma.order.update({
@@ -355,8 +335,8 @@ describe('Purchase Flow (E2E)', () => {
     });
   });
 
-  describe('PayTR callback edge cases', () => {
-    it('rejects a callback with an invalid hash by returning ERR (state unchanged)', async () => {
+  describe("PayTR callback edge cases", () => {
+    it("rejects a callback with an invalid hash by returning ERR (state unchanged)", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -366,40 +346,36 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       const prisma = getPrisma();
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
 
       // Forge a callback with a deliberately wrong hash.
       const forged = {
         merchant_oid: payment!.providerConversationId!,
-        status: 'success',
-        total_amount: '50000',
-        hash: 'this-is-not-a-real-hash',
-        payment_amount: '50000',
-        payment_type: 'card',
-        currency: 'TL',
-        test_mode: '1',
-        merchant_id: 'test-merchant',
+        status: "success",
+        total_amount: "50000",
+        hash: "this-is-not-a-real-hash",
+        payment_amount: "50000",
+        payment_type: "card",
+        currency: "TL",
+        test_mode: "1",
+        merchant_id: "test-merchant",
       };
 
       // Controller still returns 200 (PayTR contract), but order should NOT
       // transition to paid — the service path that matters here is hash check.
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(forged);
 
       const orderAfter = await prisma.order.findUnique({
@@ -407,13 +383,11 @@ describe('Purchase Flow (E2E)', () => {
       });
       expect(orderAfter?.status).toBe(OrderStatus.pending_payment);
 
-      const paymentAfter = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const paymentAfter = await latestPaymentOfOrder(buyRes.body.orderId);
       expect(paymentAfter?.status).not.toBe(PaymentStatus.completed);
     });
 
-    it('handles a duplicate success callback as a no-op (idempotent)', async () => {
+    it("handles a duplicate success callback as a no-op (idempotent)", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -423,59 +397,70 @@ describe('Purchase Flow (E2E)', () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: address.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, address.id).expect(
+        201,
+      );
 
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       const prisma = getPrisma();
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       const totalKurus = Math.round(Number(payment!.amount) * 100);
       const cb = signCallback({
         merchantOid: payment!.providerConversationId!,
-        status: 'success',
+        status: "success",
         totalAmount: totalKurus,
       });
 
       // Three identical callbacks. PayTR webhook contract: controller should
       // ack 200 each time — but real handler may return 400 on the duplicates
       // (already-paid). What we *really* test is that DB state stays consistent.
-      await request(ctx.app.getHttpServer()).post('/api/payments/callback/paytr').send(cb);
-      await request(ctx.app.getHttpServer()).post('/api/payments/callback/paytr').send(cb);
-      await request(ctx.app.getHttpServer()).post('/api/payments/callback/paytr').send(cb);
+      await request(ctx.app.getHttpServer())
+        .post("/api/payments/callback/paytr")
+        .send(cb);
+      await request(ctx.app.getHttpServer())
+        .post("/api/payments/callback/paytr")
+        .send(cb);
+      await request(ctx.app.getHttpServer())
+        .post("/api/payments/callback/paytr")
+        .send(cb);
 
-      const orderAfter = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
+      const orderAfter = await prisma.order.findUnique({
+        where: { id: buyRes.body.orderId },
+      });
       // First callback flipped the order to paid (and likely preparing); the
       // duplicates must not regress, double-credit, or duplicate side effects.
-      expect([OrderStatus.paid, OrderStatus.preparing]).toContain(orderAfter?.status);
+      expect([OrderStatus.paid, OrderStatus.preparing]).toContain(
+        orderAfter?.status,
+      );
 
       const holds = await prisma.paymentHold.findMany({
         where: { orderId: buyRes.body.orderId },
       });
       expect(holds).toHaveLength(1);
 
-      const productAfter = await prisma.product.findUnique({ where: { id: product.id } });
+      const productAfter = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
       expect(productAfter?.quantity).toBe(0);
       expect(productAfter?.reservedQuantity).toBe(0);
 
       const completedPayments = await prisma.payment.findMany({
-        where: { orderId: buyRes.body.orderId, status: PaymentStatus.completed },
+        where: {
+          orderId: buyRes.body.orderId,
+          status: PaymentStatus.completed,
+        },
       });
       expect(completedPayments).toHaveLength(1);
     });
   });
 
-  describe('Offer → payment → hold → payout end-to-end', () => {
-    it('offer accept creates order, payment completes, hold releases, PayoutTransfer created', async () => {
+  describe("Offer → payment → hold → payout end-to-end", () => {
+    it("offer accept creates order, payment completes, hold releases, PayoutTransfer created", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -489,12 +474,16 @@ describe('Purchase Flow (E2E)', () => {
 
       // Seller adds IBAN
       await prisma.sellerBankAccount.create({
-        data: { userId: seller.id, accountHolder: 'Seller Name', iban: 'TR330006100519786457841326' },
+        data: {
+          userId: seller.id,
+          accountHolder: "Seller Name",
+          iban: "TR330006100519786457841326",
+        },
       });
 
       // Create offer
       const offerRes = await request(ctx.app.getHttpServer())
-        .post('/api/offers')
+        .post("/api/offers")
         .set(authHeader(buyer))
         .send({ productId: product.id, amount: 400 })
         .expect(201);
@@ -511,20 +500,22 @@ describe('Purchase Flow (E2E)', () => {
 
       // Initiate payment
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId, provider: 'paytr' })
+        .send({ orderId, provider: "paytr" })
         .expect(201);
 
       // PayTR callback
-      const payment = await prisma.payment.findFirst({ where: { orderId } });
+      const payment = await latestPaymentOfOrder(orderId);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Hold exists
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
@@ -548,25 +539,32 @@ describe('Purchase Flow (E2E)', () => {
         data: { releaseAt: new Date(Date.now() - 1000) },
       });
 
-      const { PaymentService } = require('../../src/modules/payment/payment.service');
-      const { PayoutService } = require('../../src/modules/payout/payout.service');
+      const {
+        PaymentService,
+      } = require("../../src/modules/payment/payment.service");
+      const {
+        PayoutService,
+      } = require("../../src/modules/payout/payout.service");
       const paymentService = ctx.app.get(PaymentService);
       const payoutService = ctx.app.get(PayoutService);
 
       await paymentService.releaseHoldsDue();
-      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      const payoutsCreated =
+        await payoutService.createPayoutsForReleasedHolds();
       expect(payoutsCreated).toBeGreaterThanOrEqual(1);
 
       // PayoutTransfer for this offer-based order exists
-      const payout = await prisma.payoutTransfer.findFirst({ where: { paymentHoldId: hold!.id } });
+      const payout = await prisma.payoutTransfer.findFirst({
+        where: { paymentHoldId: hold!.id },
+      });
       expect(payout).toBeTruthy();
       expect(payout?.sellerId).toBe(seller.id);
-      expect(payout?.transferIban).toBe('TR330006100519786457841326');
+      expect(payout?.transferIban).toBe("TR330006100519786457841326");
     });
   });
 
-  describe('Seller holds endpoint', () => {
-    it('GET /payments/holds/me returns seller payment holds', async () => {
+  describe("Seller holds endpoint", () => {
+    it("GET /payments/holds/me returns seller payment holds", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -579,40 +577,38 @@ describe('Purchase Flow (E2E)', () => {
       const prisma = getPrisma();
 
       // Buy + pay
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Seller should see the hold
       const holdsRes = await request(ctx.app.getHttpServer())
-        .get('/api/payments/holds/me')
+        .get("/api/payments/holds/me")
         .set(authHeader(seller))
         .expect(200);
 
       expect(Array.isArray(holdsRes.body)).toBe(true);
       expect(holdsRes.body.length).toBeGreaterThanOrEqual(1);
-      expect(holdsRes.body[0].status).toBe('held');
+      expect(holdsRes.body[0].status).toBe("held");
       expect(Number(holdsRes.body[0].amount)).toBeGreaterThan(0);
     });
   });
 
-  describe('Reconciliation cron', () => {
-    it('reconcilePendingPaytrPayments recovers a missed callback via durum-sorgu', async () => {
+  describe("Reconciliation cron", () => {
+    it("reconcilePendingPaytrPayments recovers a missed callback via durum-sorgu", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -625,18 +621,14 @@ describe('Purchase Flow (E2E)', () => {
       const prisma = getPrisma();
 
       // Buy + initiate (but NO callback — simulating missed webhook)
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       expect(payment?.status).toBe(PaymentStatus.pending);
 
       // Set up mock durum-sorgu to return success
@@ -645,7 +637,7 @@ describe('Purchase Flow (E2E)', () => {
         paymentTotalTl: Number(payment!.amount),
         paymentAmountTl: Number(payment!.amount),
         paymentDate: new Date().toISOString(),
-        currency: 'TL',
+        currency: "TL",
       } as any);
 
       // Force the payment to be old enough for reconciliation (>3 min)
@@ -654,13 +646,17 @@ describe('Purchase Flow (E2E)', () => {
         data: { createdAt: new Date(Date.now() - 5 * 60 * 1000) },
       });
 
-      const { PaymentService } = require('../../src/modules/payment/payment.service');
+      const {
+        PaymentService,
+      } = require("../../src/modules/payment/payment.service");
       const paymentService = ctx.app.get(PaymentService);
       const result = await paymentService.reconcilePendingPaytrPayments();
       expect(result.completed).toBeGreaterThanOrEqual(1);
 
       // Payment should now be completed
-      const paymentAfter = await prisma.payment.findUnique({ where: { id: payment!.id } });
+      const paymentAfter = await prisma.payment.findUnique({
+        where: { id: payment!.id },
+      });
       expect(paymentAfter?.status).toBe(PaymentStatus.completed);
     });
   });

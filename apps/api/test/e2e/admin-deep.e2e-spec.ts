@@ -9,6 +9,7 @@ import {
 } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
+import { buyNow } from "../factories/flows";
 
 describe("Admin deep — order management + dashboard (E2E)", () => {
   let ctx: E2ETestApp;
@@ -38,11 +39,7 @@ describe("Admin deep — order management + dashboard (E2E)", () => {
       quantity: 1,
     });
     const addr = await createAddress({ userId: buyer.id });
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: addr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
     return buyRes.body.orderId;
   }
 

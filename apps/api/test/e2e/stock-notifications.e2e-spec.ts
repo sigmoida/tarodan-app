@@ -13,6 +13,7 @@ import { createAddress } from "../factories/address.factory";
 import { createOfferRow } from "../factories/offer.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { ProductLockService } from "../../src/modules/product/lock/product-lock.service";
+import { buyNow, latestPaymentOfOrder } from "../factories/flows";
 
 describe("Stock Notifications (E2E)", () => {
   let ctx: E2ETestApp;
@@ -57,19 +58,15 @@ describe("Stock Notifications (E2E)", () => {
     const prisma = getPrisma();
 
     // fastBuyer Buy Now end-to-end.
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(fastBuyer))
-      .send({ productId: product.id, shippingAddressId: fastAddr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, fastBuyer, product.id, fastAddr.id).expect(
+      201,
+    );
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(fastBuyer))
       .send({ orderId: buyRes.body.orderId, provider: "paytr" })
       .expect(201);
-    const fastPayment = await prisma.payment.findFirst({
-      where: { orderId: buyRes.body.orderId },
-    });
+    const fastPayment = await latestPaymentOfOrder(buyRes.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(
@@ -132,19 +129,15 @@ describe("Stock Notifications (E2E)", () => {
     });
 
     // fastBuyer Buy Now end-to-end.
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(fastBuyer))
-      .send({ productId: product.id, shippingAddressId: fastAddr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, fastBuyer, product.id, fastAddr.id).expect(
+      201,
+    );
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(fastBuyer))
       .send({ orderId: buyRes.body.orderId, provider: "paytr" })
       .expect(201);
-    const fastPayment = await prisma.payment.findFirst({
-      where: { orderId: buyRes.body.orderId },
-    });
+    const fastPayment = await latestPaymentOfOrder(buyRes.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(
@@ -195,19 +188,13 @@ describe("Stock Notifications (E2E)", () => {
     });
 
     // First failure flow: buyer reserves stock then payment fails -> back-in-stock fires.
-    const buy1 = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: buyerAddr.id })
-      .expect(201);
+    const buy1 = await buyNow(ctx, buyer, product.id, buyerAddr.id).expect(201);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(buyer))
       .send({ orderId: buy1.body.orderId, provider: "paytr" })
       .expect(201);
-    const pay1 = await prisma.payment.findFirst({
-      where: { orderId: buy1.body.orderId },
-    });
+    const pay1 = await latestPaymentOfOrder(buy1.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(
@@ -232,19 +219,13 @@ describe("Stock Notifications (E2E)", () => {
 
     // Second failure flow within 24h: stock returned to available so a fresh
     // Buy Now succeeds, but the second BACK_IN_STOCK must be debounced.
-    const buy2 = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: buyerAddr.id })
-      .expect(201);
+    const buy2 = await buyNow(ctx, buyer, product.id, buyerAddr.id).expect(201);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(buyer))
       .send({ orderId: buy2.body.orderId, provider: "paytr" })
       .expect(201);
-    const pay2 = await prisma.payment.findFirst({
-      where: { orderId: buy2.body.orderId },
-    });
+    const pay2 = await latestPaymentOfOrder(buy2.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(
@@ -320,19 +301,15 @@ describe("Stock Notifications (E2E)", () => {
     });
 
     // fastBuyer Buy Now → success → cascade fires, slowBuyer's offer cancelled.
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(fastBuyer))
-      .send({ productId: product.id, shippingAddressId: fastAddr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, fastBuyer, product.id, fastAddr.id).expect(
+      201,
+    );
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(fastBuyer))
       .send({ orderId: buyRes.body.orderId, provider: "paytr" })
       .expect(201);
-    const fastPayment = await getPrisma().payment.findFirst({
-      where: { orderId: buyRes.body.orderId },
-    });
+    const fastPayment = await latestPaymentOfOrder(buyRes.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(
@@ -366,19 +343,18 @@ describe("Stock Notifications (E2E)", () => {
       where: { id: product.id },
       data: { quantity: 1, reservedQuantity: 0, status: "active" },
     });
-    const otherBuyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(otherBuyer))
-      .send({ productId: product.id, shippingAddressId: otherAddr.id })
-      .expect(201);
+    const otherBuyRes = await buyNow(
+      ctx,
+      otherBuyer,
+      product.id,
+      otherAddr.id,
+    ).expect(201);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(otherBuyer))
       .send({ orderId: otherBuyRes.body.orderId, provider: "paytr" })
       .expect(201);
-    const otherPayment = await prisma.payment.findFirst({
-      where: { orderId: otherBuyRes.body.orderId },
-    });
+    const otherPayment = await latestPaymentOfOrder(otherBuyRes.body.orderId);
     // otherBuyer's payment fails → release branch runs → dispatchBackInStock
     // fires for slowBuyer (recently-cancelled buyer) AND any wishlisters.
     await request(ctx.app.getHttpServer())

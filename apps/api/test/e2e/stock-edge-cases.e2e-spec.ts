@@ -18,6 +18,7 @@ import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { randomUUID } from "crypto";
+import { buyNow as buyNowFlow, latestPaymentOfOrder } from "../factories/flows";
 
 /**
  * Kapsamlı stok edge-case'leri: eşzamanlı alımlar, iptal/iade sonrası stok
@@ -42,10 +43,7 @@ describe("Stock edge cases — comprehensive (E2E)", () => {
   });
 
   const buyNow = (buyer: any, productId: string, addrId: string) =>
-    request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId, shippingAddressId: addrId });
+    buyNowFlow(ctx, buyer, productId, addrId);
 
   /** initiate + successful PayTR callback → order paid, stock decremented. */
   async function completePayment(buyer: any, orderId: string) {
@@ -55,10 +53,7 @@ describe("Stock edge cases — comprehensive (E2E)", () => {
       .send({ orderId, provider: "paytr" })
       .expect(201);
     const prisma = getPrisma();
-    const payment = await prisma.payment.findFirst({
-      where: { orderId },
-      orderBy: { createdAt: "desc" },
-    });
+    const payment = await latestPaymentOfOrder(orderId);
     const cb = signCallback({
       merchantOid: payment!.providerConversationId!,
       status: "success",
