@@ -3,12 +3,25 @@ import {
   SELLER_TRUST_MIN_COUNTERPARTIES,
   SELLER_TRUST_MIN_TRANSACTIONS,
   SELLER_TRUST_WEIGHTS_V1,
+  type SellerTrustFormulaParams,
 } from "@tarodan/types";
+
+/**
+ * The definitions the SQL and the input assembly read. They are not formula
+ * parameters, so a lab candidate cannot change them (decision D3).
+ */
+interface TrustFormulaDefinitions {
+  version: number;
+  windows: { ratingDays: number; operationsDays: number; volumeDays: number };
+  onTime: { graceMinutes: number };
+  volume: { perCounterpartyCap: number };
+}
 
 /**
  * Seller trust formula v1 constants (tarodan-ops ADR 0014; reference
  * `docs/SELLER_TRUST.md`). Changing any value is a product decision and bumps
- * `SELLER_TRUST_FORMULA_VERSION` in `@tarodan/types`.
+ * `SELLER_TRUST_FORMULA_VERSION` in `@tarodan/types`. It is the formula's
+ * default parameter set plus the definitions above.
  */
 export const TRUST_FORMULA_V1 = {
   version: SELLER_TRUST_FORMULA_VERSION,
@@ -44,4 +57,4 @@ export const TRUST_FORMULA_V1 = {
     transactions: SELLER_TRUST_MIN_TRANSACTIONS,
     counterparties: SELLER_TRUST_MIN_COUNTERPARTIES,
   },
-} as const;
+} as const satisfies SellerTrustFormulaParams & TrustFormulaDefinitions;

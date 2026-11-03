@@ -1,36 +1,36 @@
-import type { SellerTrustComponentsV1 } from "@tarodan/types";
-import { TRUST_FORMULA_V1 as F } from "./trust-formula.constants";
+import type {
+  SellerTrustComponentKey,
+  SellerTrustComponentsV1,
+  SellerTrustFormulaParams,
+  SellerTrustInputs,
+} from "@tarodan/types";
+import { TRUST_FORMULA_V1 } from "./trust-formula.constants";
 
-/**
- * The counts one seller contributes, already aggregated by SQL in the owning
- * domains. The formula below only does arithmetic on them, so every rule of
- * v1 that is not a definition of "what counts" is pinned by its spec.
- */
-export interface SellerTrustInputs {
-  /** Distinct givers whose ratings count (one vote per person). */
-  raters: number;
-  /** Sum over those givers of each giver's mean score (1 to 5). */
-  sumOfGiverMeans: number;
-  /** Paid orders whose first deadline passed in the window (E). */
-  eligibleOrders: number;
-  /** Seller-caused failures among them (F). */
-  failures: number;
-  /** Of E, handed to the carrier (S). */
-  shipped: number;
-  /** Of S, handed over after the first deadline plus the grace (L). */
-  late: number;
-  /** Completed sales and trades after the per-counterparty cap (N). */
-  transactions: number;
-  /** Distinct counterparties behind N. */
-  counterparties: number;
-  /** Whole days since the account was created, at `asOf`. */
-  tenureDays: number;
-}
+// The type moved to @tarodan/types (shared with the admin lab); re-exported so
+// the module's existing imports keep one path.
+export type { SellerTrustInputs } from "@tarodan/types";
 
 export interface SellerTrustResult {
   /** 0 to 500; null when the minimum data rule is not met. */
   scoreX100: number | null;
   components: SellerTrustComponentsV1;
+}
+
+/**
+ * The unrounded intermediate values of one computation. The score and its
+ * explanation are both built from these, so they cannot drift apart.
+ */
+export interface SellerTrustTerms {
+  /** Smoothed per-giver rating mean, 1 to 5. */
+  smoothed: number;
+  failureRate: number;
+  lateRate: number;
+  /** Each 0 to 1. */
+  subScores: Record<SellerTrustComponentKey, number>;
+  /** `5 x` the weighted sum of the sub-scores, before rounding. */
+  score: number;
+  /** The minimum data rule is met. */
+  enoughData: boolean;
 }
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
@@ -43,69 +43,104 @@ export function toScoreX100(score: number): number {
   return Math.min(500, Math.max(0, Math.floor(score * 100 + 0.5 + 1e-9)));
 }
 
-/** Seller trust formula v1 (`docs/SELLER_TRUST.md`). Pure. */
-export function computeSellerTrust(
+/**
+ * The formula's arithmetic, once (`docs/SELLER_TRUST.md`). Pure. The order of
+ * operations is part of v1: the stored scores and the v1 pin depend on the
+ * exact doubles, so do not regroup a term.
+ */
+export function computeTrustTerms(
   inputs: SellerTrustInputs,
-): SellerTrustResult {
+  p: SellerTrustFormulaParams,
+): SellerTrustTerms {
   const smoothed =
-    (F.rating.priorWeight * F.rating.priorMean + inputs.sumOfGiverMeans) /
-    (F.rating.priorWeight + inputs.raters);
+    (p.rating.priorWeight * p.rating.priorMean + inputs.sumOfGiverMeans) /
+    (p.rating.priorWeight + inputs.raters);
   const s1 = clamp01((smoothed - 1) / 4);
 
   const failureRate =
-    (inputs.failures + F.reliability.priorWeight * F.reliability.priorRate) /
-    (inputs.eligibleOrders + F.reliability.priorWeight);
-  const s2 = clamp01(1 - failureRate / F.reliability.zeroAt);
+    (inputs.failures + p.reliability.priorWeight * p.reliability.priorRate) /
+    (inputs.eligibleOrders + p.reliability.priorWeight);
+  const s2 = clamp01(1 - failureRate / p.reliability.zeroAt);
 
   const lateRate =
-    (inputs.late + F.onTime.priorWeight * F.onTime.priorRate) /
-    (inputs.shipped + F.onTime.priorWeight);
-  const s3 = clamp01(1 - lateRate / F.onTime.zeroAt);
+    (inputs.late + p.onTime.priorWeight * p.onTime.priorRate) /
+    (inputs.shipped + p.onTime.priorWeight);
+  const s3 = clamp01(1 - lateRate / p.onTime.zeroAt);
 
   const s4 = Math.min(
     1,
-    Math.log(1 + inputs.transactions) / Math.log(1 + F.volume.saturation),
+    Math.log(1 + inputs.transactions) / Math.log(1 + p.volume.saturation),
   );
 
-  const s5 = Math.min(1, inputs.tenureDays / F.tenure.fullAtDays);
+  const s5 = Math.min(1, inputs.tenureDays / p.tenure.fullAtDays);
 
   const score =
     5 *
-    (F.weights.rating * s1 +
-      F.weights.reliability * s2 +
-      F.weights.onTime * s3 +
-      F.weights.volume * s4 +
-      F.weights.tenure * s5);
+    (p.weights.rating * s1 +
+      p.weights.reliability * s2 +
+      p.weights.onTime * s3 +
+      p.weights.volume * s4 +
+      p.weights.tenure * s5);
 
   const enoughData =
-    inputs.transactions >= F.minimum.transactions &&
-    inputs.counterparties >= F.minimum.counterparties;
+    inputs.transactions >= p.minimum.transactions &&
+    inputs.counterparties >= p.minimum.counterparties;
 
   return {
-    scoreX100: enoughData ? toScoreX100(score) : null,
+    smoothed,
+    failureRate,
+    lateRate,
+    subScores: {
+      rating: s1,
+      reliability: s2,
+      onTime: s3,
+      volume: s4,
+      tenure: s5,
+    },
+    score,
+    enoughData,
+  };
+}
+
+/**
+ * Seller trust formula v1 (`docs/SELLER_TRUST.md`). Pure. The nightly batch
+ * calls it with the inputs only, so it always computes v1. The admin lab
+ * passes a validated candidate (`validateSellerTrustParams`); the breakdown
+ * shape stays `SellerTrustComponentsV1` and the lab, not this result, labels
+ * a candidate.
+ */
+export function computeSellerTrust(
+  inputs: SellerTrustInputs,
+  params: SellerTrustFormulaParams = TRUST_FORMULA_V1,
+): SellerTrustResult {
+  const t = computeTrustTerms(inputs, params);
+  const s = t.subScores;
+
+  return {
+    scoreX100: t.enoughData ? toScoreX100(t.score) : null,
     components: {
-      version: F.version,
+      version: TRUST_FORMULA_V1.version,
       rating: {
         raters: inputs.raters,
-        smoothed: round4(smoothed),
-        subScore: round4(s1),
+        smoothed: round4(t.smoothed),
+        subScore: round4(s.rating),
       },
       reliability: {
         eligibleOrders: inputs.eligibleOrders,
         failures: inputs.failures,
-        subScore: round4(s2),
+        subScore: round4(s.reliability),
       },
       onTime: {
         shipped: inputs.shipped,
         late: inputs.late,
-        subScore: round4(s3),
+        subScore: round4(s.onTime),
       },
       volume: {
         transactions: inputs.transactions,
         counterparties: inputs.counterparties,
-        subScore: round4(s4),
+        subScore: round4(s.volume),
       },
-      tenure: { days: inputs.tenureDays, subScore: round4(s5) },
+      tenure: { days: inputs.tenureDays, subScore: round4(s.tenure) },
     },
   };
 }

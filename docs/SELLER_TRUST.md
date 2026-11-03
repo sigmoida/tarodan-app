@@ -8,9 +8,10 @@ stored; a profile read is a primary-key lookup. Decision record: tarodan-ops
 
 | What                                                | Where                                                                                                               |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Formula (pure) and its pinning spec                 | `apps/api/src/modules/seller-trust/helpers/trust-formula.ts`, `.spec.ts`                                            |
+| Formula (pure) and its pinning specs                | `apps/api/src/modules/seller-trust/helpers/trust-formula.ts`, `.spec.ts`, `.v1-pin.spec.ts`                         |
 | Constants (v1)                                      | `seller-trust/helpers/trust-formula.constants.ts`                                                                   |
 | Version, levels, thresholds, read shapes, formatter | `packages/types/src/seller-trust.ts`                                                                                |
+| Formula inputs, parameters, validator, explanation  | `packages/types/src/seller-trust-lab.ts` (API and admin only), `seller-trust/helpers/trust-explain.ts`              |
 | Table owner                                         | `seller-trust/seller-trust.service.ts` (`seller_trust_scores`)                                                      |
 | Batch                                               | `seller-trust/jobs/seller-trust-scheduler.service.ts` (`seller-trust-refresh`)                                      |
 | Aggregates, one per owning domain                   | `order/stats/`, `refund/stats/`, `rating/stats/`, `trade/stats/`, `user/stats/` (`*-seller-trust-stats.service.ts`) |
