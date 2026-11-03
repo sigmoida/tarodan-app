@@ -24,7 +24,8 @@ export const HERO_ACTIONS_CLASS = "flex flex-col gap-3 sm:flex-row";
  * The image box ratio comes from the `mediaRatios` design token: 16:10 on
  * phones (`aspect-hero-compact`; 4:3 took half the height and pushed the title
  * below the fold), 4:3 from `md` (`aspect-hero-split`). The image fills the box
- * (`fill`), and the fixed ratio keeps every slide the same height.
+ * (`fill`), so the image box has the same height on every slide; a slide only
+ * grows when its text column is taller than the box.
  */
 export const HeroSlideLayout = forwardRef<
   HTMLDivElement,
