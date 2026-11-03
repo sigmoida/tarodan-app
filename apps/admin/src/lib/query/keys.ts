@@ -27,4 +27,18 @@ export const adminKeys = {
     [`${resource}-count`, params] as const,
   /** Prefix of every `count` key of a resource — a mutation invalidates badges/summaries with it. */
   countAll: (resource: string) => [`${resource}-count`] as const,
+  /**
+   * Seller trust lab (read-only). The POSTs are reads keyed on the submitted
+   * request, so the same request shares one entry and a new one fetches fresh.
+   */
+  sellerTrustLab: {
+    params: () => ["seller-trust-lab", "params"] as const,
+    scenarios: () => ["seller-trust-lab", "scenarios"] as const,
+    scenario: (request: unknown) =>
+      ["seller-trust-lab", "scenario", request] as const,
+    seller: (userId: string, request: unknown) =>
+      ["seller-trust-lab", "seller", userId, request] as const,
+    population: (request: unknown) =>
+      ["seller-trust-lab", "population", request] as const,
+  },
 };

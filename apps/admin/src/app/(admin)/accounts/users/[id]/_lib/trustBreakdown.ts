@@ -3,6 +3,7 @@ import {
   SELLER_TRUST_WEIGHTS_V1,
   type SellerTrustComponentKey,
   type SellerTrustComponentsV1,
+  type SellerTrustExplanation,
 } from "@tarodan/types";
 import { fmtDecimal, fmtNumber, fmtPercent } from "@/lib/format";
 import type { Translate } from "@/lib/statusLabels";
@@ -43,13 +44,18 @@ type CountKey = keyof typeof COUNT_LABEL;
 const pct = (ratio: number) => fmtPercent(ratio * 100) ?? "";
 const num = (n: number) => fmtNumber(n) ?? "";
 
+/** What the rows read: the stored breakdown, or any explanation (a superset). */
+type BreakdownSource = Omit<SellerTrustComponentsV1, "version">;
+
 /**
  * The five breakdown rows, in formula order. Sub-scores and counts come from
- * the stored components; the weights from the shared formula constants.
+ * the stored components; the weights from the shared formula constants unless
+ * the caller has its own (a lab candidate).
  */
 export function trustBreakdownRows(
-  components: SellerTrustComponentsV1,
+  components: BreakdownSource,
   t: Translate,
+  weights: Record<SellerTrustComponentKey, number> = SELLER_TRUST_WEIGHTS_V1,
 ): TrustBreakdownRow[] {
   const count = (key: CountKey, value: number) =>
     `${t(COUNT_LABEL[key])}: ${num(value)}`;
@@ -73,8 +79,43 @@ export function trustBreakdownRows(
   return SELLER_TRUST_COMPONENTS_V1.map((id) => ({
     id,
     component: t(COMPONENT_LABEL[id]),
-    weight: pct(SELLER_TRUST_WEIGHTS_V1[id]),
+    weight: pct(weights[id]),
     subScore: pct(components[id].subScore),
     detail: { value: detail[id][0], secondary: detail[id][1] },
+  }));
+}
+
+/** A breakdown row with the formula's working shown (seller trust lab). */
+export interface TrustExplainRow extends TrustBreakdownRow {
+  /** Failure rate, late rate or smoothed average; none for volume and tenure. */
+  rate?: string;
+  /** Points the component adds to the score: "1.25" */
+  contribution: string;
+}
+
+/**
+ * Two percent decimals: a candidate weight has up to 4 decimals (0.1234 is
+ * "%12,34"), so weight x sub-score can be checked against the contribution.
+ */
+const pctExact = (ratio: number) => fmtPercent(ratio * 100, 2) ?? "";
+
+/** The explain table's rows: the breakdown rows plus rate and contribution. */
+export function trustExplainRows(
+  explanation: SellerTrustExplanation,
+  t: Translate,
+): TrustExplainRow[] {
+  const weights = Object.fromEntries(
+    SELLER_TRUST_COMPONENTS_V1.map((id) => [id, explanation[id].weight]),
+  ) as Record<SellerTrustComponentKey, number>;
+  const rate: Partial<Record<SellerTrustComponentKey, string | undefined>> = {
+    reliability: pctExact(explanation.reliability.failureRate),
+    onTime: pctExact(explanation.onTime.lateRate),
+  };
+  return trustBreakdownRows(explanation, t, weights).map((row) => ({
+    ...row,
+    weight: pctExact(weights[row.id]),
+    subScore: pctExact(explanation[row.id].subScore),
+    rate: rate[row.id],
+    contribution: fmtDecimal(explanation[row.id].contribution) ?? "",
   }));
 }

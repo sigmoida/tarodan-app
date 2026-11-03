@@ -337,6 +337,12 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         description: t("admin.roles.permissions.auditLogs.description"),
         pages: ["/system/logs"],
       },
+      {
+        key: "seller_trust_lab",
+        label: t("admin.roles.permissions.sellerTrustLab.label"),
+        description: t("admin.roles.permissions.sellerTrustLab.description"),
+        pages: ["/system/seller-trust-lab"],
+      },
     ],
   },
 ];

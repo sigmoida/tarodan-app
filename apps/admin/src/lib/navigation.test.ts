@@ -127,6 +127,30 @@ describe("canAccessRoute (orders / trades split)", () => {
   });
 });
 
+describe("the seller trust lab", () => {
+  it("is a System item that the seller_trust_lab key decides", () => {
+    const item = getNavGroups(t)
+      .find((group) => group.id === "system")
+      ?.items.find((entry) => entry.href === "/system/seller-trust-lab");
+    expect(item?.permission).toBe("seller_trust_lab");
+    // The matrix decides; a role override would bypass a revoked key.
+    expect(item?.roles).toBeUndefined();
+  });
+
+  it("opens only for a holder of the key; any other staff member is kept out", () => {
+    expect(routePermission("/system/seller-trust-lab")).toBe(
+      "seller_trust_lab",
+    );
+    expect(
+      canAccessRoute("/system/seller-trust-lab", holder("seller_trust_lab")),
+    ).toBe(true);
+    expect(canAccessRoute("/system/seller-trust-lab", holder("settings"))).toBe(
+      false,
+    );
+    expect(canAccessRoute("/system/seller-trust-lab", holder())).toBe(false);
+  });
+});
+
 describe("the operations menu", () => {
   it("has one Siparişler item and no separate Teklifler / Takaslar items", () => {
     const hrefs = getNavGroups(t)

@@ -106,7 +106,9 @@ export default function UserDetailPage() {
                 <MembershipSection userId={u.id} membership={u.membership} />
                 <UserActivityTabs userId={u.id} user={u} />
                 <ConsentsSection userId={u.id} />
-                {u.trust && <SellerTrustSection trust={u.trust} />}
+                {u.trust && (
+                  <SellerTrustSection userId={u.id} trust={u.trust} />
+                )}
                 <SignInMethodsSection userId={u.id} />
               </>
             }

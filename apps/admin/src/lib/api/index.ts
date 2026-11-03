@@ -8,6 +8,7 @@ import { payoutExportsApi } from "./payout-exports";
 import { marketingApi } from "./marketing";
 import { systemApi } from "./system";
 import { mailRoutingApi } from "./mail-routing";
+import { sellerTrustLabApi } from "./seller-trust-lab";
 
 /**
  * The single admin API surface, recomposed from the per-domain modules. Kept as
@@ -37,6 +38,7 @@ export const adminApi = {
   ...marketingApi,
   ...systemApi,
   ...mailRoutingApi,
+  ...sellerTrustLabApi,
 };
 
 export { api };

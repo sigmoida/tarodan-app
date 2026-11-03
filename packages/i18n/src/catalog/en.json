@@ -5292,6 +5292,159 @@
           "avatar": "Avatar",
           "upload": "Upload"
         }
+      },
+      "sellerTrustLab": {
+        "title": "Seller trust lab",
+        "readOnlyNotice": "Read-only: nothing calculated here is saved or changes scores or rankings.",
+        "auditNotice": "Seller and population runs are written to the audit log.",
+        "env": {
+          "production": "PROD",
+          "staging": "STAGING",
+          "other": "{env}"
+        },
+        "prodWarning": "Production data: real sellers are shown.",
+        "candidateLabel": "Candidate: proposed values, not saved",
+        "states": {
+          "loading": "Calculating...",
+          "error": "Could not calculate: {message}",
+          "retry": "Try again",
+          "throttled": "Too many attempts. Try again in a minute.",
+          "forbidden": "You do not have access to this page. Required permission: Seller trust lab."
+        },
+        "seller": {
+          "title": "Seller",
+          "userId": "User ID",
+          "userIdHint": "Enter the user ID (UUID).",
+          "asOf": "Calculated as of",
+          "asOfNow": "Now",
+          "asOfStored": "The last nightly run's time",
+          "asOfFallback": "There is no stored score, so the current time was used.",
+          "useCandidate": "Also calculate with the candidate parameters",
+          "run": "Calculate",
+          "storedTitle": "Stored score",
+          "recomputedTitle": "Recalculated (v1)",
+          "candidateTitle": "Candidate (not saved)",
+          "matchesStored": "Same as the stored score",
+          "differsFromStored": "Differs from the stored score: the data may have changed since the nightly run.",
+          "changedInputs": "Changed inputs",
+          "colInputs": "Inputs",
+          "colRate": "Rate",
+          "colContribution": "Contribution",
+          "colStored": "Stored",
+          "colLive": "Live",
+          "unroundedScore": "Unrounded score",
+          "roundedScore": "Rounded score",
+          "notFound": "User not found.",
+          "notScored": {
+            "banned": "This account is banned and is not scored.",
+            "deleted": "This account is deleted and is not scored.",
+            "testLane": "This is a test-lane account and is not scored."
+          },
+          "notEnoughData": "Not enough data: at least {transactions} transactions and {counterparties} distinct counterparties are needed.",
+          "noStoredRow": "There is no stored score for this seller.",
+          "windows": "Calculation windows",
+          "windowRating": "Ratings",
+          "windowOperations": "Orders and shipping",
+          "windowVolume": "Transaction volume"
+        },
+        "scenario": {
+          "title": "Scenario calculator",
+          "description": "Try the score with hypothetical inputs. No real data is used.",
+          "preset": "Preset scenario",
+          "presetNone": "Choose one",
+          "meanRating": "Average rating (1-5)",
+          "run": "Calculate",
+          "reset": "Clear",
+          "candidateApplied": "The valid candidate parameters are applied too.",
+          "errors": {
+            "invalidNumber": "{field} must be a valid number.",
+            "negative": "{field} cannot be negative.",
+            "aboveEligibleOrders": "{field} cannot exceed the orders counted.",
+            "aboveShipped": "{field} cannot exceed the shipped count."
+          }
+        },
+        "golden": {
+          "title": "Reference scenarios (v1)",
+          "description": "Approved v1 results. Read-only.",
+          "colName": "Scenario",
+          "colScore": "Score",
+          "colLevel": "Level",
+          "name": {
+            "newSeller": "New seller",
+            "smallPerfect": "Small but perfect",
+            "steady": "Steady seller",
+            "good": "Good seller",
+            "veteran": "Veteran",
+            "problem": "Problem seller",
+            "lovedUnreliable": "Loved but unreliable",
+            "reliableUnrated": "Reliable but never rated",
+            "oneStarWave": "One-star wave",
+            "minimumOnPriors": "Minimum met, priors only"
+          }
+        },
+        "params": {
+          "title": "Candidate parameters",
+          "description": "Starts from the v1 values. What you change is only tried on this page.",
+          "weights": "Weights",
+          "weightsSum": "Weights total: {sum}",
+          "priors": "Priors",
+          "priorMean": "Prior average",
+          "priorWeight": "Prior weight",
+          "priorRate": "Prior rate",
+          "zeroAt": "Rate that gives zero",
+          "saturation": "Volume saturation (transactions)",
+          "fullAtDays": "Days for the full tenure score",
+          "minimums": "Minimum data",
+          "minTransactions": "Minimum transactions",
+          "minCounterparties": "Minimum distinct counterparties",
+          "resetToV1": "Reset to v1 values",
+          "modified": "Modified",
+          "errors": {
+            "weightsSum": "Weights must total 1 (now {sum}).",
+            "range": "{field} must be between {min} and {max}.",
+            "integer": "{field} must be a whole number.",
+            "decimals": "{field} can have at most {max} decimal places.",
+            "counterparties": "Distinct counterparties cannot exceed the transaction count."
+          }
+        },
+        "population": {
+          "title": "Population",
+          "description": "Apply the candidate to the stored scores and compare with v1.",
+          "source": "Scores are read from the last nightly run; tiny differences are possible at rounding boundaries.",
+          "filterLevels": "Level filter",
+          "filterMinTransactions": "Minimum transactions",
+          "run": "Run",
+          "rowsRead": "Sellers read",
+          "rowsCompared": "Compared",
+          "skippedOtherVersion": "Skipped (other formula version)",
+          "skippedUnreadable": "Skipped (unreadable)",
+          "computedRange": "Computed between",
+          "inProgress": "A nightly run may be in progress: rows were computed at different times.",
+          "consistency": {
+            "title": "v1 consistency check",
+            "matched": "Matched",
+            "offByOne": "Off by 0.01",
+            "mismatched": "Mismatched",
+            "warning": "{count} rows do not match their stored score: storage and formula may have drifted."
+          },
+          "levelCounts": "Level distribution",
+          "histogram": "Score distribution",
+          "matrix": "Level changes: stored to candidate",
+          "newToScored": "New, now scored",
+          "scoredToNew": "Scored, now new",
+          "changed": "Changed scores",
+          "meanChange": "Mean absolute change",
+          "maxChange": "Largest absolute change",
+          "moversUp": "Top risers",
+          "moversDown": "Top fallers",
+          "colStored": "Stored",
+          "colCandidate": "Candidate",
+          "colRank": "Rank",
+          "download": "Download proposal (JSON)",
+          "downloadHint": "The file contains no user IDs or usernames.",
+          "empty": "No scores yet. The nightly run fills them.",
+          "noMatch": "No sellers match the filters."
+        }
       }
     },
     "catalog": {
@@ -9456,7 +9609,8 @@
             "transactions": "Completed transactions",
             "counterparties": "Distinct counterparties",
             "tenureDays": "Account age (days)"
-          }
+          },
+          "openInLab": "Open in trust lab"
         }
       },
       "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
@@ -9793,6 +9947,10 @@
         "auditLogs": {
           "label": "Audit Trail",
           "description": "Audit tab: records of which admin changed what and when."
+        },
+        "sellerTrustLab": {
+          "label": "Seller trust lab",
+          "description": "Explains and recomputes seller trust scores and tries candidate weights (read-only)."
         }
       },
       "form": {
@@ -10054,6 +10212,11 @@
           "name": "Email Routing",
           "description": "Sender mailbox per area and internal notification recipients",
           "keywords": "email, mail, sender, smtp, notification, recipient, mailbox, digest"
+        },
+        "sellerTrustLab": {
+          "name": "Seller trust lab",
+          "description": "Explain and recompute seller trust scores and try candidate weights. Nothing is saved.",
+          "keywords": "trust score, seller score, weights, simulation, lab"
         }
       }
     },
