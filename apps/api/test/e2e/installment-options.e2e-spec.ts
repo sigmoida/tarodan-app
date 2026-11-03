@@ -305,12 +305,84 @@ describe("installment options and rules on a real database (E2E)", () => {
       await admin.archiveRule(superAdminUserId, live[0].id);
     });
 
-    it("rolls the rule back when the audit row cannot be written", async () => {
+    it("refuses a rule write by a user who is not an active admin, writing nothing", async () => {
       const before = await prisma.installmentRule.count();
       await expect(
         admin.createRule(randomUUID(), { ...RULE, name: "No admin" }),
       ).rejects.toThrow(/Active admin user not found/);
       expect(await prisma.installmentRule.count()).toBe(before);
+    });
+
+    // The audit write fails AFTER the rule rows were written in the
+    // transaction: the rows must roll back with it (no change without its
+    // audit). The test above fails before any write, so it cannot show this.
+    describe("when the audit row fails after the write", () => {
+      const auditDown = () =>
+        jest
+          .spyOn(audit, "createRequiredAuditLog")
+          .mockRejectedValueOnce(new Error("audit down"));
+      afterEach(() => jest.restoreAllMocks());
+
+      it("rolls back a created rule", async () => {
+        const before = await prisma.installmentRule.count();
+        auditDown();
+        await expect(
+          admin.createRule(superAdminUserId, { ...RULE, name: "Rollback" }),
+        ).rejects.toThrow("audit down");
+        expect(await prisma.installmentRule.count()).toBe(before);
+      });
+
+      it("rolls back an edit: the old version stays live and no next version exists", async () => {
+        const { rule } = await admin.createRule(superAdminUserId, {
+          ...RULE,
+          name: "Rollback edit",
+        });
+        auditDown();
+        await expect(
+          admin.createRuleVersion(superAdminUserId, rule.id, {
+            ...RULE,
+            name: "Rollback edit",
+            platformSharePct: 50,
+          }),
+        ).rejects.toThrow("audit down");
+        const lineage = await prisma.installmentRule.findMany({
+          where: { lineageId: rule.id },
+        });
+        expect(
+          lineage.map((r) => [r.version, r.archivedAt, r.archivedBy]),
+        ).toEqual([[1, null, null]]);
+        await admin.archiveRule(superAdminUserId, rule.id);
+      });
+
+      it("rolls back an archive: the version stays live", async () => {
+        const { rule } = await admin.createRule(superAdminUserId, {
+          ...RULE,
+          name: "Rollback archive",
+        });
+        auditDown();
+        await expect(
+          admin.archiveRule(superAdminUserId, rule.id),
+        ).rejects.toThrow("audit down");
+        const row = await prisma.installmentRule.findUniqueOrThrow({
+          where: { id: rule.id },
+        });
+        expect(row.archivedAt).toBeNull();
+        await admin.archiveRule(superAdminUserId, rule.id);
+      });
+
+      it("rolls back a settings change: the kill switch and the minimum stay as they were", async () => {
+        const before = await settings.read();
+        auditDown();
+        await expect(
+          admin.updateSettings(superAdminUserId, {
+            enabled: !before.enabled,
+            minAmount: 750,
+          }),
+        ).rejects.toThrow("audit down");
+        const after = await settings.read();
+        expect(after.enabled).toBe(before.enabled);
+        expect(after.minAmount.toString()).toBe(before.minAmount.toString());
+      });
     });
 
     it("warns about an overlapping current rule with the same priority", async () => {
