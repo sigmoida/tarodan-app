@@ -576,11 +576,7 @@ export class PaymentCallbackService {
         payment,
         dto.merchant_oid,
         dto.merchant_oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
-        {
-          paymentType: parsed.paymentType,
-          installmentCount: parsed.installmentCount,
-          currency: parsed.currency,
-        },
+        providerPaymentDataOf(parsed),
       );
     } else {
       // Gecikmiş fail bildirimi ESKİ bir oid'e aitse ve o ödemede canlı bir 3DS

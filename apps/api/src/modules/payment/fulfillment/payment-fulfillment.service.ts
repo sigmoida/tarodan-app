@@ -49,7 +49,6 @@ import {
   type PublicIdentityInput,
 } from "../../../common/helpers/public-identity";
 import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
-import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/paytr.service";
 import {
   boostPurchasedNotice,
   orderPaidNotice,
@@ -67,20 +66,17 @@ export interface ProviderPaymentData {
 }
 
 /**
- * The payment-method data of a PayTR status inquiry (durum-sorgu), for the
- * paths that complete a payment from an inquiry instead of a callback. One
- * mapping so every recovery path stores the same fields as the callback.
+ * The payment-method data of a PayTR callback (`parseCallback`) or status
+ * inquiry (durum-sorgu). One mapping, so the callback and every recovery
+ * path store the same fields.
  */
 export function providerPaymentDataOf(
-  inquiry: Pick<
-    PayTRStatusInquirySuccess,
-    "paymentType" | "installmentCount" | "currency"
-  >,
+  source: ProviderPaymentData,
 ): ProviderPaymentData {
   return {
-    paymentType: inquiry.paymentType,
-    installmentCount: inquiry.installmentCount,
-    currency: inquiry.currency,
+    paymentType: source.paymentType,
+    installmentCount: source.installmentCount,
+    currency: source.currency,
   };
 }
 

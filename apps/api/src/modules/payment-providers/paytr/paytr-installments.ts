@@ -17,6 +17,8 @@
  *   whose meaning is unambiguous and reports everything else in `ignored`.
  */
 
+import { isPlainRecord } from "./paytr-response.util";
+
 /** Card program families PayTR accepts as `card_type` (and returns as BIN `brand`). */
 export const PAYTR_CARD_FAMILIES = [
   "advantage",
@@ -144,10 +146,6 @@ function rateOf(value: unknown): string | null {
   return Number(normalized) < 100 ? normalized : null;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /**
  * Parses `oranlar` defensively. Accepted shapes:
  * - `{ <family>: { <countKey>: <rate>, ... }, ... }` (the expected one);
@@ -176,13 +174,14 @@ export function parsePaytrInstallmentRates(
     if (conflicted.has(conflictKey)) return;
     const table = (rates[family] ??= {});
     const existing = table[String(count)];
-    if (existing !== undefined && existing !== rate) {
+    // Compared as numbers: "2.8" and "2.80" are the same rate, not a conflict.
+    if (existing !== undefined && Number(existing) !== Number(rate)) {
       delete table[String(count)];
       conflicted.add(conflictKey);
       ignored.push(`${path} (conflicting rate)`);
       return;
     }
-    table[String(count)] = rate;
+    if (existing === undefined) table[String(count)] = rate;
   };
 
   const readCounts = (
@@ -192,12 +191,12 @@ export function parsePaytrInstallmentRates(
   ) => {
     if (Array.isArray(value)) {
       value.forEach((item, index) => {
-        if (isPlainObject(item)) readCounts(family, item, `${path}[${index}]`);
+        if (isPlainRecord(item)) readCounts(family, item, `${path}[${index}]`);
         else ignored.push(`${path}[${index}]`);
       });
       return;
     }
-    if (!isPlainObject(value)) {
+    if (!isPlainRecord(value)) {
       ignored.push(path);
       return;
     }
@@ -225,10 +224,10 @@ export function parsePaytrInstallmentRates(
 
   if (Array.isArray(oranlar)) {
     oranlar.forEach((item, index) => {
-      if (isPlainObject(item)) readFamilies(item, `oranlar[${index}]`);
+      if (isPlainRecord(item)) readFamilies(item, `oranlar[${index}]`);
       else ignored.push(`oranlar[${index}]`);
     });
-  } else if (isPlainObject(oranlar)) {
+  } else if (isPlainRecord(oranlar)) {
     readFamilies(oranlar, "oranlar");
   } else {
     ignored.push("oranlar");
@@ -240,8 +239,14 @@ export function parsePaytrInstallmentRates(
   return { rates, ignored };
 }
 
-/** `max_inst_non_bus` as an integer 0-12, else undefined. */
-export function parsePaytrMaxInstallment(value: unknown): number | undefined {
+/**
+ * A PayTR installment count field as an integer 0-12, else undefined: the
+ * callback's `installment_count` (Direkt API 2. Adim), the status inquiry's
+ * `taksit` (Durum Sorgu, "0, 2-12") and `max_inst_non_bus` (Taksit Oranlari).
+ * 0 and 1 mean a single payment. Digits only: "13", "-1", "2x" and "2.5" are
+ * not counts, so every path stores the same value for the same answer.
+ */
+export function parsePaytrInstallmentCount(value: unknown): number | undefined {
   if (typeof value !== "number" && typeof value !== "string") return undefined;
   const text = String(value).trim();
   if (!/^\d{1,2}$/.test(text)) return undefined;

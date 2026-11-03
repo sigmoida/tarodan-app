@@ -2,7 +2,7 @@ import {
   isPaytrCardFamily,
   isPaytrInstallmentCount,
   parsePaytrInstallmentRates,
-  parsePaytrMaxInstallment,
+  parsePaytrInstallmentCount,
   PAYTR_CARD_FAMILIES,
 } from "./paytr-installments";
 
@@ -142,6 +142,15 @@ describe("parsePaytrInstallmentRates", () => {
     expect(ignored).toEqual(["oranlar[1].world.2 (conflicting rate)"]);
   });
 
+  it("treats the same rate in two notations as one rate, not a conflict", () => {
+    const { rates, ignored } = parsePaytrInstallmentRates([
+      { world: { taksit_2: 2.8 } },
+      { world: { taksit_2: "2.80" } },
+    ]);
+    expect(rates).toEqual({ world: { "2": "2.8" } });
+    expect(ignored).toEqual([]);
+  });
+
   it.each([[undefined], [null], ["[]"], [42]])(
     "returns an empty table for a missing or scalar oranlar: %p",
     (value) => {
@@ -152,8 +161,13 @@ describe("parsePaytrInstallmentRates", () => {
   );
 });
 
-describe("parsePaytrMaxInstallment", () => {
+describe("parsePaytrInstallmentCount", () => {
   it.each([
+    ["0", 0],
+    [" 3 ", 3],
+    ["-1", undefined],
+    ["2x", undefined],
+    [true, undefined],
     ["9", 9],
     [12, 12],
     [0, 0],
@@ -161,7 +175,7 @@ describe("parsePaytrMaxInstallment", () => {
     ["", undefined],
     ["6.5", undefined],
     [null, undefined],
-  ])("max_inst_non_bus %p -> %p", (raw, expected) => {
-    expect(parsePaytrMaxInstallment(raw)).toBe(expected);
+  ])("count %p -> %p", (raw, expected) => {
+    expect(parsePaytrInstallmentCount(raw)).toBe(expected);
   });
 });

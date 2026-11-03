@@ -166,9 +166,8 @@ import { isNothingLeftToRefund } from "./paytr-refund-rejection";
 import {
   isPaytrCardFamily,
   isPaytrInstallmentCount,
-  PAYTR_INSTALLMENT_COUNT_MAX,
   parsePaytrInstallmentRates,
-  parsePaytrMaxInstallment,
+  parsePaytrInstallmentCount,
   type PaytrBinLookupResult,
   type PaytrCardFamily,
   type PaytrInstallmentRatesResult,
@@ -372,7 +371,7 @@ export class PayTRService implements IPaymentProvider {
       // Durum Sorgu (https://dev.paytr.com/durum-sorgu) documents the count
       // as `taksit` ("0, 2-12"). `installment_count` is the callback's name
       // (Direkt API 2. Adim) and stays only as a fallback.
-      const installmentCount = statusInquiryInstallmentCount(
+      const installmentCount = parsePaytrInstallmentCount(
         data.taksit ?? data.installment_count ?? data.InstallmentCount,
       );
 
@@ -467,10 +466,8 @@ export class PayTRService implements IPaymentProvider {
     paymentAmount?: number;
     testMode?: boolean;
   } {
-    const installment =
-      callback.installment_count != null && callback.installment_count !== ""
-        ? parseInt(callback.installment_count, 10)
-        : undefined;
+    // Same validation as the status inquiry's `taksit` (0-12, digits only).
+    const installment = parsePaytrInstallmentCount(callback.installment_count);
     // Direkt API 2. adım (bildirim) dokümanı: CALLBACK'te payment_amount ×100 (KURUŞ)
     // gelir (örn. 34.56 TL → "3456"), total_amount ile AYNI birim. Kuruş → TL: /100.
     // DİKKAT: Step 1 İSTEĞİNDE payment_amount ondalık TL'dir ("100.99") — bu parse
@@ -490,9 +487,7 @@ export class PayTRService implements IPaymentProvider {
       errorCode: callback.failed_reason_code,
       errorMessage: callback.failed_reason_msg,
       paymentType: callback.payment_type,
-      installmentCount: Number.isFinite(installment as number)
-        ? installment
-        : undefined,
+      installmentCount: installment,
       currency: callback.currency,
       paymentAmount,
       testMode: callback.test_mode === "1",
@@ -755,6 +750,10 @@ export class PayTRService implements IPaymentProvider {
    * by `parsePaytrInstallmentRates`; `max_inst_non_bus` is the store's
    * maximum count for non-business cards. "Oranlar gunluk olarak
    * degisebilir": the caller stores a snapshot with `raw` and prices from it.
+   * Where `single_ratio=1` / `abroad_ratio=1` put their rates is not
+   * documented; they stay in `raw` until the staging capture (hub plan S0)
+   * shows the field, rather than being guessed (an echoed "1" flag must not
+   * be read as a 1% rate).
    * Never throws: a failure is `{ ok: false }`.
    */
   async getInstallmentRates(
@@ -812,7 +811,7 @@ export class PayTRService implements IPaymentProvider {
       return {
         ok: true,
         requestId: reqId,
-        maxInstallmentNonBusiness: parsePaytrMaxInstallment(
+        maxInstallmentNonBusiness: parsePaytrInstallmentCount(
           data.max_inst_non_bus,
         ),
         rates,
@@ -1194,7 +1193,9 @@ export class PayTRService implements IPaymentProvider {
         }))
         .filter((c): c is typeof c & { ctoken: string } => !!c.ctoken);
     } catch (error: unknown) {
-      this.logger.error(`PayTR capi/list failed: ${errorMessage(error)}`);
+      this.logger.error(
+        `PayTR capi/list failed merchant=${this.merchant}: ${errorMessage(error)}`,
+      );
       return [];
     }
   }
@@ -1319,14 +1320,6 @@ function statusInquiryPaymentType(
   if (method === "KART") return "card";
   if (method === "EFT") return "eft";
   return method.toLowerCase();
-}
-
-/** `taksit` as 0-12 (0 and 1 mean a single payment); undefined if invalid. */
-function statusInquiryInstallmentCount(value: unknown): number | undefined {
-  const text = textOf(value);
-  if (text === undefined || !/^\d{1,2}$/.test(text)) return undefined;
-  const count = Number.parseInt(text, 10);
-  return count <= PAYTR_INSTALLMENT_COUNT_MAX ? count : undefined;
 }
 
 /**

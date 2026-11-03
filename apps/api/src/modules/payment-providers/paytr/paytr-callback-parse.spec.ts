@@ -57,4 +57,14 @@ describe("PayTRService.parseCallback — rich field extraction", () => {
     const r = svc.parseCallback({ ...base, payment_amount: "3456" });
     expect(r.paymentAmount).toBe(34.56);
   });
+
+  // Same validation as the status inquiry's `taksit`, so the stored count
+  // does not depend on which path completed the payment.
+  it.each([["13"], ["-1"], ["2x"], ["2.5"], [""]])(
+    "drops an installment_count that is not 0-12 (%p)",
+    (installment_count) => {
+      const r = svc.parseCallback({ ...base, installment_count });
+      expect(r.installmentCount).toBeUndefined();
+    },
+  );
 });
