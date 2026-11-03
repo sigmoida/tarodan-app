@@ -13,6 +13,7 @@ import type {
   PaytrSettlementSummaryEntry,
   PaytrSettlementDetailEntry,
 } from "./paytr/paytr.service";
+import type { PaytrCardFamily } from "./paytr/paytr-installments";
 
 /**
  * #89: the payment-provider contract. Money-path consumers depend on this
@@ -75,7 +76,10 @@ export interface IPaymentProvider {
     buyer: PayTRBuyer,
     basketItems: PayTRBasketItem[],
     options?: {
+      /** 2-12 installments; absent, 0 or 1 is a single payment. */
       installmentCount?: number;
+      /** PayTR `card_type`, sent only with installments (not signed). */
+      cardType?: PaytrCardFamily;
       /** The query of both return URLs (`paymentReturnQuery`). */
       returnQueryParams?: string;
       storeCard?: boolean;

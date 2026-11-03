@@ -159,6 +159,82 @@ describe("PayTRService installment signing (single payment pins)", () => {
     });
   });
 
+  describe("createDirectPaymentForm, installments (no caller yet)", () => {
+    it("signs installment_count and sends card_type outside the token", async () => {
+      const fields = await formFields({
+        installmentCount: 6,
+        cardType: "world",
+      });
+
+      expect(fields.installment_count).toBe("6");
+      expect(fields.card_type).toBe("world");
+      // card_type is not in the Direct API hash (1. Adim samples).
+      expect(fields.paytr_token).toBe(
+        tokenOf({
+          oid: "ORDSINGLE1",
+          amount: "1234.50",
+          installment: "6",
+          non3d: "0",
+        }),
+      );
+    });
+
+    it("sends card_type with a saved card too (Kayitli karttan odeme)", async () => {
+      const fields = await formFields({
+        installmentCount: 3,
+        cardType: "saglamkart",
+        savedCard: { utoken: "UT1", ctoken: "CT1", requireCvv: true },
+      });
+      expect(fields.installment_count).toBe("3");
+      expect(fields.card_type).toBe("saglamkart");
+      expect(fields.ctoken).toBe("CT1");
+    });
+
+    it("allows installments without card_type", async () => {
+      const fields = await formFields({ installmentCount: 12 });
+      expect(fields.installment_count).toBe("12");
+      expect(fields).not.toHaveProperty("card_type");
+    });
+
+    it.each([0, 1, undefined])(
+      "never sends card_type on a single payment (installmentCount %p)",
+      async (installmentCount) => {
+        const fields = await formFields({
+          installmentCount,
+          cardType: "axess",
+        });
+        expect(fields.installment_count).toBe("0");
+        expect(fields).not.toHaveProperty("card_type");
+        expect(fields.paytr_token).toBe(
+          tokenOf({
+            oid: "ORDSINGLE1",
+            amount: "1234.50",
+            installment: "0",
+            non3d: "0",
+          }),
+        );
+      },
+    );
+
+    it.each([13, 2.5, -1, Number.NaN])(
+      "refuses to sign installmentCount %p",
+      async (installmentCount) => {
+        await expect(formFields({ installmentCount })).rejects.toThrow(
+          /installment_count/,
+        );
+      },
+    );
+
+    it("refuses a card_type outside PayTR's families (BIN brand 'none')", async () => {
+      await expect(
+        formFields({
+          installmentCount: 3,
+          cardType: "none" as never,
+        }),
+      ).rejects.toThrow(/card_type/);
+    });
+  });
+
   describe("chargeRecurring (membership renewals)", () => {
     it("always sends and signs installment_count 0, with no card_type", async () => {
       fetchSpy.mockResolvedValue({

@@ -194,9 +194,12 @@ import {
 } from "./paytr-fetch-retry.util";
 import { isNothingLeftToRefund } from "./paytr-refund-rejection";
 import {
+  isPaytrCardFamily,
+  isPaytrInstallmentCount,
   PAYTR_INSTALLMENT_COUNT_MAX,
   parsePaytrInstallmentRates,
   parsePaytrMaxInstallment,
+  type PaytrCardFamily,
   type PaytrInstallmentRatesResult,
 } from "./paytr-installments";
 import { isPaytrSuccess, isPlainRecord, textOf } from "./paytr-response.util";
@@ -844,7 +847,18 @@ export class PayTRService implements IPaymentProvider {
     buyer: PayTRBuyer,
     basketItems: PayTRBasketItem[],
     options?: {
+      /**
+       * Installments: an integer 2-12 (signed as `installment_count`).
+       * Absent, 0 or 1 is a single payment ("0"); anything else throws.
+       */
       installmentCount?: number;
+      /**
+       * `card_type` (Direkt API 1. Adim, optional, "Taksitli islemlerde
+       * kullanmak uzere"): the card family from the BIN lookup's `brand`.
+       * Sent only with an installment count, never on a single payment,
+       * and not part of the token, so it cannot change the signed amount.
+       */
+      cardType?: PaytrCardFamily;
       /**
        * The query of BOTH return URLs, e.g. "paymentId=...&type=boost"
        * (`paymentReturnQuery`): the success page verifies the payment with it,
@@ -886,12 +900,7 @@ export class PayTRService implements IPaymentProvider {
     // ×100). chargeRecurring de aynı /odeme'yi ONDALIK TL ile çağırır — tutarlı.
     const paymentAmountStr = amount.toFixed(2); // ONDALIK TL
     const paymentType = "card";
-    // Tek çekim için '0' gönderilir (Direkt API kuralı)
-    const installmentCount = String(
-      options?.installmentCount && options.installmentCount > 1
-        ? options.installmentCount
-        : 0,
-    );
+    const { installmentCount, cardType } = directFormInstallment(options);
     const currency = "TL";
     const testMode = this.resolveTestMode(options?.testMode);
     const testModeStr = testMode ? "1" : "0";
@@ -955,6 +964,7 @@ export class PayTRService implements IPaymentProvider {
       debug_on: testMode ? "1" : "0",
       client_lang: "tr",
     });
+    if (cardType) formData.set("card_type", cardType);
 
     if (options?.savedCard) {
       formData.set("utoken", options.savedCard.utoken);
@@ -1315,4 +1325,30 @@ function statusInquiryInstallmentCount(value: unknown): number | undefined {
   if (text === undefined || !/^\d{1,2}$/.test(text)) return undefined;
   const count = Number.parseInt(text, 10);
   return count <= PAYTR_INSTALLMENT_COUNT_MAX ? count : undefined;
+}
+
+/**
+ * `installment_count` and `card_type` of a Direct API form (Direkt API 1.
+ * Adim: "0" single payment, 2-12 installments). Absent, 0 and 1 stay a
+ * single payment exactly as before; a count outside 2-12 or a card type
+ * outside PayTR's list is a programming error and throws (fail closed: no
+ * form is signed). `card_type` is only meaningful for installments, so a
+ * single payment never sends it.
+ */
+function directFormInstallment(options?: {
+  installmentCount?: number;
+  cardType?: string;
+}): { installmentCount: string; cardType?: PaytrCardFamily } {
+  const count = options?.installmentCount;
+  if (count === undefined || count === 0 || count === 1) {
+    return { installmentCount: "0" };
+  }
+  if (!isPaytrInstallmentCount(count)) {
+    throw new Error(`PayTR installment_count must be 0 or 2-12, got ${count}`);
+  }
+  const cardType = options?.cardType;
+  if (cardType !== undefined && !isPaytrCardFamily(cardType)) {
+    throw new Error(`PayTR card_type is not a card family: ${cardType}`);
+  }
+  return { installmentCount: String(count), cardType };
 }
