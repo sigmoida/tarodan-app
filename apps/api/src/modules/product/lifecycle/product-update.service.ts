@@ -694,6 +694,9 @@ export class ProductUpdateService {
                 },
               },
             },
+            // Same as the re-read below: without it a manufacturer-only edit
+            // answered `manufacturer: null`.
+            manufacturer: { select: { id: true, name: true, slug: true } },
             productAttributes: {
               include: { attribute: { include: { group: true } } },
             },

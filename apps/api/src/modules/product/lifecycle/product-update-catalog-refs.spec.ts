@@ -245,6 +245,22 @@ describe("ProductUpdateService: catalog references on edit", () => {
       expectUntouched(writtenData(tx), "manufacturer");
     });
 
+    it("saves a manufacturer change and answers with the manufacturer", async () => {
+      const { service, tx } = makeService({
+        makers: [...ACTIVE_CATALOG.makers, { id: "maker-2", isActive: true }],
+      });
+
+      await save(service, { manufacturerId: "maker-2" });
+
+      expect(writtenData(tx)).toMatchObject({
+        manufacturer: { connect: { id: "maker-2" } },
+      });
+      // The response is formatted from this row, without a re-read.
+      expect(tx.product.update.mock.calls[0][0].include).toHaveProperty(
+        "manufacturer",
+      );
+    });
+
     it("refuses a brand change that keeps the old brand's model", async () => {
       const { service, prisma } = makeService();
 
