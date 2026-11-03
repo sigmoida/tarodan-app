@@ -10,7 +10,14 @@
 -- runs a migration in a transaction, so CREATE INDEX CONCURRENTLY is not used;
 -- same plain-index precedent as 20261006100000.)
 --
+-- `lock_timeout` 3 s: while the SHARE request waits (behind an open write
+-- transaction on payments), every later payment write queues behind it. A
+-- timeout rolls this migration back and Prisma blocks later deploys (P3009)
+-- until it is marked rolled back; recovery in docs/OPERATIONS.md,
+-- "Installment payments: schema".
+--
 -- Safe on live data: no row changes; NULLs never collide in a unique index.
 -- Rollback: DROP INDEX "payments_charge_attempt_id_key"; (only together with
 -- the rest of the installment schema, see 20261103120000).
+SET LOCAL lock_timeout = '3s';
 CREATE UNIQUE INDEX "payments_charge_attempt_id_key" ON "payments"("charge_attempt_id");

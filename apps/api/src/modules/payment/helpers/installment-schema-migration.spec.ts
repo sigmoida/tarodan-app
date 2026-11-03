@@ -60,6 +60,26 @@ describe(`migrations ${SCHEMA}, ${VALIDATE}, ${INDEX}`, () => {
     }
   });
 
+  it("bounds the lock waits that queue app traffic, before the first statement that locks", () => {
+    // A waiting ACCESS EXCLUSIVE (schema) or SHARE (index) request queues
+    // every later read or write of the table behind it; a 3 s timeout fails
+    // the migration safely instead (rolled back, P3009, runbook recovery).
+    // LOCAL: it ends with Prisma's migration transaction.
+    const firstStatement = (sql: string) =>
+      sql
+        .split(";")
+        .map((part) => part.trim())
+        .find(Boolean);
+    expect(firstStatement(schemaSql)).toBe("SET LOCAL lock_timeout = '3s'");
+    expect(firstStatement(indexSql)).toBe("SET LOCAL lock_timeout = '3s'");
+    for (const sql of [schemaSql, indexSql]) {
+      expect(sql).not.toMatch(/\bSET\s+(SESSION\s+)?lock_timeout/i);
+    }
+    // VALIDATE (SHARE UPDATE EXCLUSIVE) does not conflict with reads or
+    // writes: no timeout, so no extra failed-deploy path.
+    expect(validateSql).not.toMatch(/lock_timeout/);
+  });
+
   it("alters the existing tables in the payment -> order lock order", () => {
     const first = (table: string) =>
       schemaSql.indexOf(`ALTER TABLE "${table}"`);
@@ -152,6 +172,7 @@ describe(`migrations ${SCHEMA}, ${VALIDATE}, ${INDEX}`, () => {
       .map((s) => s.trim())
       .filter(Boolean);
     expect(statements).toEqual([
+      "SET LOCAL lock_timeout = '3s'",
       'CREATE UNIQUE INDEX "payments_charge_attempt_id_key" ON "payments"("charge_attempt_id")',
     ]);
   });
