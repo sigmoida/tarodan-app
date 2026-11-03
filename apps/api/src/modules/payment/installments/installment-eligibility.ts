@@ -3,6 +3,7 @@ import { INSTALLMENT_COUNT_MAX, INSTALLMENT_COUNT_MIN } from "@tarodan/types";
 import type { InstallmentBuyerSegment } from "@tarodan/types";
 import {
   isPaytrCardFamily,
+  parsePaytrRate,
   type PaytrCardFamily,
 } from "../../payment-providers/paytr/paytr-installments";
 import { INSTALLMENT_KEEP_GUARD_ENABLED } from "./installment-config";
@@ -96,18 +97,10 @@ export interface InstallmentRateSource {
   rates: Prisma.JsonValue;
 }
 
-const RATE_TEXT = /^\d{1,2}(?:\.\d+)?$/;
-
+/** A stored rate, read like a PayTR answer (`parsePaytrRate`). */
 function rateOf(value: unknown): Prisma.Decimal | null {
-  const text =
-    typeof value === "number" && Number.isFinite(value)
-      ? String(value)
-      : typeof value === "string"
-        ? value.trim()
-        : null;
-  return text !== null && RATE_TEXT.test(text)
-    ? new Prisma.Decimal(text)
-    : null;
+  const text = parsePaytrRate(value);
+  return text === null ? null : new Prisma.Decimal(text);
 }
 
 /** Card families present in a snapshot's rate table. */
@@ -175,7 +168,18 @@ export interface InstallmentOfferInput {
   slices: readonly KeepGuardSlice[] | null;
 }
 
+/** What happened to one count PayTR offers. */
+export type InstallmentCountOutcome =
+  | { count: number; status: "offered"; offer: InstallmentOffer }
+  | {
+      count: number;
+      status: "excluded_by_rule" | "excluded_by_keep_guard" | "unpriceable";
+      rule: ResolvedInstallmentRule;
+    };
+
 export interface InstallmentOfferResult {
+  /** Every count PayTR offers, ascending, with its outcome (admin preview). */
+  counts: InstallmentCountOutcome[];
   /** The counts above 1 that may be charged, ascending. */
   offers: InstallmentOffer[];
   /** Counts PayTR offers for the card family. */
@@ -192,6 +196,7 @@ export function evaluateInstallmentOffer(
   input: InstallmentOfferInput,
 ): InstallmentOfferResult {
   const result: InstallmentOfferResult = {
+    counts: [],
     offers: [],
     offeredByPaytr: [],
     excludedByRule: [],
@@ -211,6 +216,7 @@ export function evaluateInstallmentOffer(
     );
     if (!rule.allowed) {
       result.excludedByRule.push(count);
+      result.counts.push({ count, status: "excluded_by_rule", rule });
       continue;
     }
     let price: InstallmentPrice;
@@ -227,6 +233,7 @@ export function evaluateInstallmentOffer(
       // Rates outside the formula's domain: that count is not charged.
       if (error instanceof RangeError) {
         result.unpriceable.push(count);
+        result.counts.push({ count, status: "unpriceable", rule });
         continue;
       }
       throw error;
@@ -237,9 +244,12 @@ export function evaluateInstallmentOffer(
       !keepGuardHolds(price, installmentRatePct, input.slices)
     ) {
       result.excludedByKeepGuard.push(count);
+      result.counts.push({ count, status: "excluded_by_keep_guard", rule });
       continue;
     }
-    result.offers.push({ price, installmentRatePct, rule });
+    const offer: InstallmentOffer = { price, installmentRatePct, rule };
+    result.offers.push(offer);
+    result.counts.push({ count, status: "offered", offer });
   }
   return result;
 }

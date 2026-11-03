@@ -22,12 +22,13 @@ import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 import { isPaytrCardFamily } from "../../payment-providers/paytr/paytr-installments";
 import { INSTALLMENT_FEE_VAT_RATE_PCT } from "./installment-config";
-import { offeredInstallmentCounts } from "./installment-eligibility";
-import { priceInstallment } from "./installment-pricing";
+import {
+  evaluateInstallmentOffer,
+  offeredInstallmentCounts,
+} from "./installment-eligibility";
 import { InstallmentRatesService } from "./installment-rates.service";
 import {
   liveInstallmentRulesWhere,
-  resolveInstallmentRule,
   type InstallmentRuleCandidate,
 } from "./installment-rules";
 
@@ -231,45 +232,39 @@ export class InstallmentRulesService {
       });
     }
 
-    const rows: AdminInstallmentPreviewRow[] = [];
-    for (const { count, installmentRatePct } of offered) {
-      const rule = resolveInstallmentRule(
-        candidates,
-        query.segment,
-        count,
-        now,
-      );
+    // The same loop the buyer's options run (minus the keep guard, which
+    // needs orders): a new exclusion there reaches the preview too.
+    const { counts } = evaluateInstallmentOffer({
+      baseAmount,
+      snapshot,
+      family: query.family,
+      segment: query.segment,
+      rules: candidates,
+      now,
+      feeVatRatePct: INSTALLMENT_FEE_VAT_RATE_PCT,
+      slices: null,
+    });
+    const rows = counts.map((outcome): AdminInstallmentPreviewRow => {
+      const rule =
+        outcome.status === "offered" ? outcome.offer.rule : outcome.rule;
       const base = {
-        count,
+        count: outcome.count,
         platformSharePct: rule.platformSharePct.toNumber(),
         ruleId: rule.ruleId,
       };
-      if (!rule.allowed) {
-        rows.push({ ...base, offered: false, ...NO_PRICE });
-        continue;
+      if (outcome.status !== "offered") {
+        return { ...base, offered: false, ...NO_PRICE };
       }
-      try {
-        const price = priceInstallment({
-          baseAmount,
-          count,
-          singleRatePct: snapshot.singleRatePct,
-          installmentRatePct,
-          platformSharePct: rule.platformSharePct,
-          feeVatRatePct: INSTALLMENT_FEE_VAT_RATE_PCT,
-        });
-        rows.push({
-          ...base,
-          offered: true,
-          totalAmount: price.chargedAmount.toNumber(),
-          feeAmount: price.feeAmount.toNumber(),
-          monthlyAmount: price.monthlyAmount.toNumber(),
-          platformCostAmount: price.platformCostAmount.toNumber(),
-        });
-      } catch (error: unknown) {
-        if (!(error instanceof RangeError)) throw error;
-        rows.push({ ...base, offered: false, ...NO_PRICE });
-      }
-    }
+      const { price } = outcome.offer;
+      return {
+        ...base,
+        offered: true,
+        totalAmount: price.chargedAmount.toNumber(),
+        feeAmount: price.feeAmount.toNumber(),
+        monthlyAmount: price.monthlyAmount.toNumber(),
+        platformCostAmount: price.platformCostAmount.toNumber(),
+      };
+    });
     return { ...answer, rows };
   }
 

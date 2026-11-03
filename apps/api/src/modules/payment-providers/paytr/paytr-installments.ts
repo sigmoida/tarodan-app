@@ -135,8 +135,12 @@ function countOf(key: string): number | null {
   return count >= 1 && count <= PAYTR_INSTALLMENT_COUNT_MAX ? count : null;
 }
 
-/** Normalizes a rate to a dot-decimal string in [0, 100), else null. */
-function rateOf(value: unknown): string | null {
+/**
+ * A PayTR rate as a dot-decimal string in [0, 100), else null: a number or a
+ * text with a dot or a Turkish comma. The one reading of a rate value, for
+ * the PayTR answer and for the stored snapshot alike.
+ */
+export function parsePaytrRate(value: unknown): string | null {
   let text: string;
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null;
@@ -207,7 +211,7 @@ export function parsePaytrInstallmentRates(
     }
     for (const [key, raw] of Object.entries(value)) {
       const count = countOf(key);
-      const rate = count === null ? null : rateOf(raw);
+      const rate = count === null ? null : parsePaytrRate(raw);
       if (count === null || rate === null) {
         ignored.push(`${path}.${key}`);
         continue;
@@ -266,7 +270,7 @@ export function parsePaytrSingleRate(
 ): string | undefined {
   let found: string | undefined;
   for (const field of fields) {
-    const rate = rateOf(answer[field]);
+    const rate = parsePaytrRate(answer[field]);
     if (rate === null) continue;
     if (found !== undefined && Number(found) !== Number(rate)) return undefined;
     found ??= rate;

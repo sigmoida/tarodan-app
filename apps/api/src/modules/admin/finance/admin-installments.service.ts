@@ -12,13 +12,15 @@ import type {
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { InstallmentSettingsService } from "../../payment/installments/installment-settings.service";
-import { InstallmentRatesService } from "../../payment/installments/installment-rates.service";
+import {
+  InstallmentRatesService,
+  isRateSnapshotFresh,
+} from "../../payment/installments/installment-rates.service";
 import {
   InstallmentRulesService,
   toAdminInstallmentRule,
   type InstallmentRuleWrite,
 } from "../../payment/installments/installment-rules.service";
-import { INSTALLMENT_RATES_MAX_AGE_MS } from "../../payment/installments/installment-config";
 import { rateFamiliesOf } from "../../payment/installments/installment-eligibility";
 import type { InstallmentPreviewQueryDto } from "./dto/installments.dto";
 
@@ -167,8 +169,7 @@ export class AdminInstallmentsService {
     return {
       rateSnapshotId: latest.id,
       fetchedAt: latest.fetchedAt.toISOString(),
-      fresh:
-        Date.now() - latest.fetchedAt.getTime() < INSTALLMENT_RATES_MAX_AGE_MS,
+      fresh: isRateSnapshotFresh(latest),
       maxInstallmentNonBusiness: latest.maxInstallmentNonBusiness,
       families: rateFamiliesOf(latest.rates),
     };
