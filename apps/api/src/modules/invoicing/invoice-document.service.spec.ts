@@ -119,3 +119,24 @@ describe("InvoiceDocumentService.resolveRecipient — mükellefiyet sağlayıcı
     expect(provider.resolveRecipientKind).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The installment fee document (ADR 0019, D4) is invoiced at the VAT rate
+ * snapshotted on the charge it was collected with. The generic resolver must
+ * refuse it rather than invoice it at today's rate.
+ */
+describe("InvoiceDocumentService.resolveVatRate", () => {
+  it("refuses a type whose rate is snapshotted on the charge", async () => {
+    const { service } = build(fakeProvider("local"));
+
+    await expect(
+      service.resolveVatRate("buyer_installment_fee"),
+    ).rejects.toThrow(/snapshotted on the charge/);
+  });
+
+  it("still resolves the standard fallback for other types", async () => {
+    const { service } = build(fakeProvider("local"));
+
+    await expect(service.resolveVatRate("membership")).resolves.toBe(20);
+  });
+});

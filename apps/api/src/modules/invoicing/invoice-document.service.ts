@@ -71,6 +71,15 @@ export class InvoiceDocumentService {
   ): Promise<number> {
     const source = VAT_SOURCE_BY_TYPE[type] ?? "standard";
 
+    // Fail closed: a rate fixed at charge time must come from that charge's
+    // snapshot; a resolved "today" rate could disagree with the VAT the
+    // buyer paid.
+    if (source === "charge_snapshot") {
+      throw new Error(
+        `VAT rate of ${type} is snapshotted on the charge; pass it in instead of resolving it`,
+      );
+    }
+
     if (source === "service" && this.taxPolicy) {
       try {
         const policy = await this.taxPolicy.resolve();

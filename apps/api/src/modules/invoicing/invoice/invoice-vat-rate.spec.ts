@@ -182,8 +182,12 @@ const singleOrderPackage = (orderId: string, over: any = {}) => ({
 describe("fatura KDV oranının kaynağı", () => {
   it("her fatura türünün bir oran kaynağı tanımlıdır", () => {
     for (const source of Object.values(VAT_SOURCE_BY_TYPE)) {
-      expect(["service", "category", "standard"]).toContain(source);
+      expect(["service", "category", "standard", "charge_snapshot"]).toContain(
+        source,
+      );
     }
+    // The installment fee VAT was fixed when the charge was priced (ADR 0019).
+    expect(VAT_SOURCE_BY_TYPE.buyer_installment_fee).toBe("charge_snapshot");
     expect(VAT_SOURCE_BY_TYPE.commission).toBe("service");
     expect(VAT_SOURCE_BY_TYPE.service_fee).toBe("service");
     expect(VAT_SOURCE_BY_TYPE.platform_sale).toBe("category");

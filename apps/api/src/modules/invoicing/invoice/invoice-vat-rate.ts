@@ -15,7 +15,16 @@ import { FiscalInvoiceType } from "@prisma/client";
  *  - `standard` → Kategorisi olmayan tüketici hizmetleri (üyelik, öne çıkarma).
  *                 Bölgenin varsayılan oranı, yoksa `ELOGO_VAT_RATE`.
  */
-export type InvoiceVatSource = "service" | "category" | "standard";
+export type InvoiceVatSource =
+  | "service"
+  | "category"
+  | "standard"
+  /**
+   * The rate was fixed when the charge was priced and is snapshotted on it
+   * (`PaymentChargeAttempt.feeVatRatePct`): the issuer passes it in. The
+   * generic resolver refuses this source instead of guessing a rate.
+   */
+  | "charge_snapshot";
 
 export const VAT_SOURCE_BY_TYPE: Record<FiscalInvoiceType, InvoiceVatSource> = {
   commission: "service",
@@ -37,12 +46,10 @@ export const VAT_SOURCE_BY_TYPE: Record<FiscalInvoiceType, InvoiceVatSource> = {
   penalty: "service",
   membership: "standard",
   boost: "standard",
-  // Installment fee (ADR 0019 D4): a platform charge with no category and not
-  // collected under the service-fee VAT toggle. The rate actually collected
-  // is snapshotted per charge (`PaymentChargeAttempt.feeVatRatePct`); the
-  // document issuer (task A6) must read that snapshot. Nothing issues this
-  // type before A6.
-  buyer_installment_fee: "standard",
+  // Installment fee (ADR 0019 D4): the VAT inside it was fixed when the
+  // charge was priced (`PaymentChargeAttempt.feeVatRatePct`), not by the
+  // service-fee toggle or a category.
+  buyer_installment_fee: "charge_snapshot",
   // İade faturası kaynak faturanın oranını AYNEN taşır (snapshot); bu değer
   // yalnız kaynak çözülemediğinde devreye girer.
   return_invoice: "standard",
