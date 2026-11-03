@@ -1,15 +1,16 @@
-import * as request from 'supertest';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { OrderStatus, PaymentStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { buyNow } from "../factories/flows";
 
 /**
  * B-001 regression coverage.
@@ -19,18 +20,19 @@ import { createAddress } from '../factories/address.factory';
  *   2. Forward `useBypass` through every entry point (orders + membership) so the
  *      mobile client knows to call `/payments/:id/bypass-complete`.
  *   3. `bypass-complete` then completes the payment + transitions the order to paid.
+ *      It needs the payment owner's JWT (SEC-H1, 71a4e9af0), as the clients send.
  *
  * Pre-fix bug: membership.service.ts dropped `useBypass` from its response shape,
  * leaving the mobile screen stuck on "Bekliyor". This test pins both shapes + the
  * bypass-complete behaviour so the regression cannot return silently.
  */
-describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2e)', () => {
+describe("B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2e)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
   const originalBypass = process.env.PAYMENT_BYPASS;
 
   beforeAll(async () => {
-    process.env.PAYMENT_BYPASS = 'true';
+    process.env.PAYMENT_BYPASS = "true";
     ctx = await createE2ETestApp();
   });
 
@@ -46,8 +48,8 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
     baseline = await seedBaseline();
   });
 
-  describe('Order checkout', () => {
-    it('returns useBypass: true on initiate, then bypass-complete marks payment + order paid', async () => {
+  describe("Order checkout", () => {
+    it("returns useBypass: true on initiate, then bypass-complete marks payment + order paid", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -58,16 +60,12 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
       });
       const addr = await createAddress({ userId: buyer.id });
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
 
       const initiateRes = await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       // Contract: useBypass flag MUST be on the response root.
@@ -78,6 +76,7 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
 
       const completeRes = await request(ctx.app.getHttpServer())
         .post(`/api/payments/${initiateRes.body.paymentId}/bypass-complete`)
+        .set(authHeader(buyer))
         .send({})
         .expect(201);
       expect(completeRes.body.success).toBe(true);
@@ -99,31 +98,31 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
     });
   });
 
-  describe('Membership subscribe', () => {
-    it('forwards useBypass from paymentService through membership.subscribe response', async () => {
+  describe("Membership subscribe", () => {
+    it("forwards useBypass from paymentService through membership.subscribe response", async () => {
       const user = await createUser(ctx.module);
 
       // Need platform seller for membership virtual product.
       const prisma = getPrisma();
       await prisma.user.upsert({
-        where: { email: 'platform@tarodan.com' },
+        where: { email: "platform@tarodan.com" },
         update: {},
         create: {
-          email: 'platform@tarodan.com',
-          passwordHash: 'unused',
-          displayName: 'Platform',
-          sellerType: 'platform',
+          email: "platform@tarodan.com",
+          passwordHash: "unused",
+          displayName: "Platform",
+          sellerType: "platform",
           isSeller: true,
         },
       });
 
       // basic tier seed
       const tier = await prisma.membershipTier.upsert({
-        where: { type: 'basic' as any },
+        where: { type: "basic" as any },
         update: { monthlyPrice: 50 },
         create: {
-          type: 'basic' as any,
-          name: 'Basic',
+          type: "basic" as any,
+          name: "Basic",
           monthlyPrice: 50,
           yearlyPrice: 500,
           maxFreeListings: 10,
@@ -134,9 +133,9 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
       });
 
       const subscribeRes = await request(ctx.app.getHttpServer())
-        .post('/api/membership/subscribe')
+        .post("/api/membership/subscribe")
         .set(authHeader(user))
-        .send({ tierType: tier.type, billingPeriod: 'monthly' })
+        .send({ tierType: tier.type, billingPeriod: "monthly" })
         .expect(201);
 
       // The fix: useBypass must be forwarded — pre-fix dropped silently.
@@ -146,6 +145,7 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
 
       const completeRes = await request(ctx.app.getHttpServer())
         .post(`/api/payments/${subscribeRes.body.paymentId}/bypass-complete`)
+        .set(authHeader(user))
         .send({})
         .expect(201);
       expect(completeRes.body.success).toBe(true);
@@ -157,8 +157,8 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
     });
   });
 
-  describe('Idempotency', () => {
-    it('bypass-complete called twice does not corrupt payment state', async () => {
+  describe("Idempotency", () => {
+    it("bypass-complete called twice does not corrupt payment state", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -168,19 +168,16 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
         quantity: 1,
       });
       const addr = await createAddress({ userId: buyer.id });
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       const initiateRes = await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       await request(ctx.app.getHttpServer())
         .post(`/api/payments/${initiateRes.body.paymentId}/bypass-complete`)
+        .set(authHeader(buyer))
         .send({})
         .expect(201);
 
@@ -189,6 +186,7 @@ describe('B-001 — PAYMENT_BYPASS forwards useBypass and completes payments (e2
       // the payment row stays at completed and no orphan transitions occur.
       const second = await request(ctx.app.getHttpServer())
         .post(`/api/payments/${initiateRes.body.paymentId}/bypass-complete`)
+        .set(authHeader(buyer))
         .send({});
       expect([200, 201, 400]).toContain(second.status);
 
