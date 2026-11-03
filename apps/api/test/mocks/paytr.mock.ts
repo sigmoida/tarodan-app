@@ -6,8 +6,10 @@ import type {
   PayTRBuyer,
   PayTRBasketItem,
   PayTRCallbackData,
+  PayTRService,
   PayTRStatusInquiryResult,
 } from "../../src/modules/payment-providers/paytr/paytr.service";
+import { PaymentProviderRegistry } from "../../src/modules/payment-providers/payment-provider.registry";
 
 /**
  * In-memory PayTR mock for E2E tests.
@@ -457,6 +459,23 @@ export class MockPayTRService {
     this.nextRegisteredCardResult = null;
     this.storedCardsByUtoken.clear();
   }
+}
+
+/**
+ * A real PaymentProviderRegistry over a PayTR stub, for suites that construct
+ * money services by hand (no app boot). Money-path services resolve the PSP
+ * through the registry (#89), so a bare `{ createRefund }` in the provider slot
+ * fails with "resolve is not a function". The stub answers for every merchant.
+ */
+export function paymentProviderRegistryFor(
+  paytr: Partial<Record<keyof PayTRService, unknown>>,
+): PaymentProviderRegistry {
+  const provider = {
+    ...paytr,
+    key: "paytr",
+    forMerchant: () => provider,
+  };
+  return new PaymentProviderRegistry(provider as unknown as PayTRService);
 }
 
 /** The notification route of `merchant` (what its PayTR panel posts to). */

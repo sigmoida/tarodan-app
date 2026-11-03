@@ -19,7 +19,6 @@
  */
 import * as request from "supertest";
 import * as crypto from "crypto";
-import { randomUUID } from "crypto";
 import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
@@ -29,8 +28,9 @@ import {
 } from "../test-utils/db";
 import { createUser, authHeader } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
+import { guestCheckout as guestCheckoutFlow } from "../factories/flows";
 import { scenario } from "../test-utils/scenario";
-import { getLastEmailTo, extractCode, clearMailbox } from "../test-utils/mail";
+import { clearMailbox } from "../test-utils/mail";
 import { GoogleAuthService } from "../../src/modules/auth/social/google-auth.service";
 import { OrderGuestClaimService } from "../../src/modules/order/claim/order-guest-claim.service";
 
@@ -69,43 +69,7 @@ describe("Guest order claim on a verified e-mail (E2E)", () => {
       categoryId: baseline.categoryId,
       price: 250,
     });
-    await request(server())
-      .post("/api/orders/guest/send-verification-code")
-      .send({ email })
-      .expect(200);
-    const code = extractCode((await getLastEmailTo(email)).body, 6);
-    const tariff = await prisma.shippingTariff.findFirst({
-      where: { provider: "surat", status: "active" },
-      select: { version: true },
-    });
-    // Checkout pins the quoted price: send the quote's hash and rule set.
-    const quote = await request(server())
-      .post("/api/orders/quote")
-      .send({ items: [{ productId: product.id, quantity: 1 }] })
-      .expect(201);
-    const res = await request(server())
-      .post("/api/orders/checkout/guest")
-      .send({
-        items: [{ productId: product.id }],
-        idempotencyKey: randomUUID(),
-        email,
-        emailVerificationCode: code,
-        phone: "+905551234567",
-        guestName: "Guest Buyer",
-        expectedShippingTariffVersion: tariff?.version ?? 1,
-        expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
-        expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
-        expectedPricingHash: quote.body.pricingHash,
-        shippingAddress: {
-          fullName: "Guest Buyer",
-          phone: "+905551234567",
-          city: "Istanbul",
-          district: "Kadikoy",
-          address: "Example Street 1",
-        },
-      })
-      .expect(201);
-    return res.body.checkoutGroupId as string;
+    return guestCheckoutFlow(ctx, { productId: product.id, email });
   }
 
   /** Owners of the group, its packages and its orders. */

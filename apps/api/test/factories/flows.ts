@@ -1,13 +1,18 @@
 /**
- * Yüksek-seviye akış yardımcıları — API E2E için sık tekrar eden çok-adımlı senaryolar.
+ * High-level flow helpers for API E2E: multi-step scenarios that suites repeat.
  *
- * Senaryolar ürün→sipariş→ödeme→kargo→payout zincirini sürekli kurar; bu helper'lar
- * o zinciri gerçek endpoint'ler üzerinden (mock PayTR + Sürat stub ile) tek çağrıya indirir.
- * Kaynak pattern'ler: refund-flow.e2e-spec.ts:buyAndPay ve apps/web/e2e/support/journeys-extra.ts.
+ * Suites keep building the product -> order -> payment -> cargo -> payout
+ * chain; these helpers drive it through the real endpoints (mock PayTR and the
+ * Surat stub) in one call, with the request contract the clients send today.
+ * Source patterns: refund-flow.e2e-spec.ts:buyAndPay and
+ * apps/web/e2e/support/journeys-extra.ts.
  */
+import { once } from "events";
+import { randomUUID } from "crypto";
 import * as request from "supertest";
 import { E2ETestApp } from "../test-utils/create-app";
 import { getPrisma } from "../test-utils/db";
+import { extractCode, getLastEmailTo } from "../test-utils/mail";
 import { authHeader } from "./user.factory";
 import { createOfferRow } from "./offer.factory";
 import { paytrCallbackPath, signCallback } from "../mocks/paytr.mock";
@@ -17,7 +22,10 @@ type Auth = { accessToken: string };
 
 const server = (ctx: E2ETestApp) => ctx.app.getHttpServer();
 
-/** POST /api/orders/buy — pending_payment sipariş oluştur (ödeme yok). */
+/**
+ * POST /api/orders/buy with the current contract (quote pricing hash, tariff
+ * and commission rule set pins): a pending_payment order, not paid.
+ */
 export function buyNow(
   ctx: E2ETestApp,
   buyer: Auth,
@@ -30,26 +38,29 @@ export function buyNow(
 
   let prepared: Promise<void> | undefined;
   const prepareBody = () =>
-    (prepared ??= getPrisma()
-      .shippingTariff.findFirst({
-        where: { provider: "surat", status: "active" },
-        select: { version: true },
-      })
-      .then(async (tariff) => {
-        const quote = await request(server(ctx))
-          .post("/api/orders/quote")
-          .send({ items: [{ productId, quantity: 1 }] });
-        req.send({
-          productId,
-          ...(shippingAddressId ? { shippingAddressId } : {}),
-          expectedShippingTariffVersion: tariff?.version ?? 1,
-          expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
-          expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
-          ...(quote.status === 201 && quote.body.pricingHash
-            ? { expectedPricingHash: quote.body.pricingHash }
-            : {}),
-        });
-      }));
+    (prepared ??= activeShippingTariffVersion().then(async (tariffVersion) => {
+      // Send the quote to the outer request's URL, not to the server object.
+      // supertest >= 7.3 shares the ephemeral server between requests made
+      // from the same server and closes it when the last pending one
+      // settles. The outer `buy` request is not dispatched yet, so a quote
+      // made via `request(server(ctx))` would close the server under it and
+      // the buy would fail with ECONNREFUSED.
+      const httpServer = server(ctx);
+      if (!httpServer.listening) await once(httpServer, "listening");
+      const quote = await request(new URL(req.url).origin)
+        .post("/api/orders/quote")
+        .send({ items: [{ productId, quantity: 1 }] });
+      req.send({
+        productId,
+        ...(shippingAddressId ? { shippingAddressId } : {}),
+        expectedShippingTariffVersion: tariffVersion,
+        expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
+        expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
+        ...(quote.status === 201 && quote.body.pricingHash
+          ? { expectedPricingHash: quote.body.pricingHash }
+          : {}),
+      });
+    }));
 
   const originalThen = req.then.bind(req);
   req.then = ((onFulfilled?: any, onRejected?: any) =>
@@ -67,6 +78,60 @@ export function buyNow(
   }) as typeof req.end;
 
   return req;
+}
+
+/** The active Surat tariff version that order-create requests pin. */
+async function activeShippingTariffVersion(): Promise<number> {
+  const tariff = await getPrisma().shippingTariff.findFirst({
+    where: { provider: "surat", status: "active" },
+    select: { version: true },
+  });
+  return tariff?.version ?? 1;
+}
+
+/**
+ * Guest cart checkout through the real endpoints, as web sends it: the OTP
+ * mail (read from Mailpit), the quote, then POST /orders/checkout/guest with
+ * the quote's pricing pins. A guest purchase is always a checkout group;
+ * returns its id.
+ */
+export async function guestCheckout(
+  ctx: E2ETestApp,
+  params: { productId: string; email: string },
+): Promise<string> {
+  const { productId, email } = params;
+  await request(server(ctx))
+    .post("/api/orders/guest/send-verification-code")
+    .send({ email })
+    .expect(200);
+  const code = extractCode((await getLastEmailTo(email)).body, 6);
+  const quote = await request(server(ctx))
+    .post("/api/orders/quote")
+    .send({ items: [{ productId, quantity: 1 }] })
+    .expect(201);
+  const res = await request(server(ctx))
+    .post("/api/orders/checkout/guest")
+    .send({
+      items: [{ productId }],
+      idempotencyKey: randomUUID(),
+      email,
+      emailVerificationCode: code,
+      phone: "+905551234567",
+      guestName: "Guest Buyer",
+      expectedShippingTariffVersion: await activeShippingTariffVersion(),
+      expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
+      expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
+      expectedPricingHash: quote.body.pricingHash,
+      shippingAddress: {
+        fullName: "Guest Buyer",
+        phone: "+905551234567",
+        city: "Istanbul",
+        district: "Kadikoy",
+        address: "Example Street 1",
+      },
+    })
+    .expect(201);
+  return res.body.checkoutGroupId as string;
 }
 
 /**
@@ -144,16 +209,38 @@ export async function initiatePayment(
   };
 }
 
+/**
+ * The latest payment that charges `orderId`. Every order sits in a checkout
+ * group (a direct buy opens a single-order group, a3588f12e) and an order's
+ * payment is the group's single payment (df83a09fc), which carries
+ * `checkoutGroupId` and no `orderId`; only legacy/offer payments are order-keyed.
+ */
+export async function latestPaymentOfOrder(orderId: string) {
+  const prisma = getPrisma();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { checkoutGroupId: true },
+  });
+  return prisma.payment.findFirst({
+    where: {
+      OR: [
+        { orderId },
+        ...(order?.checkoutGroupId
+          ? [{ checkoutGroupId: order.checkoutGroupId }]
+          : []),
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 /** Siparişin son payment'ına başarılı PayTR callback'i gönder → completed + escrow held. */
 export async function completePaymentByCallback(
   ctx: E2ETestApp,
   orderId: string,
 ): Promise<void> {
   const prisma = getPrisma();
-  const payment = await prisma.payment.findFirst({
-    where: { orderId },
-    orderBy: { createdAt: "desc" },
-  });
+  const payment = await latestPaymentOfOrder(orderId);
   if (!payment?.providerConversationId) {
     throw new Error(
       `completePaymentByCallback: order ${orderId} için payment/merchantOid yok`,
@@ -193,6 +280,62 @@ export async function completePaymentByCallback(
   throw new Error(
     `completePaymentByCallback: fulfillment outbox did not complete for order ${orderId}`,
   );
+}
+
+/**
+ * Pays one party's side of an accepted trade: initiate-trade-cash as that
+ * party, then a signed success callback on the merchant the payment was taken
+ * on. Since 5ee405ea6 (charge both parties before a trade leaves for the
+ * warehouse) a v2 trade has one TradeCashPayment row per party
+ * (`@@unique([tradeId, payerId])`) and moves on only when both are paid.
+ * Returns that party's row id.
+ */
+export async function payTradeSide(
+  ctx: E2ETestApp,
+  tradeId: string,
+  payer: Auth & { id: string },
+): Promise<{ tradeCashPaymentId: string }> {
+  const prisma = getPrisma();
+  await request(server(ctx))
+    .post("/api/payments/initiate-trade-cash")
+    .set(authHeader(payer))
+    .send({ tradeId })
+    .expect(201);
+  const row = await prisma.tradeCashPayment.findUniqueOrThrow({
+    where: { tradeId_payerId: { tradeId, payerId: payer.id } },
+    select: { id: true },
+  });
+  const payment = await prisma.payment.findFirst({
+    where: { tradeCashPaymentId: row.id },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!payment?.providerConversationId) {
+    throw new Error(
+      `payTradeSide: no payment/merchantOid for trade ${tradeId}`,
+    );
+  }
+  await request(server(ctx))
+    .post(paytrCallbackPath(payment.paytrMerchant))
+    .send(
+      signCallback({
+        merchant: payment.paytrMerchant,
+        merchantOid: payment.providerConversationId,
+        status: "success",
+        totalAmount: Math.round(Number(payment.amount) * 100),
+      }),
+    )
+    .expect(200);
+  await ctx.waitForBackgroundTasks();
+  return { tradeCashPaymentId: row.id };
+}
+
+/** Pays both sides of an accepted v2 trade (see payTradeSide), in order. */
+export async function payTradeBothSides(
+  ctx: E2ETestApp,
+  tradeId: string,
+  parties: Array<Auth & { id: string }>,
+): Promise<void> {
+  for (const party of parties) await payTradeSide(ctx, tradeId, party);
 }
 
 /** orders/buy + initiate + başarılı callback → ödenmiş sipariş. Döner: { orderId }. */
