@@ -11730,9 +11730,6 @@
         "sellerAtFault": "İade/iptalde kusur satıcıda olduğu için kalan tutar satıcıya ödenmez"
       },
       "holdResidualNotSettleable": "Bu ödemede kapatılacak satıcı kusurlu kalan tutar yok (tutulmuyor, iadeyle dondurulmuş, sipariş kapanmamış, kusur satıcıda değil ya da kalan tutar yok)",
-      "installmentInfoFetchFailed": "Taksit bilgisi alınamadı",
-      "installmentInfoUnavailable": "Taksit bilgileri alınamadı",
-      "installmentResponseInvalid": "Taksit bilgisi alınamadı",
       "loginRequired": "Oturum açmanız gerekiyor",
       "loginRequiredForOrder": "Bu sipariş için giriş yapmanız gerekiyor",
       "loginRequiredForPayment": "Bu ödeme için giriş yapmanız gerekiyor",
@@ -11787,7 +11784,12 @@
       "paytrReportEmptyResponse": "PayTR rapor geçersiz/boş yanıt ({url})",
       "paytrReportRequestFailed": "PayTR rapor isteği başarısız: {reason}",
       "paytrReturnedTransferQueryFailed": "PayTR geri dönen transfer sorgusu başarısız: {reason}",
-      "paytrSendFromAccountFailed": "PayTR hesaptan gönder başarısız: {reason}"
+      "paytrSendFromAccountFailed": "PayTR hesaptan gönder başarısız: {reason}",
+      "installmentNotOffered": "Seçtiğiniz taksit bu kart ve tutar için kullanılamıyor.",
+      "installmentPricingChanged": "Taksit tutarı güncellendi. Lütfen yeni tutarı kontrol edip tekrar deneyin.",
+      "installmentUnavailable": "Taksit şu an kullanılamıyor. Tek çekim ile devam edebilirsiniz.",
+      "installmentOptionsInvalidRequest": "Taksit seçenekleri için bir kart (kart numarasının ilk haneleri ya da kayıtlı kart) ve bir ödeme ya da tutar gönderilmelidir.",
+      "installmentOptionsTooManyRequests": "Taksit seçenekleri çok sık istendi. Lütfen biraz sonra tekrar deneyin."
     },
     "product": {
       "alreadyLiked": "Bu ürünü zaten beğendiniz",
@@ -12347,6 +12349,32 @@
         "revokeGrantOnly": "İadesiz iptal yalnız ücretsiz tanımlar içindir",
         "grantListingNotActive": "Yalnız yayındaki ilanlara öne çıkarma tanımlanabilir",
         "stopActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış öne çıkarma durdurulabilir"
+      },
+      "installments": {
+        "useDedicatedEndpoint": "Bu ayar Finans > Taksit ekranından değiştirilir.",
+        "minAmount": {
+          "notANumber": "Asgari tutar bir sayı olmalıdır.",
+          "outOfRange": "Asgari tutar {min} ile {max} TL arasında olmalıdır.",
+          "tooManyDecimals": "Asgari tutar en fazla {decimals} ondalık basamak içerebilir."
+        },
+        "rule": {
+          "nameRequired": "Kural adı zorunludur.",
+          "nameTooLong": "Kural adı çok uzun.",
+          "segmentInvalid": "Geçersiz kullanıcı grubu.",
+          "countRange": "Taksit aralığı 2 ile 12 arasında olmalı; en az taksit, en çok taksitten büyük olamaz.",
+          "shareRange": "Platform payı yüzde 0 ile 100 arasında olmalıdır.",
+          "sharePrecision": "Platform payı en fazla iki ondalık basamak içerebilir.",
+          "shareWithoutAllowed": "Kapatılan taksitlerde platform payı 0 olmalıdır.",
+          "priorityRange": "Öncelik -1000 ile 1000 arasında bir tam sayı olmalıdır.",
+          "validFromInvalid": "Başlangıç zamanı geçersiz.",
+          "validUntilInvalid": "Bitiş zamanı geçersiz.",
+          "validUntilNotAfterFrom": "Bitiş zamanı başlangıçtan sonra olmalıdır.",
+          "notFound": "Taksit kuralı bulunamadı.",
+          "notCurrent": "Bu kural sürümü artık güncel değil (değiştirilmiş ya da kaldırılmış). Listeyi yenileyip tekrar deneyin."
+        },
+        "preview": {
+          "familyInvalid": "Bilinmeyen kart ailesi."
+        }
       }
     },
     "advertisement": {

@@ -11730,9 +11730,6 @@
         "sellerAtFault": "The seller was at fault in the refund/cancellation, so the remaining amount is not paid to the seller"
       },
       "holdResidualNotSettleable": "This payment has no seller-fault remainder to settle (it is not held, is frozen by a refund, its order is not closed, the seller was not at fault or nothing is left)",
-      "installmentInfoFetchFailed": "Installment information could not be fetched",
-      "installmentInfoUnavailable": "Installment information could not be retrieved",
-      "installmentResponseInvalid": "The installment response is invalid or empty",
       "loginRequired": "You need to log in",
       "loginRequiredForOrder": "You need to log in for this order",
       "loginRequiredForPayment": "You need to log in for this payment",
@@ -11787,7 +11784,12 @@
       "paytrReportEmptyResponse": "PayTR report returned an invalid or empty response ({url})",
       "paytrReportRequestFailed": "PayTR report request failed: {reason}",
       "paytrReturnedTransferQueryFailed": "PayTR returned-transfer query failed: {reason}",
-      "paytrSendFromAccountFailed": "PayTR send-from-account failed: {reason}"
+      "paytrSendFromAccountFailed": "PayTR send-from-account failed: {reason}",
+      "installmentNotOffered": "The selected installment option is not available for this card and amount.",
+      "installmentPricingChanged": "The installment amount has changed. Please check the new amount and try again.",
+      "installmentUnavailable": "Installments are unavailable right now. You can continue with a single payment.",
+      "installmentOptionsInvalidRequest": "Send one card (the first card digits or a saved card) and one payment or amount to get installment options.",
+      "installmentOptionsTooManyRequests": "Installment options were requested too often. Please try again shortly."
     },
     "product": {
       "alreadyLiked": "You have already liked this product",
@@ -12347,6 +12349,32 @@
         "revokeGrantOnly": "Only free grants can be cancelled without a refund",
         "grantListingNotActive": "A boost can only be granted to a live listing",
         "stopActiveOrPausedOnly": "Only an active or paused boost can be stopped"
+      },
+      "installments": {
+        "useDedicatedEndpoint": "This setting is managed on Finance > Installments.",
+        "minAmount": {
+          "notANumber": "The minimum amount must be a number.",
+          "outOfRange": "The minimum amount must be between {min} and {max} TL.",
+          "tooManyDecimals": "The minimum amount can have at most {decimals} decimal places."
+        },
+        "rule": {
+          "nameRequired": "The rule name is required.",
+          "nameTooLong": "The rule name is too long.",
+          "segmentInvalid": "Unknown user group.",
+          "countRange": "The installment range must be within 2 to 12, and the lowest count cannot exceed the highest.",
+          "shareRange": "The platform share must be between 0 and 100 percent.",
+          "sharePrecision": "The platform share can have at most two decimal places.",
+          "shareWithoutAllowed": "The platform share must be 0 for installments that are turned off.",
+          "priorityRange": "The priority must be a whole number between -1000 and 1000.",
+          "validFromInvalid": "The start time is not valid.",
+          "validUntilInvalid": "The end time is not valid.",
+          "validUntilNotAfterFrom": "The end time must be after the start time.",
+          "notFound": "Installment rule not found.",
+          "notCurrent": "This rule version is no longer current (it was changed or removed). Refresh the list and try again."
+        },
+        "preview": {
+          "familyInvalid": "Unknown card family."
+        }
       }
     },
     "advertisement": {
