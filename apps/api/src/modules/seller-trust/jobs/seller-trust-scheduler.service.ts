@@ -10,20 +10,15 @@ import {
   inReadOnlySnapshot,
   type ReadSnapshotLimits,
 } from "../../../common/helpers/bounded-transaction";
-import {
-  statsWindowEndingAt,
-  type StatsWindow,
-} from "../../../common/helpers/stats-window";
 import { CacheService } from "../../cache/cache.service";
-import { OrderSellerTrustStatsService } from "../../order/stats/order-seller-trust-stats.service";
-import { RefundSellerTrustStatsService } from "../../refund/stats/refund-seller-trust-stats.service";
-import { RatingSellerTrustStatsService } from "../../rating/stats/rating-seller-trust-stats.service";
-import { TradeSellerTrustStatsService } from "../../trade/stats/trade-seller-trust-stats.service";
-import { UserSellerTrustStatsService } from "../../user/stats/user-seller-trust-stats.service";
 import { SellerTrustService } from "../seller-trust.service";
 import { computeSellerTrust } from "../helpers/trust-formula";
 import { TRUST_FORMULA_V1 as F } from "../helpers/trust-formula.constants";
-import { assembleTrustInputs, hasTrustActivity } from "../helpers/trust-inputs";
+import { hasTrustActivity } from "../helpers/trust-inputs";
+import {
+  SellerTrustInputsReader,
+  type TrustWindows,
+} from "../inputs/seller-trust-inputs.reader";
 
 /** Bull job name = cron catalog key = Sentry monitor slug. Renaming is an ops step. */
 export const SELLER_TRUST_REFRESH_JOB = "seller-trust-refresh";
@@ -39,24 +34,11 @@ const LOCK_TTL_SECONDS = 2 * 60 * 60;
 const RUN_BUDGET_MS = 90 * 60 * 1000;
 const BATCH_SIZE = 500;
 const PAUSE_BETWEEN_BATCHES_MS = 100;
-/**
- * Candidates by `preparing_deadline` look this much further back than the
- * volume window: an order completes some days to weeks after it was paid
- * (preparing, transit, return window), so a seller whose completions are all
- * near the window's start is still found.
- */
-const CANDIDATE_MARGIN_DAYS = 30;
 
 const READ_LIMITS: ReadSnapshotLimits = {
   statementTimeoutMs: 15_000,
   transactionTimeoutMs: 30_000,
 };
-
-interface TrustWindows {
-  rating: StatsWindow;
-  operations: StatsWindow;
-  volume: StatsWindow;
-}
 
 interface BatchResult {
   eligible: number;
@@ -82,10 +64,10 @@ function errorKind(error: unknown): string {
  * as an order shipped between two batches, is read as of each batch's
  * snapshot; the next night picks it up.) Safeguards:
  * a Redis run lock (on top of Bull's one-consumer delivery), set-based reads
- * per owning domain in batches of 500 inside a read-only snapshot with a
- * statement timeout, one bounded upsert per batch, a pause between batches,
- * and stale-row cleanup only after every batch succeeded. Nothing writes to
- * `users` or to any hot table.
+ * per owning domain (`SellerTrustInputsReader`) in batches of 500 inside a
+ * read-only snapshot with a statement timeout, one bounded upsert per batch,
+ * a pause between batches, and stale-row cleanup only after every batch
+ * succeeded. Nothing writes to `users` or to any hot table.
  */
 @Injectable()
 export class SellerTrustSchedulerService implements OnModuleInit {
@@ -95,11 +77,7 @@ export class SellerTrustSchedulerService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly sellerTrust: SellerTrustService,
-    private readonly orderStats: OrderSellerTrustStatsService,
-    private readonly refundStats: RefundSellerTrustStatsService,
-    private readonly ratingStats: RatingSellerTrustStatsService,
-    private readonly tradeStats: TradeSellerTrustStatsService,
-    private readonly userStats: UserSellerTrustStatsService,
+    private readonly inputs: SellerTrustInputsReader,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
 
@@ -171,32 +149,15 @@ export class SellerTrustSchedulerService implements OnModuleInit {
     asOf: Date,
   ): Promise<CronRunSummary> {
     const started = Date.now();
-    const windows: TrustWindows = {
-      rating: statsWindowEndingAt(asOf, F.windows.ratingDays),
-      operations: statsWindowEndingAt(asOf, F.windows.operationsDays),
-      volume: statsWindowEndingAt(asOf, F.windows.volumeDays),
-    };
+    const windows = this.inputs.windowsAt(asOf);
 
     const { candidates, guestBuyerId } = await inReadOnlySnapshot(
       this.prisma,
       READ_LIMITS,
-      async (tx) => {
-        const sellers = await this.orderStats.activeSellerIds(
-          tx,
-          statsWindowEndingAt(
-            asOf,
-            F.windows.volumeDays + CANDIDATE_MARGIN_DAYS,
-          ).since,
-        );
-        const traders = await this.tradeStats.activeTraderIds(
-          tx,
-          windows.volume.since,
-        );
-        return {
-          candidates: [...new Set([...sellers, ...traders])].sort(),
-          guestBuyerId: await this.userStats.guestBuyerId(tx),
-        };
-      },
+      async (tx) => ({
+        candidates: await this.inputs.candidateIds(tx, asOf, windows),
+        guestBuyerId: await this.inputs.guestBuyerId(tx),
+      }),
     );
 
     const batches: string[][] = [];
@@ -275,46 +236,8 @@ export class SellerTrustSchedulerService implements OnModuleInit {
     windows: TrustWindows,
     guestBuyerId: string | null,
   ): Promise<BatchResult> {
-    const assembled = await inReadOnlySnapshot(
-      this.prisma,
-      READ_LIMITS,
-      async (tx) => {
-        const eligible = await this.userStats.trustEligibleUsers(tx, ids);
-        const userIds = eligible.map((u) => u.id);
-        if (userIds.length === 0) return [];
-        const sellerFaultOrderIds = await this.refundStats.sellerFaultOrderIds(
-          tx,
-          userIds,
-          windows.operations.since,
-        );
-        const fulfilment = await this.orderStats.fulfilmentStats(
-          tx,
-          userIds,
-          windows.operations,
-          F.onTime.graceMinutes,
-          sellerFaultOrderIds,
-        );
-        const sales = await this.orderStats.salesCounterparties(
-          tx,
-          userIds,
-          windows.volume,
-          guestBuyerId,
-        );
-        const trades = await this.tradeStats.tradeCounterparties(
-          tx,
-          userIds,
-          windows.volume,
-        );
-        const ratings = await this.ratingStats.sellerRatingStats(
-          tx,
-          userIds,
-          windows.rating,
-        );
-        return assembleTrustInputs(
-          { eligible, fulfilment, sales, trades, ratings },
-          asOf,
-        );
-      },
+    const assembled = await inReadOnlySnapshot(this.prisma, READ_LIMITS, (tx) =>
+      this.inputs.readInputs(tx, ids, asOf, windows, guestBuyerId),
     );
 
     const rows = assembled

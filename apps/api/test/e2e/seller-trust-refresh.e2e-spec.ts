@@ -19,6 +19,7 @@ import {
 } from "../test-utils/db";
 import { SellerTrustSchedulerService } from "../../src/modules/seller-trust/jobs/seller-trust-scheduler.service";
 import { SellerTrustService } from "../../src/modules/seller-trust/seller-trust.service";
+import { SellerTrustInputsReader } from "../../src/modules/seller-trust/inputs/seller-trust-inputs.reader";
 import { OrderSellerTrustStatsService } from "../../src/modules/order/stats/order-seller-trust-stats.service";
 import { RefundSellerTrustStatsService } from "../../src/modules/refund/stats/refund-seller-trust-stats.service";
 import { RatingSellerTrustStatsService } from "../../src/modules/rating/stats/rating-seller-trust-stats.service";
@@ -57,11 +58,13 @@ function buildRunner() {
     prisma as never,
     cache as never,
     new SellerTrustService(prisma as never),
-    new OrderSellerTrustStatsService(),
-    new RefundSellerTrustStatsService(),
-    new RatingSellerTrustStatsService(),
-    new TradeSellerTrustStatsService(),
-    new UserSellerTrustStatsService(),
+    new SellerTrustInputsReader(
+      new OrderSellerTrustStatsService(),
+      new RefundSellerTrustStatsService(),
+      new RatingSellerTrustStatsService(),
+      new TradeSellerTrustStatsService(),
+      new UserSellerTrustStatsService(),
+    ),
     { add: jest.fn() } as unknown as Queue,
   );
   jest
