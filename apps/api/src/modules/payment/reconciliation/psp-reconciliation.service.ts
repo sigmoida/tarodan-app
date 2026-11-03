@@ -4,6 +4,7 @@ import { PrismaService } from "../../../prisma";
 import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/paytr.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "../payment-common.service";
@@ -188,9 +189,9 @@ export class PspReconciliationService {
             paymentDate: capturedInquiry.paymentDate ?? null,
           },
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.error(
-          `PayTR reconcile failed payment ${row.id}: ${error?.message}`,
+          `PayTR reconcile failed payment ${row.id}: ${errorMessage(error)}`,
         );
       }
     }
@@ -357,9 +358,9 @@ export class PspReconciliationService {
               `payment=${row.id} oid=${capturedOid} tutar=${ourAmount}. MANUEL İADE gerekir.`,
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.error(
-          `detectOrphanCapturedFailedPayments payment ${row.id}: ${error?.message}`,
+          `detectOrphanCapturedFailedPayments payment ${row.id}: ${errorMessage(error)}`,
         );
       }
     }
