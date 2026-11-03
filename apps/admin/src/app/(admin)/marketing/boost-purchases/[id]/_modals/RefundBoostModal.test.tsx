@@ -141,6 +141,7 @@ describe("RefundBoostModal", () => {
     });
     expect(h.toast.success).toHaveBeenCalledWith(
       "admin.marketing.boostPurchases.refund.done",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -188,6 +189,7 @@ describe("RefundBoostModal", () => {
 
     expect(h.toast.error).toHaveBeenCalledWith(
       "server:server.admin.boost.refundNotAllowed",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).not.toHaveBeenCalled();
     expect(findButton(ACTION)).toBeDefined();

@@ -167,7 +167,10 @@ describe("PackageFormModal", () => {
 
     await click(button("common.update"));
 
-    expect(h.toast.error).toHaveBeenCalledWith(error.response.data.message);
+    expect(h.toast.error).toHaveBeenCalledWith(
+      error.response.data.message,
+      expect.objectContaining({ id: expect.any(String) }),
+    );
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -176,6 +179,7 @@ describe("PackageFormModal", () => {
 
     expect(h.toast.success).toHaveBeenCalledWith(
       "admin.marketing.adPackages.updated",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).toHaveBeenCalled();
   });

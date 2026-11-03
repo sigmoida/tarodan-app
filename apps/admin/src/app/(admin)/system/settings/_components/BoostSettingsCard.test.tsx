@@ -67,7 +67,10 @@ describe("BoostSettingsCard", () => {
     await render({});
     await click(toggle());
     expect(h.updateSetting).toHaveBeenCalledWith("boost_enabled", "false");
-    expect(h.toast.success).toHaveBeenCalledWith("admin.settings.saved");
+    expect(h.toast.success).toHaveBeenCalledWith(
+      "admin.settings.saved",
+      expect.objectContaining({ id: expect.any(String) }),
+    );
   });
 
   it("writes 'true' when boost sales are turned back on", async () => {
