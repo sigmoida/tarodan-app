@@ -3,27 +3,29 @@
 import { forwardRef, type ReactNode } from "react";
 import type { HeroImageSide } from "@tarodan/types";
 
-/** Hero slayt başlığı (admin slaytı ve kodda tanımlı slayt aynı tipografi). */
+/** Hero slide title (admin slides and slides defined in code share the type). */
 export const HERO_TITLE_CLASS =
   "mb-4 whitespace-pre-line font-display text-3xl font-bold leading-[1.1] tracking-tight text-heading md:mb-6 md:text-4xl lg:text-[3.25rem]";
 
-/** Başlığın altındaki açıklama metni. */
+/** Description text under the title. */
 export const HERO_SUBTITLE_CLASS =
   "mb-6 max-w-lg text-base leading-relaxed text-muted md:text-lg";
 
-/** CTA satırı: telefonda alt alta, `sm`'den itibaren yan yana. */
+/** CTA row: stacked on phones, side by side from `sm`. */
 export const HERO_ACTIONS_CLASS = "flex flex-col gap-3 sm:flex-row";
 
 /**
- * Tek hero slaytının iskeleti — dolgu, iki sütunlu ızgara ve görsel kutusu.
+ * Skeleton of one hero slide: padding, the two-column grid and the image box.
  *
- * Sıralama: mobilde HER ZAMAN görsel üstte, metin altta — dar ekranda iki
- * sütunluk "yan yana" kurgusunun bir karşılığı yok ve görselin altta kalması
- * onu ekran dışına itiyordu. `md`'den itibaren `imageSide` geçerli.
+ * Order: on phones the image is ALWAYS on top and the text below; a narrow
+ * screen has no room for the side-by-side layout, and an image at the bottom
+ * was pushed off screen. From `md` the slide's `imageSide` applies.
  *
- * Görsel kutusu mobilde 16/10 (4/3 dikey alanın yarısını yiyip başlığı katlanın
- * altına itiyordu), `md`'den itibaren 4/3; görsel kutuyu `fill` ile doldurur.
- * Kutu sabit oranlı olduğundan tüm slaytlar aynı yükseklikte kalır.
+ * The image box ratio comes from the `mediaRatios` design token: 16:10 on
+ * phones (`aspect-hero-compact`; 4:3 took half the height and pushed the title
+ * below the fold), 4:3 from `md` (`aspect-hero-split`). The image fills the box
+ * (`fill`), so the image box has the same height on every slide; a slide only
+ * grows when its text column is taller than the box.
  */
 export const HeroSlideLayout = forwardRef<
   HTMLDivElement,
@@ -31,9 +33,9 @@ export const HeroSlideLayout = forwardRef<
     imageSide: HeroImageSide;
     media: ReactNode;
     children: ReactNode;
-    /** Slayt yüzeyi (ör. arka plan) — kabuğun kendisi saydamdır. */
+    /** Slide surface (e.g. the background); the shell itself is transparent. */
     className?: string;
-    /** Görsel kutusunun yüzeyi. */
+    /** Surface of the image box. */
     mediaClassName?: string;
   }
 >(function HeroSlideLayout(
@@ -51,7 +53,7 @@ export const HeroSlideLayout = forwardRef<
             {children}
           </div>
           <div
-            className={`relative order-1 aspect-[16/10] w-full overflow-hidden rounded-lg md:aspect-[4/3] ${
+            className={`relative order-1 aspect-hero-compact w-full overflow-hidden rounded-lg md:aspect-hero-split ${
               imageRight ? "md:order-2" : "md:order-1"
             } ${mediaClassName}`}
           >

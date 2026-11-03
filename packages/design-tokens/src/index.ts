@@ -7,6 +7,7 @@ export * from "./motion";
 export * from "./z-index";
 export * from "./containers";
 export * from "./breakpoints";
+export * from "./media";
 
 import { colors } from "./colors";
 import { radius } from "./radius";
@@ -17,6 +18,7 @@ import { motion } from "./motion";
 import { zIndex } from "./z-index";
 import { containers } from "./containers";
 import { breakpoints } from "./breakpoints";
+import { mediaRatios } from "./media";
 
 export const tokens = {
   colors,
@@ -28,6 +30,7 @@ export const tokens = {
   zIndex,
   containers,
   breakpoints,
+  mediaRatios,
 } as const;
 
 export type Tokens = typeof tokens;

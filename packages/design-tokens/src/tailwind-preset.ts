@@ -4,12 +4,14 @@ import containerQueries from "@tailwindcss/container-queries";
 import {
   colors,
   containers,
+  mediaRatios,
   radius,
   spacing,
   shadows,
   motion,
   typography,
   zIndex,
+  type MediaRatio,
 } from "./index";
 
 /**
@@ -38,24 +40,28 @@ const toRem = (obj: Record<string, number>): Record<string, string> =>
     Object.entries(obj).map(([k, v]) => [k, v === 0 ? "0px" : `${v / 16}rem`]),
   );
 
+/** A `MediaRatio` token as a CSS `aspect-ratio` value ("16 / 10"). */
+const toAspectRatio = ({ width, height }: MediaRatio): string =>
+  `${width} / ${height}`;
+
 /**
- * Güvenli alan (safe area) yardımcıları.
+ * Safe area helpers.
  *
- * Çentikli ve yuvarlak köşeli ekranlarda ekranın kenarları sistem tarafından
- * kullanılır: üstte durum çubuğu, altta ana ekran çizgisi, YATAY kullanımda
- * solda/sağda çentik. Bu şeritlere denk gelen içerik ya kesilir ya da
- * dokunulamaz olur. `env(safe-area-inset-*)` her kenar için o şeridin
- * kalınlığını verir.
+ * On screens with a notch and rounded corners the system uses the screen
+ * edges: the status bar at the top, the home indicator at the bottom, and in
+ * LANDSCAPE the notch on the left or right. Content under those strips is cut
+ * off or cannot be tapped. `env(safe-area-inset-*)` gives the thickness of the
+ * strip on each edge.
  *
- * `env()` YALNIZCA belge `viewport-fit=cover` ile yayınlandığında sıfırdan
- * farklı döner (apps/web → `app/layout.tsx`'teki `viewport.viewportFit`).
- * Kapalıyken bu yardımcılar sıfır ekler, yani düzen olduğu gibi kalır —
- * güvenle her yere yazılabilirler.
+ * `env()` is non-zero ONLY when the document is served with
+ * `viewport-fit=cover` (apps/web: `viewport.viewportFit` in `app/layout.tsx`).
+ * Without it these helpers add zero, so the layout stays as it is; they are
+ * safe to use anywhere.
  *
- * DİKKAT: `p*-safe` boşluğu EKLEMEZ, ATAR. Aynı kenarda zaten bir `p-4` varsa
- * onu ezer (ya da ezilir — ikisi de yalın sınıf, kazanan sıraya kalır). Mevcut
- * bir boşluğa güvenli alanı eklemek gerektiğinde ya `px-gutter` gibi birleşik
- * bir yardımcı kullanın ya da değeri açıkça yazın:
+ * CAUTION: `p*-safe` does not ADD padding, it SETS it. If the same edge already
+ * has a `p-4`, one overrides the other (both are plain classes, so the order
+ * decides). To add the safe area to existing padding, use a combined helper
+ * such as `px-gutter` or write the value out:
  * `pb-[calc(1rem+env(safe-area-inset-bottom))]`.
  */
 const safeAreaPlugin = plugin(({ addUtilities }) => {
@@ -69,13 +75,13 @@ const safeAreaPlugin = plugin(({ addUtilities }) => {
       paddingRight: "env(safe-area-inset-right)",
     },
     /**
-     * Sayfa kenar boşluğu. İki işi birden yapar:
+     * Page gutter. It does two things:
      *
-     * 1. Ekranla birlikte ölçeklenir — `clamp` telefonda 1rem verir, ekran
-     *    büyüdükçe 2rem'e kadar açılır. Sabit 1rem, geniş ekranda içeriği
-     *    kenara yapışık bırakıyordu.
-     * 2. Yatay çentik bu değerden genişse onun kadar olur, böylece yatay
-     *    kullanımda metin çentiğin altına girmez.
+     * 1. It scales with the screen: `clamp` gives 1rem on phones and opens up
+     *    to 2rem as the screen grows. A fixed 1rem left content stuck to the
+     *    edge on wide screens.
+     * 2. When the landscape notch is wider than this value, the gutter matches
+     *    it, so text never slides under the notch in landscape.
      */
     ".px-gutter": {
       paddingLeft: "max(clamp(1rem, 2vw, 2rem), env(safe-area-inset-left))",
@@ -94,20 +100,21 @@ const tarodanPreset: Partial<Config> = {
   plugins: [safeAreaPlugin, containerQueries],
   theme: {
     /**
-     * Kırılım noktaları — Tailwind'in varsayılan listesi, başına `xs` eklenmiş.
+     * Breakpoints: Tailwind's default list with `xs` added in front.
      *
-     * Varsayılanda ilk basamak `sm:640px` olduğu için 360px'lik bir telefon ile
-     * 600px'lik bir tablet AYNI stili alıyordu: iki sütunlu form satırları dar
-     * telefonda sıkışıyor, tek sütuna indirildiğinde de aradaki ekranlar
-     * gereksiz yere tek sütunda kalıyordu. `xs` o boşluğu kapatır.
+     * By default the first step is `sm` (640px), so a 360px phone and a 600px
+     * tablet got the SAME styles: two-column form rows were cramped on narrow
+     * phones, and once they were made one column, the screens in between stayed
+     * one column for no reason. `xs` closes that gap.
      *
-     * 400px sınırı cihazlara göre seçildi: yaygın dar telefonlar (375 iPhone SE,
-     * 390 iPhone 14, 360 Android) ALTINDA kalır — orada tek sütun; geniş
-     * telefonlar (412 Galaxy, 430 iPhone Pro Max) üstünde kalır — orada iki
-     * sütun. Doğru taraf hangisiyse çağıran yer ona göre `xs:` yazar.
+     * The 400px edge was chosen by device: common narrow phones (375 iPhone SE,
+     * 390 iPhone 14, 360 Android) stay BELOW it, one column there; wide phones
+     * (412 Galaxy, 430 iPhone Pro Max) are above it, two columns there. The
+     * caller writes `xs:` for whichever side is right.
      *
-     * `extend` DEĞİL, tam liste: `extend.screens` yeni basamağı listenin sonuna
-     * eklerdi ve `xs:` kuralları CSS'te `sm:`den SONRA yazılıp onları ezerdi.
+     * A full list, NOT `extend`: `extend.screens` would append the new step at
+     * the end of the list, and the `xs:` rules would be emitted AFTER `sm:` in
+     * the CSS and override them.
      */
     screens: {
       xs: "400px",
@@ -170,6 +177,12 @@ const tarodanPreset: Partial<Config> = {
       // Named container sizes from `containers.ts` (rem, like spacing).
       containers: {
         "card-wide": `${containers.cardWide / 16}rem`,
+      },
+      // Media box ratios from `media.ts`. `extend` keeps Tailwind's own
+      // `aspect-auto`, `aspect-square` and `aspect-video`.
+      aspectRatio: {
+        "hero-compact": toAspectRatio(mediaRatios.heroCompact),
+        "hero-split": toAspectRatio(mediaRatios.heroSplit),
       },
       borderRadius: toPx(radius),
       spacing: toRem(spacing),
