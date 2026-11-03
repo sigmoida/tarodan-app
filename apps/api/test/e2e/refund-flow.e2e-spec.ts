@@ -302,25 +302,35 @@ describe("Refund flow (E2E)", () => {
       },
     });
 
-    // 14 gün cayma süresi dolduktan sonra iade akışı tamamen kaldırıldı:
-    // açıklama/kanıt verilse bile talep oluşturulamaz (eski "past_cooling_off
-    // + kanıt" / satıcı-itiraz akışı silindi). Her iki istek de 400 döner.
-    const blocked = await request(ctx.app.getHttpServer())
+    // Once the return window has closed no refund request can be opened,
+    // with or without evidence (the old "past_cooling_off + evidence" seller
+    // dispute flow was removed). Both requests are refused for the window,
+    // not for another reason. The first uses a reason that needs no
+    // evidence: refund-creation checks evidence before the window, so a
+    // `damaged` request without photos gets the evidence error instead.
+    const expectWindowClosed = (res: request.Response) =>
+      expect(res.body.i18nKey).toBe("server.refund.coolingOffExpired");
+
+    await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: "damaged", description: "broken" })
-      .expect(400);
-    expect(blocked.body.message).toMatch(/14 gün|dolmuş|oluşturulamaz/i);
+      .send({ reason: "changed_mind", description: "no longer needed" })
+      .expect(400)
+      .expect(expectWindowClosed);
 
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
       .send({
         reason: "damaged",
-        description: "Ürün ambalajı yırtık geldi, kapısı kırık.",
+        description: "The package arrived torn and the door is broken.",
         evidencePhotoUrls: ["https://example.com/photo1.jpg"],
       })
-      .expect(400);
+      .expect(400)
+      .expect(expectWindowClosed);
+
+    expect(await prisma.refundRequest.count({ where: { orderId } })).toBe(0);
+    expect(ctx.paytr.refundCalls).toHaveLength(0);
   });
 
   it("refuses refund on pending_payment order (must cancel order instead)", async () => {
@@ -906,7 +916,7 @@ describe("Refund flow (E2E)", () => {
     expect(ctx.paytr.refundCalls).toHaveLength(1);
   });
 
-  it("F4: PayTR iadeyi reddederse iptal başarısız olur; para iade edilmiş sayılmaz, talep finans incelemesine düşer", async () => {
+  it("F4: a PayTR refund rejection fails the cancel and sends the request to financial review; the admin approve refunds it once", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -941,6 +951,29 @@ describe("Refund flow (E2E)", () => {
     const rr = await prisma.refundRequest.findFirst({ where: { orderId } });
     expect(rr!.status).toBe(RefundRequestStatus.pending_review);
     expect(rr!.financialReviewRequired).toBe(true);
+
+    // Recovery: the admin approves the request. The rejected attempt moved no
+    // money, so the approve sends the same refund (same request key) to PayTR
+    // once more and closes the order; the buyer is refunded exactly once.
+    const admin = await createAdminUser(ctx.module);
+    await request(ctx.app.getHttpServer())
+      .post(`/api/admin/refund-requests/${rr!.id}/approve`)
+      .set(authHeader(admin))
+      .send({ note: "PayTR rejection reviewed, refund resent." })
+      .expect(200);
+
+    expect(ctx.paytr.refundCalls).toHaveLength(2);
+    expect(ctx.paytr.refundCalls[1]).toEqual(ctx.paytr.refundCalls[0]);
+    const finalOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    expect(finalOrder.status).toBe(OrderStatus.cancelled);
+    const finalPay = await latestPaymentOfOrder(orderId);
+    expect(finalPay!.status).toBe(PaymentStatus.refunded);
+    const finalRr = await prisma.refundRequest.findUniqueOrThrow({
+      where: { id: rr!.id },
+    });
+    expect(finalRr.status).toBe(RefundRequestStatus.refunded);
   });
 
   it("F3: kargoya verildikten (shipped) sonra sipariş iptali reddedilir (400)", async () => {

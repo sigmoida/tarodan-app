@@ -482,7 +482,11 @@ describe("Money Flow Timeline (E2E)", () => {
         where: { id: receiverRowId },
       });
       expect(receiverRowAfter!.refundedAt).toBeTruthy();
-      expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(2);
+      // One PayTR refund per paid row, never a second one for the same row.
+      expect(ctx.paytr.refundCalls).toHaveLength(2);
+      expect(
+        new Set(ctx.paytr.refundCalls.map((c) => c.merchantOid)).size,
+      ).toBe(2);
     });
   });
 
@@ -616,19 +620,44 @@ describe("Money Flow Timeline (E2E)", () => {
         .post(`/api/admin/trades/${tradeId}/reject`)
         .set(authHeader(admin))
         // faultySide is required since 0ab45dde7 (warehouse inspection step):
-        // the receiver's item failed, so the initiator's cash goes back.
+        // the receiver's item failed, so the initiator is faultless.
         .send({ reason: "Ürün hasarlı", faultySide: "receiver" })
         .expect(200);
 
-      // Cash payment should be refunded
+      // The faultless initiator gets everything back, once. The faulty
+      // receiver loses the service fee and, the parcels having shipped, the
+      // shipping (trade-refund-policy); its row carries only those two, so
+      // nothing is left to refund and PayTR is not called for it.
       const cpAfter = await prisma.tradeCashPayment.findFirst({
         where: { tradeId, payerId: initiator.id },
       });
       expect(cpAfter?.refundedAt).toBeTruthy();
       expect(cpAfter?.releasedAt).toBeNull();
+      expect(cpAfter?.fullRefundEntitled).toBe(true);
+      const receiverRow = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId, payerId: receiver.id },
+      });
+      expect(receiverRow?.fullRefundEntitled).toBe(false);
+      expect(
+        Number(receiverRow!.totalAmount) -
+          Number(receiverRow!.tradeFeeAmount) -
+          Number(receiverRow!.shippingAmount),
+      ).toBeCloseTo(0, 2);
+      expect(receiverRow?.refundedAt).toBeNull();
+      expect(receiverRow?.releasedAt).toBeNull();
 
-      // PayTR refund was called
-      expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
+      const initiatorPayment = await prisma.payment.findFirst({
+        where: { tradeCashPaymentId: cpAfter!.id },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(ctx.paytr.refundCalls).toHaveLength(1);
+      expect(ctx.paytr.refundCalls[0].merchantOid).toBe(
+        initiatorPayment!.providerConversationId,
+      );
+      expect(ctx.paytr.refundCalls[0].refundAmount).toBeCloseTo(
+        Number(cpAfter!.totalAmount),
+        2,
+      );
 
       // Trade should be returning or cancelled
       const tradeAfter = await prisma.trade.findUnique({
