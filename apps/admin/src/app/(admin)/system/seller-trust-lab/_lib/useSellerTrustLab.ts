@@ -38,8 +38,9 @@ export function useLabScenarios() {
  * keyed on the submitted request. No invalidation, no toast; an error goes to
  * the card's error state. Results hold real seller data, so they are dropped
  * as soon as nothing shows them (`gcTime: 0`) and never served stale.
- * The seller and population calls are audited, so only a click may run one:
- * focus, a network reconnect and a remount never refetch on their own.
+ * The seller and population calls are audited, so only a user action (a
+ * click, or opening a `?userId=` deep link) may run one: focus, a network
+ * reconnect and a remount never refetch on their own.
  */
 function useSubmittedQuery<Req, Res>(
   keyOf: (request: Req) => QueryKey,

@@ -472,6 +472,14 @@ describe("scenario calculator", () => {
       document.querySelector('[data-testid="explain-candidate"]'),
     ).not.toBeNull();
   });
+
+  it("blocks the run while a changed candidate is invalid, never sending v1 alone", async () => {
+    await open();
+    await type(input("weights.rating"), "0.9");
+    await flush();
+    await click(button(`${L}.scenario.run`));
+    expect(h.scenario).not.toHaveBeenCalled();
+  });
 });
 
 describe("population", () => {

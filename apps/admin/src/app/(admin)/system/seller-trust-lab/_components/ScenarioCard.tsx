@@ -41,9 +41,13 @@ export function ScenarioCard({ candidate }: { candidate: CandidateParams }) {
   const presets = useLabScenarios();
   const { query, submit, clear } = useLabScenario();
 
+  // A changed but invalid candidate blocks the run, so a v1-only result is
+  // never read as the candidate's (the seller card does the same).
+  const candidateInvalid = candidate.modified && candidate.params === null;
+
   const run = (values: ScenarioFormValues) => {
     const inputs = validInputs(values);
-    if (!inputs) return;
+    if (!inputs || candidateInvalid) return;
     submit({
       inputs,
       ...(candidate.params && candidate.modified
@@ -122,7 +126,7 @@ export function ScenarioCard({ candidate }: { candidate: CandidateParams }) {
           <Button
             type="submit"
             isLoading={waiting}
-            disabled={waiting || !form.formState.isValid}
+            disabled={waiting || !form.formState.isValid || candidateInvalid}
           >
             {t(`${C}.scenario.run`)}
           </Button>
