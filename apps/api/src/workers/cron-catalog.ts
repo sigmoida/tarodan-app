@@ -130,9 +130,9 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
   },
   {
     key: "paytr-installment-rates",
-    label: "PayTR taksit oranları",
+    label: "PayTR installment rates",
     description:
-      "PayTR taksit oranı tablosunu çekip günlük oran anlık görüntüsünü saklar (taksit fiyatlaması)",
+      "Fetches the PayTR installment rate table and stores the daily rate snapshot (installment pricing)",
     triggerable: true,
   },
   {

@@ -79,6 +79,15 @@ describe("critical public route throttles", () => {
       method: "getPaymentStatus",
       limit: 120,
     },
+    // Installment options (ADR 0019): each call may reach PayTR's BIN
+    // service; the web calls it through the gateway. A 20/min per-payment
+    // budget sits on top (InstallmentOptionsService).
+    {
+      controller: PaymentController,
+      method: "getInstallmentOptions",
+      limit: 30,
+      perClientIp: true,
+    },
     {
       controller: NewsletterController,
       method: "subscribe",
