@@ -146,19 +146,19 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
   });
 
   describe("lookupBin", () => {
+    const answer = (body: Record<string, unknown>) =>
+      fetchSpy.mockResolvedValue({ text: async () => JSON.stringify(body) });
+
     it("hits /odeme/api/bin-detail with hash = bin + merchant_id + merchant_salt", async () => {
-      fetchSpy.mockResolvedValue({
-        text: async () =>
-          JSON.stringify({
-            status: "success",
-            bank: "Yapı Kredi",
-            bankCode: 67,
-            schema: "VISA",
-            cardType: "credit",
-            brand: "world",
-            businessCard: "n",
-            allow_non3d: "Y",
-          }),
+      answer({
+        status: "success",
+        bank: "Yapı Kredi",
+        bankCode: "0067",
+        schema: "VISA",
+        cardType: "credit",
+        brand: "world",
+        businessCard: "n",
+        allow_non3d: "Y",
       });
 
       const r = await service.lookupBin("454671xxxx");
@@ -169,18 +169,90 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       );
       const body = bodyOf();
       expect(body.get("bin_number")).toBe("454671");
+      expect(body.get("merchant_id")).toBe(MID);
       const expected = crypto
         .createHmac("sha256", KEY)
         .update("454671" + MID + SALT)
         .digest("base64");
       expect(body.get("paytr_token")).toBe(expected);
 
+      expect(r).toEqual({
+        ok: true,
+        outcome: "success",
+        bank: "Yapı Kredi",
+        bankCode: "0067",
+        schema: "VISA",
+        cardType: "credit",
+        brand: "world",
+        cardFamily: "world",
+        businessCard: false,
+        allowNon3d: true,
+      });
+    });
+
+    it.each([
+      ["4546711234567890", "45467112"],
+      ["4546 7112", "45467112"],
+      ["4546711", "454671"],
+    ])("sends 8 digits when it has them, else 6 (%p)", async (input, sent) => {
+      answer({ status: "success", brand: "none" });
+      await service.lookupBin(input);
+      expect(bodyOf().get("bin_number")).toBe(sent);
+    });
+
+    it("reports brand 'none' without a card family (no PayTR installments)", async () => {
+      answer({ status: "success", brand: "none", businessCard: "y" });
+      const r = await service.lookupBin("45467112");
       expect(r.ok).toBe(true);
-      expect(r.bank).toBe("Yapı Kredi");
-      expect(r.schema).toBe("VISA");
-      expect(r.cardType).toBe("credit");
-      expect(r.businessCard).toBe(false);
-      expect(r.allowNon3d).toBe(true);
+      if (!r.ok) return;
+      expect(r.brand).toBe("none");
+      expect(r.cardFamily).toBeUndefined();
+      expect(r.businessCard).toBe(true);
+    });
+
+    it("leaves unknown flag values undefined instead of guessing", async () => {
+      answer({ status: "success", brand: "Bonus", businessCard: "?" });
+      const r = await service.lookupBin("45467112");
+      if (!r.ok) throw new Error("expected success");
+      expect(r.cardFamily).toBe("bonus");
+      expect(r.businessCard).toBeUndefined();
+      expect(r.allowNon3d).toBeUndefined();
+    });
+
+    it("tells an undefined BIN (failed, cacheable) from a query error", async () => {
+      answer({ status: "failed" });
+      expect(await service.lookupBin("45467112")).toEqual({
+        ok: false,
+        outcome: "failed",
+        errMsg: "BIN not defined",
+      });
+
+      answer({ status: "error", err_msg: "paytr_token gecersiz" });
+      expect(await service.lookupBin("45467112")).toEqual({
+        ok: false,
+        outcome: "error",
+        errMsg: "paytr_token gecersiz",
+      });
+    });
+
+    it("returns an error outcome on a network failure or a non-JSON answer", async () => {
+      fetchSpy.mockRejectedValueOnce(new Error("timeout"));
+      expect(await service.lookupBin("45467112")).toMatchObject({
+        ok: false,
+        outcome: "error",
+      });
+
+      fetchSpy.mockResolvedValueOnce({ text: async () => "<html>" });
+      expect(await service.lookupBin("45467112")).toMatchObject({
+        ok: false,
+        outcome: "error",
+      });
+    });
+
+    it("refuses fewer than 6 digits without calling PayTR", async () => {
+      const r = await service.lookupBin("45467");
+      expect(r).toMatchObject({ ok: false, outcome: "error" });
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 

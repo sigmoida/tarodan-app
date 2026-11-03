@@ -199,10 +199,16 @@ import {
   PAYTR_INSTALLMENT_COUNT_MAX,
   parsePaytrInstallmentRates,
   parsePaytrMaxInstallment,
+  type PaytrBinLookupResult,
   type PaytrCardFamily,
   type PaytrInstallmentRatesResult,
 } from "./paytr-installments";
-import { isPaytrSuccess, isPlainRecord, textOf } from "./paytr-response.util";
+import {
+  isPaytrSuccess,
+  isPlainRecord,
+  paytrYesNo,
+  textOf,
+} from "./paytr-response.util";
 import { errorMessage } from "../../../common/helpers/error-message";
 
 // =============================================================================
@@ -672,37 +678,33 @@ export class PayTRService implements IPaymentProvider {
 
   // ==========================================================================
   // BIN LOOKUP + INSTALLMENT RATES
-  // https://dev.paytr.com/en/direkt-api/bin-sorgulama-servisi
-  // https://dev.paytr.com/en/direkt-api/taksit-sorgulama
+  // https://dev.paytr.com/direkt-api/bin-sorgulama-servisi
+  // https://dev.paytr.com/direkt-api/taksit-sorgulama
   // ==========================================================================
 
   /**
-   * BIN sorgulama: kartın ilk 6/8 hanesinden banka/şema/tip bilgisini döndürür.
-   * Dokümana göre endpoint /odeme/api/bin-detail; hash_str = bin_number + merchant_id
-   * + merchant_salt (HMAC key = merchant_key). PAN saklanmaz — yalnız BIN gönderilir.
+   * BIN lookup (`POST /odeme/api/bin-detail`): bank, scheme, type and card
+   * family of the first 6 or 8 card digits ("Maksimum dogrulama icin 8 hane
+   * kullanin"). Token, from the doc samples: base64(HMAC-SHA256(bin_number +
+   * merchant_id + merchant_salt, merchant_key)). Only the BIN is sent; it is
+   * never logged.
    *
-   * DÜZELTME: Eski getInstallmentOptions bu endpoint'i (a) YANLIŞ hash sırasıyla
-   * (merchant_id + bin + amount + salt) ve (b) YANLIŞ yanıt şemasıyla (taksit1..12 —
-   * bin-detail taksit tablosu DÖNDÜRMEZ; o /odeme/taksit-oranlari'dır) çağırıyordu.
+   * `status` per the doc: "success"; "failed" when the BIN is not defined
+   * (e.g. a foreign card), a stable answer the caller may cache; "error"
+   * when the query had a problem (also network errors here), not cacheable.
+   * Never throws.
    */
-  async lookupBin(binNumber: string): Promise<{
-    ok: boolean;
-    bank?: string;
-    bankCode?: number;
-    schema?: string; // VISA | MASTERCARD | AMEX | TROY | OTHER
-    cardType?: string; // credit | debit
-    brand?: string; // axess | bonus | ... | none
-    businessCard?: boolean;
-    allowNon3d?: boolean;
-    errMsg?: string;
-  }> {
+  async lookupBin(binNumber: string): Promise<PaytrBinLookupResult> {
     if (!this.isConfigured) {
-      return { ok: false, errMsg: "PayTR not configured" };
+      return { ok: false, outcome: "error", errMsg: "PayTR not configured" };
     }
-    const bin = (binNumber || "").replace(/\D/g, "").slice(0, 8);
-    if (bin.length < 6) return { ok: false, errMsg: "bin_number too short" };
+    const digits = (binNumber ?? "").replace(/\D/g, "");
+    if (digits.length < 6) {
+      return { ok: false, outcome: "error", errMsg: "bin_number too short" };
+    }
+    // The doc takes 6 or 8 digits; 7 is sent as 6.
+    const bin = digits.length >= 8 ? digits.slice(0, 8) : digits.slice(0, 6);
 
-    // Doküman: hash_str = bin_number + merchant_id + merchant_salt
     const paytrToken = this.creds.signWithSalt(bin + this.merchantId);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -719,31 +721,46 @@ export class PayTRService implements IPaymentProvider {
           signal: AbortSignal.timeout(this.httpTimeoutMs),
         },
       );
-      const data = this.parsePaytrJson<any>(await response.text());
-      if (!data || data.status !== "success") {
-        return { ok: false, errMsg: data?.err_msg || "BIN lookup failed" };
+      const data = this.parsePaytrJson<Record<string, unknown>>(
+        await response.text(),
+      );
+      if (!isPlainRecord(data)) {
+        return { ok: false, outcome: "error", errMsg: "Invalid BIN answer" };
       }
+      if (!isPaytrSuccess(data.status)) {
+        const failed = textOf(data.status)?.toLowerCase() === "failed";
+        return {
+          ok: false,
+          outcome: failed ? "failed" : "error",
+          errMsg:
+            textOf(data.err_msg) ??
+            (failed ? "BIN not defined" : "BIN lookup failed"),
+        };
+      }
+      const brand = textOf(data.brand)?.toLowerCase();
       return {
         ok: true,
-        bank: data.bank != null ? String(data.bank) : undefined,
-        bankCode: Number.isFinite(Number(data.bankCode))
-          ? Number(data.bankCode)
-          : undefined,
-        schema: data.schema != null ? String(data.schema) : undefined,
-        cardType: data.cardType != null ? String(data.cardType) : undefined,
-        brand: data.brand != null ? String(data.brand) : undefined,
-        businessCard:
-          data.businessCard != null
-            ? String(data.businessCard).toLowerCase() === "y"
-            : undefined,
-        allowNon3d:
-          data.allow_non3d != null
-            ? String(data.allow_non3d).toLowerCase() === "y"
-            : undefined,
+        outcome: "success",
+        bank: textOf(data.bank),
+        // Kept as text: the doc's example "0010" has leading zeros.
+        bankCode: textOf(data.bankCode),
+        schema: textOf(data.schema)?.toUpperCase(),
+        cardType: textOf(data.cardType)?.toLowerCase(),
+        brand,
+        cardFamily: isPaytrCardFamily(brand) ? brand : undefined,
+        businessCard: paytrYesNo(data.businessCard),
+        allowNon3d: paytrYesNo(data.allow_non3d),
       };
-    } catch (error: any) {
-      this.logger.error(`PayTR BIN lookup hata: ${error?.message}`);
-      return { ok: false, errMsg: error?.message || "BIN lookup error" };
+    } catch (error: unknown) {
+      // warn, not error: the caller decides what an unavailable BIN means
+      // (the installment options fall back to a single payment).
+      const message = errorMessage(error);
+      this.logger.warn(`PayTR BIN lookup failed: ${message}`);
+      return {
+        ok: false,
+        outcome: "error",
+        errMsg: message || "BIN lookup error",
+      };
     }
   }
 

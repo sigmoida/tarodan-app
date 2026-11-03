@@ -88,6 +88,34 @@ export type PaytrInstallmentRatesResult =
     }
   | { ok: false; errMsg: string };
 
+/**
+ * `bin-detail` answer. `outcome` follows the doc's `status`: "success";
+ * "failed" = BIN not defined (e.g. a foreign card), stable and cacheable;
+ * "error" = the query or the network failed, not cacheable.
+ */
+export type PaytrBinLookupResult =
+  | {
+      ok: true;
+      outcome: "success";
+      /** `bank`, e.g. "Yapi Kredi". */
+      bank?: string;
+      /** `bankCode` as text (the doc's example "0010" has leading zeros). */
+      bankCode?: string;
+      /** `schema`: VISA | MASTERCARD | AMEX | TROY | OTHER. */
+      schema?: string;
+      /** `cardType`: credit | debit. */
+      cardType?: string;
+      /** `brand` as sent, lower-cased; "none" = no installments through PayTR. */
+      brand?: string;
+      /** `brand` when it is a PayTR card family; undefined for "none" or unknown. */
+      cardFamily?: PaytrCardFamily;
+      /** `businessCard` y/n; undefined when PayTR sent something else. */
+      businessCard?: boolean;
+      /** `allow_non3d` Y/N. */
+      allowNon3d?: boolean;
+    }
+  | { ok: false; outcome: "failed" | "error"; errMsg: string };
+
 /** "taksit_2", "2", "2_taksit", "taksit-2" -> 2 (only 1-12). */
 const COUNT_KEY = /^(?:taksit[_-]?)?(\d{1,2})(?:[_-]?taksit)?$/i;
 /** A non-negative decimal with a dot or a Turkish comma. */
