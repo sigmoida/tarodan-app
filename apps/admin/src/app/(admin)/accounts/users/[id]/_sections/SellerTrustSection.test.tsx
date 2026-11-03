@@ -12,6 +12,12 @@ vi.mock("next-intl", () => ({
 }));
 vi.mock("@/hooks/useMediaQuery", () => ({ useMediaQuery: () => false }));
 
+// The viewer's permission keys; each test sets what the staff member holds.
+let held: string[] = [];
+vi.mock("@/context/PermissionsContext", () => ({
+  usePermissions: () => ({ can: (key: string) => held.includes(key) }),
+}));
+
 import { SellerTrustSection } from "./SellerTrustSection";
 
 (
@@ -35,10 +41,13 @@ const rated: AdminSellerTrustView = {
   computedAt: "2026-10-21T00:30:00.000Z",
 };
 
+const USER_ID = "8f0c6a1e-2b7d-4c3a-9e15-0d4b6f2a7c91";
+
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  held = [];
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -57,7 +66,7 @@ afterEach(() => {
 });
 
 function render(trust: AdminSellerTrustView) {
-  act(() => root.render(<SellerTrustSection trust={trust} />));
+  act(() => root.render(<SellerTrustSection userId={USER_ID} trust={trust} />));
   return container.textContent ?? "";
 }
 
@@ -108,5 +117,24 @@ describe("SellerTrustSection", () => {
     expect(text).toContain("3,74 / 5");
     expect(text).toContain("admin.users.detail.trust.unavailable");
     expect(text).not.toContain("admin.users.detail.trust.colWeight");
+  });
+
+  it("links to the trust lab on this seller for staff who hold the key", () => {
+    held = ["seller_trust_lab"];
+    render(rated);
+    const link = container.querySelector("a");
+    expect(link?.textContent).toBe("admin.users.detail.trust.openInLab");
+    expect(link?.getAttribute("href")).toBe(
+      `/system/seller-trust-lab?userId=${USER_ID}`,
+    );
+  });
+
+  it("shows no lab link to staff without the key", () => {
+    held = ["users"];
+    render(rated);
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.textContent).not.toContain(
+      "admin.users.detail.trust.openInLab",
+    );
   });
 });

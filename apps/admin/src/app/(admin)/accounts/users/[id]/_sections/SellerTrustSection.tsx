@@ -7,8 +7,10 @@ import {
   SELLER_TRUST_LEVEL_I18N_KEYS,
   type AdminSellerTrustView,
 } from "@tarodan/types";
+import { usePermissions } from "@/context/PermissionsContext";
 import { fmtDateTime, fmtDecimal } from "@/lib/format";
 import { DataTable } from "@/components/DataTable";
+import { TextLink } from "@/components/TextLink";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
 import { trustBreakdownRows } from "../_lib/trustBreakdown";
@@ -19,10 +21,18 @@ import { trustBreakdownColumns } from "../_lib/trustColumns";
  * last computed it, and the per-component breakdown. Read-only; everything
  * comes from the `trust` field of the user detail (never null; `computedAt`
  * null means no stored row yet). `components` is null when the stored
- * breakdown is from another formula version.
+ * breakdown is from another formula version. Staff who hold the
+ * `seller_trust_lab` permission get a link to the lab on this seller.
  */
-export function SellerTrustSection({ trust }: { trust: AdminSellerTrustView }) {
+export function SellerTrustSection({
+  userId,
+  trust,
+}: {
+  userId: string;
+  trust: AdminSellerTrustView;
+}) {
   const t = useTranslations();
+  const { can } = usePermissions();
   const columns = useMemo(() => trustBreakdownColumns(t), [t]);
   const rows = useMemo(
     () => (trust.components ? trustBreakdownRows(trust.components, t) : []),
@@ -42,6 +52,11 @@ export function SellerTrustSection({ trust }: { trust: AdminSellerTrustView }) {
       title={t("admin.users.detail.trust.title")}
       bodyClassName="space-y-4"
     >
+      {can("seller_trust_lab") && (
+        <TextLink href={`/system/seller-trust-lab?userId=${userId}`}>
+          {t("admin.users.detail.trust.openInLab")}
+        </TextLink>
+      )}
       <DataList>
         <Field label={t("admin.users.detail.trust.score")}>{scoreText}</Field>
         <Field label={t("admin.users.detail.trust.level")}>
