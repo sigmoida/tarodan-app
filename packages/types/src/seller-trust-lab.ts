@@ -152,13 +152,13 @@ export interface SellerTrustParamIssue {
   code: SellerTrustParamIssueCode;
 }
 
-const GROUPS = Object.keys(SELLER_TRUST_PARAM_LIMITS).reduce<
-  Record<string, string[]>
->((acc, path) => {
+// A Map, not an object: `key in {}` is also true for inherited keys such as
+// `constructor`, which would then pass as a known group.
+const GROUPS = new Map<string, string[]>();
+for (const path of Object.keys(SELLER_TRUST_PARAM_LIMITS)) {
   const [group, key] = path.split(".");
-  (acc[group] ??= []).push(key);
-  return acc;
-}, {});
+  GROUPS.set(group, [...(GROUPS.get(group) ?? []), key]);
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -193,9 +193,9 @@ export function validateSellerTrustParams(p: unknown): SellerTrustParamIssue[] {
   const valid = new Map<string, number>();
 
   for (const key of Object.keys(p)) {
-    if (!(key in GROUPS)) issues.push({ field: key, code: "unknownField" });
+    if (!GROUPS.has(key)) issues.push({ field: key, code: "unknownField" });
   }
-  for (const [group, keys] of Object.entries(GROUPS)) {
+  for (const [group, keys] of GROUPS) {
     const values = p[group];
     if (!isRecord(values)) {
       issues.push({ field: group, code: "notAnObject" });
@@ -289,8 +289,9 @@ interface ComponentTerms {
   subScore: number;
   weight: number;
   /**
-   * `5 x weight x subScore`, in points. The five add up to `score` up to
-   * binary noise; `score` itself is computed exactly as the stored score.
+   * `5 x (weight x subScore)`, in points: the weighted term the score adds
+   * up. The five add up to `score` up to binary noise; rounded one by one
+   * for display, their sum may miss the rounded score by a few hundredths.
    */
   contribution: number;
 }

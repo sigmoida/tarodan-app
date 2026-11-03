@@ -260,6 +260,30 @@ describe("validateSellerTrustParams", () => {
     ]);
   });
 
+  it("refuses keys an object only inherits (constructor, __proto__, toString)", () => {
+    // JSON.parse makes `__proto__` an own key, as a request body would.
+    const body = JSON.parse(
+      JSON.stringify(v1()).replace(
+        /^\{/,
+        '{"constructor":1,"__proto__":{},"toString":2,',
+      ),
+    ) as unknown;
+    expect(validateSellerTrustParams(body)).toEqual([
+      { field: "constructor", code: "unknownField" },
+      { field: "__proto__", code: "unknownField" },
+      { field: "toString", code: "unknownField" },
+    ]);
+    const nested = JSON.parse(
+      JSON.stringify(v1()).replace(
+        '"tenure":{',
+        '"tenure":{"hasOwnProperty":1,',
+      ),
+    ) as unknown;
+    expect(validateSellerTrustParams(nested)).toEqual([
+      { field: "tenure.hasOwnProperty", code: "unknownField" },
+    ]);
+  });
+
   it("refuses a set or a group that is not an object", () => {
     for (const bad of [null, undefined, 1, "x", []]) {
       expect(validateSellerTrustParams(bad)).toEqual([
