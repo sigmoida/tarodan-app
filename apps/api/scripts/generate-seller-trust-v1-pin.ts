@@ -5,16 +5,17 @@
  *
  * The fixture was generated ONCE, by the formula code as it was before the
  * parameter refactor (tarodan-ops plan 2026-11-03-seller-trust-score-lab,
- * section 4.1), and committed. Never regenerate it for v1: a pin that is
- * rewritten from the code it pins proves nothing. A new formula version gets
- * its own pin file.
+ * section 4.1), and committed in "test(api): pin seller trust v1 outputs on
+ * seeded inputs". Never regenerate it for v1: a pin rewritten from the code
+ * it pins proves nothing, so the script refuses to overwrite an existing
+ * file. A new formula version gets its own pin file (change OUT).
  *
  * Run from apps/api:
  *   npx ts-node -r tsconfig-paths/register scripts/generate-seller-trust-v1-pin.ts
  *
  * The inputs are synthetic (a seeded PRNG), never production data.
  */
-import { writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { computeSellerTrust } from "../src/modules/seller-trust/helpers/trust-formula";
 
@@ -35,6 +36,14 @@ function mulberry32(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
   };
+}
+
+// The pin is frozen: refuse to rewrite it from whatever the code computes now.
+if (existsSync(OUT)) {
+  console.error(
+    `${OUT} exists. The v1 pin is never regenerated; a new formula version gets its own pin file.`,
+  );
+  process.exit(1);
 }
 
 const rand = mulberry32(SEED);

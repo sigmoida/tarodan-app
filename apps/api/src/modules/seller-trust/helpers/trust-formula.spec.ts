@@ -5,12 +5,9 @@ import {
   SELLER_TRUST_WEIGHTS_V1,
 } from "@tarodan/types";
 import { TRUST_FORMULA_V1 } from "./trust-formula.constants";
-import {
-  computeSellerTrust,
-  toScoreX100,
-  type SellerTrustInputs,
-} from "./trust-formula";
+import { computeSellerTrust, toScoreX100 } from "./trust-formula";
 import { SELLER_TRUST_GOLDEN_V1 } from "./trust-golden-v1";
+import { trustInputs as inputs } from "../testing/trust-inputs-fixture";
 
 /**
  * Pins seller trust formula v1 rules to `docs/SELLER_TRUST.md`: the minimum
@@ -21,19 +18,6 @@ import { SELLER_TRUST_GOLDEN_V1 } from "./trust-golden-v1";
  * here is a formula change: bump SELLER_TRUST_FORMULA_VERSION and get the
  * product decision first.
  */
-const inputs = (over: Partial<SellerTrustInputs>): SellerTrustInputs => ({
-  raters: 0,
-  sumOfGiverMeans: 0,
-  eligibleOrders: 0,
-  failures: 0,
-  shipped: 0,
-  late: 0,
-  transactions: 0,
-  counterparties: 0,
-  tenureDays: 0,
-  ...over,
-});
-
 describe("computeSellerTrust (formula v1)", () => {
   describe("minimum data (D2)", () => {
     it("A new: 3 sales and two 5-star ratings have no score", () => {

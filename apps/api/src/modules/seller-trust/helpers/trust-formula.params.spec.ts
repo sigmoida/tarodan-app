@@ -2,11 +2,11 @@ import {
   pickSellerTrustFormulaParams,
   validateSellerTrustParams,
   type SellerTrustFormulaParams,
-  type SellerTrustInputs,
 } from "@tarodan/types";
 import { computeSellerTrust } from "./trust-formula";
 import { TRUST_FORMULA_V1 } from "./trust-formula.constants";
 import { loadV1PinInputs } from "../testing/trust-v1-pin-fixture";
+import { trustInputs as inputs } from "../testing/trust-inputs-fixture";
 
 /**
  * The formula takes a parameter set; the default is v1 (AC-F4). The v1 pin
@@ -14,19 +14,6 @@ import { loadV1PinInputs } from "../testing/trust-v1-pin-fixture";
  * seeded inputs.
  */
 const pinInputs = loadV1PinInputs();
-
-const inputs = (over: Partial<SellerTrustInputs>): SellerTrustInputs => ({
-  raters: 0,
-  sumOfGiverMeans: 0,
-  eligibleOrders: 0,
-  failures: 0,
-  shipped: 0,
-  late: 0,
-  transactions: 0,
-  counterparties: 0,
-  tenureDays: 0,
-  ...over,
-});
 
 const candidate = (
   change: (p: SellerTrustFormulaParams) => void,
