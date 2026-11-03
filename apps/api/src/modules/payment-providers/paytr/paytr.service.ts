@@ -38,37 +38,6 @@ export interface PayTRBasketItem {
   quantity: number;
 }
 
-export interface PayTRPaymentRequest {
-  merchantOid: string;
-  email: string;
-  paymentAmount: number; // in kuruş
-  paymentType: "card" | "eft";
-  installmentCount: number;
-  currency: "TL" | "EUR" | "USD" | "GBP" | "RUB";
-  testMode: "0" | "1";
-  noInstallment: "0" | "1";
-  maxInstallment:
-    "0" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
-  userName: string;
-  userAddress: string;
-  userPhone: string;
-  merchantOkUrl: string;
-  merchantFailUrl: string;
-  userBasket: string; // Base64 encoded JSON array
-  debugOn: "0" | "1";
-  lang: "tr" | "en";
-  userIp: string;
-  timeoutLimit?: string;
-  cardType?: "bonus" | "axess" | "maximum" | "world" | "cardfinans" | "paraf";
-  syncMode?: "0" | "1";
-}
-
-export interface PayTRIframeResponse {
-  status: "success" | "failed";
-  reason?: string;
-  token?: string;
-}
-
 export interface PayTRCallbackData {
   merchant_oid: string;
   status: "success" | "failed";
@@ -80,7 +49,8 @@ export interface PayTRCallbackData {
   payment_type?: string;
   currency?: string;
   payment_amount?: string;
-  // Direkt API 2. adım (bildirim) dokümanı: PayTR taksit sayısını da bildirir.
+  // Direkt API 2. Adim (https://dev.paytr.com/direkt-api/direkt-api-2-adim):
+  // "Islemde yapilan taksit sayisi" (0 = single payment).
   installment_count?: string;
 }
 
@@ -302,7 +272,7 @@ export class PayTRService implements IPaymentProvider {
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
   }
-  private parsePaytrJson<T = any>(rawText: string): T | null {
+  private parsePaytrJson<T = unknown>(rawText: string): T | null {
     return this.paytr.parsePaytrJson<T>(rawText);
   }
 
@@ -414,19 +384,24 @@ export class PayTRService implements IPaymentProvider {
         data.net_tutar != null ? String(data.net_tutar) : undefined,
       );
 
-      // İade listesi — reference_no eşlemesi için normalize edilir.
-      const returnsRaw = Array.isArray(data.returns) ? data.returns : [];
-      const returns = returnsRaw.map((r: any) => ({
-        amountTl: PayTRService.parsePaytrMoneyString(
-          r?.return_amount != null ? String(r.return_amount) : undefined,
-        ),
-        referenceNo:
-          r?.reference_no != null && String(r.reference_no) !== ""
-            ? String(r.reference_no)
-            : undefined,
-        date: r?.return_date != null ? String(r.return_date) : undefined,
-        type: r?.return_type != null ? String(r.return_type) : undefined,
-      }));
+      // Refunds, normalized for the reference_no match.
+      const returnsRaw: unknown[] = Array.isArray(data.returns)
+        ? data.returns
+        : [];
+      const returns = returnsRaw.map((entry) => {
+        const r = isPlainRecord(entry) ? entry : {};
+        return {
+          amountTl: PayTRService.parsePaytrMoneyString(
+            r.return_amount != null ? String(r.return_amount) : undefined,
+          ),
+          referenceNo:
+            r.reference_no != null && String(r.reference_no) !== ""
+              ? String(r.reference_no)
+              : undefined,
+          date: r.return_date != null ? String(r.return_date) : undefined,
+          type: r.return_type != null ? String(r.return_type) : undefined,
+        };
+      });
 
       return {
         ok: true,
@@ -443,11 +418,14 @@ export class PayTRService implements IPaymentProvider {
         returns,
         raw: data,
       };
-    } catch (error: any) {
-      this.logger.error(`PayTR durum-sorgu hatası: ${error?.message}`);
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      this.logger.error(
+        `PayTR durum-sorgu oid=${merchantOid} failed: ${message}`,
+      );
       return {
         ok: false,
-        errMsg: error?.message || "PayTR status inquiry error",
+        errMsg: message || "PayTR status inquiry error",
       };
     }
   }
@@ -1130,14 +1108,15 @@ export class PayTRService implements IPaymentProvider {
         tryAgain: data.try_again,
         raw: data,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = errorMessage(error);
       this.logger.error(
-        `PayTR recurring hata oid=${params.merchantOid}: ${error?.message}`,
+        `PayTR recurring failed oid=${params.merchantOid}: ${message}`,
       );
-      // Ağ/timeout → geçici kabul et, tekrar denenebilir.
+      // Network error or timeout: treated as temporary, may be retried.
       return {
         status: "failed",
-        reason: error?.message || "bağlantı hatası",
+        reason: message || "bağlantı hatası",
         tryAgain: true,
       };
     }
@@ -1182,20 +1161,23 @@ export class PayTRService implements IPaymentProvider {
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       const rawText = await response.text();
-      const data = this.parsePaytrJson<any>(rawText);
-      // Hata: {status:'error', err_msg}. Eşleşme yoksa boş JSON. Başarı: kart dizisi.
-      if (!data || data.status === "error") {
-        if (data?.status === "error")
+      const data = this.parsePaytrJson<
+        | PaytrCapiCardRaw[]
+        | { status?: string; err_msg?: string; cards?: PaytrCapiCardRaw[] }
+      >(rawText);
+      // Error: {status:'error', err_msg}. No match: empty JSON. Success: a card array.
+      if (!data || (!Array.isArray(data) && data.status === "error")) {
+        if (data && !Array.isArray(data))
           this.logger.warn(`PayTR capi/list error: ${data.err_msg}`);
         return [];
       }
-      const cards = Array.isArray(data)
+      const cards: PaytrCapiCardRaw[] = Array.isArray(data)
         ? data
         : Array.isArray(data.cards)
           ? data.cards
           : [];
       return cards
-        .map((c: any) => ({
+        .map((c) => ({
           ctoken: c.ctoken,
           last4: c.last_4,
           requireCvv: String(c.require_cvv) === "1",
@@ -1210,9 +1192,9 @@ export class PayTRService implements IPaymentProvider {
               ? String(c.businessCard).toLowerCase() === "y"
               : undefined,
         }))
-        .filter((c: any) => !!c.ctoken);
-    } catch (error: any) {
-      this.logger.error(`PayTR capi/list hata: ${error?.message}`);
+        .filter((c): c is typeof c & { ctoken: string } => !!c.ctoken);
+    } catch (error: unknown) {
+      this.logger.error(`PayTR capi/list failed: ${errorMessage(error)}`);
       return [];
     }
   }
@@ -1249,9 +1231,10 @@ export class PayTRService implements IPaymentProvider {
         rawText,
       );
       return { status: data?.status || "error", reason: data?.err_msg };
-    } catch (error: any) {
-      this.logger.error(`PayTR capi/delete hata: ${error?.message}`);
-      return { status: "error", reason: error?.message };
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      this.logger.error(`PayTR capi/delete failed: ${message}`);
+      return { status: "error", reason: message };
     }
   }
 
@@ -1370,4 +1353,18 @@ function directFormInstallment(options?: {
     throw new Error(`PayTR card_type is not a card family: ${cardType}`);
   }
   return { installmentCount: String(count), cardType };
+}
+
+/** One card of a `capi/list` answer, as PayTR sends it. */
+interface PaytrCapiCardRaw {
+  ctoken?: string;
+  last_4: string;
+  require_cvv?: string | number;
+  month?: string;
+  year?: string;
+  c_brand?: string;
+  c_type?: string;
+  schema?: string;
+  c_bank?: string;
+  businessCard?: string;
 }
