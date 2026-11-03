@@ -5292,6 +5292,158 @@
           "avatar": "Avatar",
           "upload": "Yükleme"
         }
+      },
+      "sellerTrustLab": {
+        "title": "Güven skoru laboratuvarı",
+        "readOnlyNotice": "Salt okuma: burada yapılan hesaplar kaydedilmez, skorları ve sıralamayı değiştirmez.",
+        "auditNotice": "Satıcı ve topluluk sorguları denetim kaydına yazılır.",
+        "env": {
+          "production": "PROD",
+          "staging": "STAGING",
+          "other": "{env}"
+        },
+        "prodWarning": "Üretim verisi: gerçek satıcılar gösteriliyor.",
+        "candidateLabel": "Aday: önerilen değerler, kaydedilmez",
+        "states": {
+          "loading": "Hesaplanıyor...",
+          "error": "Hesaplanamadı: {message}",
+          "retry": "Tekrar dene",
+          "throttled": "Çok sık denendi. Bir dakika sonra tekrar deneyin.",
+          "forbidden": "Bu sayfayı açma izniniz yok. Gerekli izin: Güven skoru laboratuvarı."
+        },
+        "seller": {
+          "title": "Satıcı",
+          "userId": "Kullanıcı kimliği",
+          "userIdHint": "Kullanıcı kimliğini (UUID) girin.",
+          "asOf": "Hesaplama anı",
+          "asOfNow": "Şimdi",
+          "asOfStored": "Son gece çalışmasının anı",
+          "asOfFallback": "Kayıtlı skor olmadığı için şimdiki an kullanıldı.",
+          "useCandidate": "Aday parametrelerle de hesapla",
+          "run": "Hesapla",
+          "storedTitle": "Kayıtlı skor",
+          "recomputedTitle": "Yeniden hesaplanan (v1)",
+          "candidateTitle": "Aday (kaydedilmez)",
+          "matchesStored": "Kayıtlı skorla aynı",
+          "differsFromStored": "Kayıtlı skordan farklı: veri gece çalışmasından sonra değişmiş olabilir.",
+          "changedInputs": "Değişen girdiler",
+          "colInputs": "Girdiler",
+          "colRate": "Oran",
+          "colContribution": "Katkı",
+          "colStored": "Kayıtlı",
+          "colLive": "Şimdiki",
+          "unroundedScore": "Yuvarlanmamış skor",
+          "roundedScore": "Yuvarlanmış skor",
+          "notFound": "Kullanıcı bulunamadı.",
+          "notScored": {
+            "banned": "Bu hesap yasaklı; skor hesaplanmaz.",
+            "deleted": "Bu hesap silinmiş; skor hesaplanmaz.",
+            "testLane": "Bu bir test şeridi hesabı; skor hesaplanmaz."
+          },
+          "notEnoughData": "Yeterli veri yok: en az {transactions} işlem ve {counterparties} farklı karşı taraf gerekir.",
+          "noStoredRow": "Bu satıcı için kayıtlı skor yok.",
+          "windows": "Hesaplama pencereleri",
+          "windowRating": "Değerlendirmeler",
+          "windowOperations": "Sipariş ve kargo",
+          "windowVolume": "İşlem hacmi"
+        },
+        "scenario": {
+          "title": "Senaryo hesaplayıcı",
+          "description": "Varsayımsal girdilerle skoru dene. Gerçek veri kullanılmaz.",
+          "preset": "Hazır senaryo",
+          "presetNone": "Seçiniz",
+          "meanRating": "Ortalama puan (1-5)",
+          "run": "Hesapla",
+          "reset": "Temizle",
+          "candidateApplied": "Geçerli aday parametreler de uygulanır.",
+          "errors": {
+            "invalidNumber": "{field} geçerli bir sayı olmalı.",
+            "negative": "{field} negatif olamaz.",
+            "aboveEligibleOrders": "{field}, değerlendirilen sipariş sayısını aşamaz.",
+            "aboveShipped": "{field}, kargolanan sayısını aşamaz."
+          }
+        },
+        "golden": {
+          "title": "Referans senaryolar (v1)",
+          "description": "Onaylanmış v1 sonuçları. Salt okunur.",
+          "colName": "Senaryo",
+          "colScore": "Skor",
+          "colLevel": "Seviye",
+          "name": {
+            "newSeller": "Yeni satıcı",
+            "smallPerfect": "Küçük ama kusursuz",
+            "steady": "Düzenli satıcı",
+            "good": "İyi satıcı",
+            "veteran": "Kıdemli satıcı",
+            "problem": "Sorunlu satıcı",
+            "lovedUnreliable": "Sevilen ama güvenilmez",
+            "reliableUnrated": "Güvenilir ama hiç değerlendirilmemiş",
+            "oneStarWave": "Tek yıldız dalgası",
+            "minimumOnPriors": "Asgari şart, yalnızca varsayımlar"
+          }
+        },
+        "params": {
+          "title": "Aday parametreler",
+          "description": "v1 değerleriyle başlar. Değiştirdiklerin yalnızca bu sayfada denenir.",
+          "weights": "Ağırlıklar",
+          "weightsSum": "Ağırlıkların toplamı: {sum}",
+          "priors": "Başlangıç varsayımları",
+          "priorMean": "Başlangıç ortalaması",
+          "priorWeight": "Başlangıç ağırlığı",
+          "priorRate": "Başlangıç oranı",
+          "zeroAt": "Sıfır skor oranı",
+          "saturation": "Hacim doygunluğu (işlem)",
+          "fullAtDays": "Tam puan için gün",
+          "minimums": "Asgari veri",
+          "minTransactions": "Asgari işlem",
+          "minCounterparties": "Asgari farklı karşı taraf",
+          "resetToV1": "v1 değerlerine dön",
+          "modified": "Değiştirildi",
+          "errors": {
+            "weightsSum": "Ağırlıkların toplamı 1 olmalı (şu an {sum}).",
+            "range": "{field}, {min} ile {max} arasında olmalı.",
+            "integer": "{field} tam sayı olmalı.",
+            "counterparties": "Farklı karşı taraf sayısı işlem sayısını aşamaz."
+          }
+        },
+        "population": {
+          "title": "Topluluk",
+          "description": "Adayı kayıtlı skorlara uygula ve sonucu v1 ile karşılaştır.",
+          "source": "Skorlar son gece çalışmasından okunur; yuvarlama sınırında küçük farklar olabilir.",
+          "filterLevels": "Seviye filtresi",
+          "filterMinTransactions": "Asgari işlem",
+          "run": "Çalıştır",
+          "rowsRead": "Okunan satıcı",
+          "rowsCompared": "Karşılaştırılan",
+          "skippedOtherVersion": "Başka formül sürümü nedeniyle atlanan",
+          "skippedUnreadable": "Okunamadığı için atlanan",
+          "computedRange": "Hesaplama aralığı",
+          "inProgress": "Gece çalışması sürüyor olabilir: kayıtlar farklı zamanlarda hesaplanmış.",
+          "consistency": {
+            "title": "v1 tutarlılık kontrolü",
+            "matched": "Eşleşen",
+            "offByOne": "0,01 farklı",
+            "mismatched": "Uyuşmayan",
+            "warning": "{count} kayıt kayıtlı skorla uyuşmuyor: depolama ile formül arasında sapma olabilir."
+          },
+          "levelCounts": "Seviye dağılımı",
+          "histogram": "Skor dağılımı",
+          "matrix": "Seviye geçişleri (kayıtlı → aday)",
+          "newToScored": "Yeni → skorlu",
+          "scoredToNew": "Skorlu → yeni",
+          "changed": "Değişen skor",
+          "meanChange": "Ortalama mutlak değişim",
+          "maxChange": "En büyük mutlak değişim",
+          "moversUp": "En çok yükselenler",
+          "moversDown": "En çok düşenler",
+          "colStored": "Kayıtlı",
+          "colCandidate": "Aday",
+          "colRank": "Sıra",
+          "download": "Öneriyi indir (JSON)",
+          "downloadHint": "Dosyada kullanıcı kimliği veya kullanıcı adı yoktur.",
+          "empty": "Henüz skor yok. Gece çalışması skorları doldurur.",
+          "noMatch": "Filtrelere uyan satıcı yok."
+        }
       }
     },
     "catalog": {
@@ -9456,7 +9608,8 @@
             "transactions": "Tamamlanan işlem",
             "counterparties": "Farklı karşı taraf",
             "tenureDays": "Hesap yaşı (gün)"
-          }
+          },
+          "openInLab": "Güven skoru laboratuvarında aç"
         }
       },
       "unbanConfirmDesc": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?",
@@ -9793,6 +9946,10 @@
         "auditLogs": {
           "label": "Denetim İzi",
           "description": "Denetim sekmesi: hangi yönetici neyi ne zaman değiştirdi kayıtları."
+        },
+        "sellerTrustLab": {
+          "label": "Güven skoru laboratuvarı",
+          "description": "Satıcı güven skorunu açıklar, yeniden hesaplar ve aday ağırlıkları dener (salt okunur)."
         }
       },
       "form": {
@@ -10054,6 +10211,11 @@
           "name": "E-posta Yönlendirme",
           "description": "Alan bazında gönderen posta kutusu ve iç bildirim alıcıları",
           "keywords": "e-posta, mail, gönderen, smtp, bildirim, alıcı, posta kutusu, özet"
+        },
+        "sellerTrustLab": {
+          "name": "Güven skoru laboratuvarı",
+          "description": "Satıcı güven skorunu açıkla, yeniden hesapla ve aday ağırlıkları dene. Hiçbir şey kaydedilmez.",
+          "keywords": "güven skoru, satıcı skoru, ağırlık, simülasyon, laboratuvar"
         }
       }
     },

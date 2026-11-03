@@ -557,6 +557,17 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "test_tools",
           roles: ["super_admin"],
         },
+        {
+          // The matrix decides: super admin always, `admin` through the key
+          // (default on). No `roles` override; the API also refuses a moderator.
+          name: t("admin.nav.items.sellerTrustLab.name"),
+          href: "/system/seller-trust-lab",
+          description: t("admin.nav.items.sellerTrustLab.description"),
+          keywords: t("admin.nav.items.sellerTrustLab.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "seller_trust_lab",
+        },
       ],
     },
   ];
