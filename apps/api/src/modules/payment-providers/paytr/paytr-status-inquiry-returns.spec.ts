@@ -110,4 +110,76 @@ describe("PayTRService.queryPaymentStatus — returns + kesinti alanları", () =
     expect(r.providerNetTl).toBeUndefined();
     expect(r.returns).toEqual([]);
   });
+  // Regression: the parser read `installment_count`, which durum-sorgu does
+  // not send, so a payment recovered by inquiry never stored its count.
+  // Durum Sorgu (https://dev.paytr.com/durum-sorgu) documents `taksit`
+  // (0, 2-12), `kart_marka`, `masked_pan` and `odeme_tipi` (KART | EFT).
+  it("reads taksit, kart_marka, masked_pan and odeme_tipi", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "1066,50",
+          payment_amount: "1000,00",
+          currency: "TL",
+          taksit: "6",
+          kart_marka: "WORLD",
+          masked_pan: "455359******6747",
+          odeme_tipi: "KART",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(6);
+    expect(r.cardBrand).toBe("WORLD");
+    expect(r.maskedPan).toBe("455359******6747");
+    expect(r.paymentType).toBe("card");
+    expect(r.paymentTotalTl).toBeCloseTo(1066.5);
+    expect(r.paymentAmountTl).toBeCloseTo(1000);
+  });
+
+  it("reads a single payment as taksit 0", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "100,00",
+          payment_amount: "100,00",
+          taksit: 0,
+          odeme_tipi: "EFT",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(0);
+    expect(r.paymentType).toBe("eft");
+  });
+
+  it.each([["13"], ["abc"], ["2.5"], [""], [-1]])(
+    "leaves installmentCount undefined for an invalid taksit %p",
+    async (taksit) => {
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({
+            status: "success",
+            payment_total: "100,00",
+            taksit,
+          }),
+      });
+
+      const r = await service.queryPaymentStatus("ORDER123");
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.installmentCount).toBeUndefined();
+      expect(r.cardBrand).toBeUndefined();
+      expect(r.maskedPan).toBeUndefined();
+    },
+  );
 });

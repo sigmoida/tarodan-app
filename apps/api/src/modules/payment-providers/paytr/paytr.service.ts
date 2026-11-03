@@ -103,10 +103,20 @@ export type PayTRStatusInquirySuccess = {
   paymentAmountTl: number;
   paymentDate?: string;
   currency: string;
-  /** Ödeme yöntemi (card/eft) — gözlemlenebilirlik/muhasebe için. */
+  /**
+   * Payment method, "card" | "eft" as in the callback's `payment_type`.
+   * Durum-sorgu documents it as `odeme_tipi` (KART | EFT), mapped here.
+   */
   paymentType?: string;
-  /** Taksit sayısı (0/1 = tek çekim). */
+  /** `taksit`: installment count, 0 = single payment, 2-12 (0/1 = single). */
   installmentCount?: number;
+  /** `kart_marka`: card brand/family as PayTR reports it (e.g. "WORLD", "BONUS"). */
+  cardBrand?: string;
+  /**
+   * `masked_pan`: first 6 + last 4 digits, masked. Card data: never log it,
+   * never put it in Sentry; store only where a field is meant for it.
+   */
+  maskedPan?: string;
   /** PayTR'nin bu işlemden kestiği komisyon (TL) — `kesinti_tutari`. PSP ücret mutabakatı için. */
   providerFeeTl?: number;
   /** Kesinti sonrası kalan tutar (TL) — `net_tutar`. */
@@ -184,6 +194,7 @@ import {
 } from "./paytr-fetch-retry.util";
 import { isNothingLeftToRefund } from "./paytr-refund-rejection";
 import {
+  PAYTR_INSTALLMENT_COUNT_MAX,
   parsePaytrInstallmentRates,
   parsePaytrMaxInstallment,
   type PaytrInstallmentRatesResult,
@@ -376,16 +387,13 @@ export class PayTRService implements IPaymentProvider {
 
       const currency = String(data.currency ?? data.Currency ?? "TL");
 
-      const paymentType =
-        (data.payment_type as string | undefined) ??
-        (data.PaymentType as string | undefined);
-      const installmentRaw =
-        (data.installment_count as string | number | undefined) ??
-        (data.InstallmentCount as string | number | undefined);
-      const installmentCount =
-        installmentRaw != null && installmentRaw !== ""
-          ? Number.parseInt(String(installmentRaw), 10)
-          : undefined;
+      const paymentType = statusInquiryPaymentType(data);
+      // Durum Sorgu (https://dev.paytr.com/durum-sorgu) documents the count
+      // as `taksit` ("0, 2-12"). `installment_count` is the callback's name
+      // (Direkt API 2. Adim) and stays only as a fallback.
+      const installmentCount = statusInquiryInstallmentCount(
+        data.taksit ?? data.installment_count ?? data.InstallmentCount,
+      );
 
       // PSP kesintisi (virgüllü gelebilir: "2,35") — ücret mutabakatı için.
       const providerFeeTl = PayTRService.parsePaytrMoneyString(
@@ -415,10 +423,10 @@ export class PayTRService implements IPaymentProvider {
         paymentAmountTl: amountTl,
         paymentDate,
         currency,
-        paymentType: paymentType != null ? String(paymentType) : undefined,
-        installmentCount: Number.isFinite(installmentCount as number)
-          ? installmentCount
-          : undefined,
+        paymentType,
+        installmentCount,
+        cardBrand: textOf(data.kart_marka),
+        maskedPan: textOf(data.masked_pan),
         providerFeeTl: providerFeeTl ?? undefined,
         providerNetTl: providerNetTl ?? undefined,
         returns,
@@ -1282,4 +1290,29 @@ export class PayTRService implements IPaymentProvider {
   getSettlementDetail(params: { date: string }) {
     return this.reports.getSettlementDetail(params, this.merchant);
   }
+}
+
+/**
+ * Payment method of a durum-sorgu answer in the callback's vocabulary
+ * ("card" | "eft"). The doc field is `odeme_tipi` (KART | EFT); an explicit
+ * `payment_type` wins when PayTR sends one.
+ */
+function statusInquiryPaymentType(
+  data: Record<string, unknown>,
+): string | undefined {
+  const explicit = textOf(data.payment_type ?? data.PaymentType);
+  if (explicit !== undefined) return explicit;
+  const method = textOf(data.odeme_tipi)?.toUpperCase();
+  if (method === undefined) return undefined;
+  if (method === "KART") return "card";
+  if (method === "EFT") return "eft";
+  return method.toLowerCase();
+}
+
+/** `taksit` as 0-12 (0 and 1 mean a single payment); undefined if invalid. */
+function statusInquiryInstallmentCount(value: unknown): number | undefined {
+  const text = textOf(value);
+  if (text === undefined || !/^\d{1,2}$/.test(text)) return undefined;
+  const count = Number.parseInt(text, 10);
+  return count <= PAYTR_INSTALLMENT_COUNT_MAX ? count : undefined;
 }
