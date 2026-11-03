@@ -74,13 +74,14 @@ type CancellationOrder = Prisma.OrderGetPayload<{
 }>;
 
 /**
- * İade talebinin DOĞUŞU — RefundService'ten birebir taşındı. Bir talebin hangi
- * yoldan açılacağına siparişin fazı karar verir (classifyOrderPhase): henüz
- * yola çıkmamış sipariş anında iade edilir, cayma penceresindeki sipariş fiziksel
- * dönüş bekler, penceresi geçmiş sipariş admin incelemesine düşer.
+ * The BIRTH of a refund request, moved as-is from RefundService. The order's
+ * phase decides the path (classifyOrderPhase): an order not yet handed to the
+ * carrier is refunded instantly, an order inside the return window waits for
+ * the physical return, and an order past the window is refused (no request
+ * is opened).
  *
- * Üç yol da AYNI finansal servisten hesap alır; buradaki fark yalnız hangi
- * durumla başlanacağı ve iade kargosunun ne zaman açılacağıdır.
+ * Both open paths take their figures from the SAME financial service; they
+ * differ only in the starting status and when the return shipment opens.
  */
 @Injectable()
 export class RefundCreationService {
@@ -193,21 +194,23 @@ export class RefundCreationService {
     // can never open a refund misleads the buyer.
     if (phase === "past_cooling_off") {
       // No refund after the return window: once it closes the buyer cannot
-      // open a request. Escrow pays the seller out from the same window end,
-      // so no refund is ever open or openable at payout time.
+      // open a request. Escrow pays the seller out from the same window end
+      // (plus the payout grace), so no new request can appear after payout.
       throw new BadRequestException(
         i18nMessage("server.refund.coolingOffExpired", {
           returnWindowDays: coolingOffDays,
         }),
       );
     }
-    if (phase === "unknown") {
+    const isPreShipment = phase === "preparing" || phase === "paid";
+    // Default closed: only the pre-shipment and in-window phases open a
+    // request; any other phase (`unknown`, or one added later) is refused.
+    if (!isPreShipment && phase !== "in_cooling_off") {
       throw new BadRequestException(
         i18nMessage("server.refund.orderStatusNotEligible"),
       );
     }
 
-    const isPreShipment = phase === "preparing" || phase === "paid";
     const policy = isPreShipment
       ? resolveCancellationPolicy(
           dto.reason === RefundReason.changed_mind ? "changed_mind" : "other",
@@ -230,7 +233,7 @@ export class RefundCreationService {
       return this.createInstantRefund(order, requesterId, dto, reqQty, policy);
     }
 
-    // Only `in_cooling_off` is left: the refused phases threw above.
+    // Only `in_cooling_off` is left: every other phase threw above.
     return this.createCoolingOffRefund(order, requesterId, dto, reqQty, policy);
   }
 

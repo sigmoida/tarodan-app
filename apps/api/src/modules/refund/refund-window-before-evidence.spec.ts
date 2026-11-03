@@ -206,7 +206,11 @@ describe("RefundCreationService - window check runs before the evidence check", 
   });
 
   describe("before shipment", () => {
-    it("still requires a photo for a non-remorse reason", async () => {
+    // Pins the existing cancellation policy (`manual_review_cancellation`
+    // requires evidence), which this fix leaves unchanged on purpose. Whether
+    // a pre-shipment fault claim should need a photo is a separate product
+    // decision.
+    it("keeps the evidence rule for a non-remorse reason", async () => {
       const { service, instant } = makeService(preparingOrder);
 
       await expect(
