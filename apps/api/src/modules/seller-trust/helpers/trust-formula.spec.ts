@@ -10,12 +10,16 @@ import {
   toScoreX100,
   type SellerTrustInputs,
 } from "./trust-formula";
+import { SELLER_TRUST_GOLDEN_V1 } from "./trust-golden-v1";
 
 /**
- * Pins seller trust formula v1 to the worked examples of the plan
- * (tarodan-ops plans/2026-10-21-seller-trust-score.md, section 3.6) and to
- * `docs/SELLER_TRUST.md`. A failing case here is a formula change: bump
- * SELLER_TRUST_FORMULA_VERSION and get the product decision first.
+ * Pins seller trust formula v1 rules to `docs/SELLER_TRUST.md`: the minimum
+ * data rule, priors, clamps, rounding, levels and the stored breakdown. The
+ * worked examples (cases A to F of tarodan-ops
+ * plans/2026-10-21-seller-trust-score.md, section 3.6) are golden scenarios
+ * in `trust-golden-v1.ts` (`trust-formula.golden.spec.ts`). A failing case
+ * here is a formula change: bump SELLER_TRUST_FORMULA_VERSION and get the
+ * product decision first.
  */
 const inputs = (over: Partial<SellerTrustInputs>): SellerTrustInputs => ({
   raters: 0,
@@ -31,124 +35,11 @@ const inputs = (over: Partial<SellerTrustInputs>): SellerTrustInputs => ({
 });
 
 describe("computeSellerTrust (formula v1)", () => {
-  const cases: Array<{
-    name: string;
-    in: Partial<SellerTrustInputs>;
-    subs: [number, number, number, number, number];
-    scoreX100: number;
-    level: string;
-  }> = [
-    {
-      name: "D small and perfect",
-      in: {
-        raters: 5,
-        sumOfGiverMeans: 25,
-        eligibleOrders: 5,
-        shipped: 5,
-        transactions: 5,
-        counterparties: 5,
-        tenureDays: 60,
-      },
-      subs: [0.875, 0.9467, 0.9333, 0.3882, 0.0822],
-      scoreX100: 395,
-      level: "fair",
-    },
-    {
-      name: "E steady",
-      in: {
-        raters: 12,
-        sumOfGiverMeans: 12 * 4.8,
-        eligibleOrders: 15,
-        shipped: 15,
-        late: 1,
-        transactions: 15,
-        counterparties: 12,
-        tenureDays: 200,
-      },
-      subs: [0.8912, 0.968, 0.88, 0.6008, 0.274],
-      scoreX100: 417,
-      level: "trusted",
-    },
-    {
-      name: "B good",
-      in: {
-        raters: 25,
-        sumOfGiverMeans: 25 * 4.8,
-        eligibleOrders: 45,
-        failures: 1,
-        shipped: 44,
-        late: 3,
-        transactions: 40,
-        counterparties: 30,
-        tenureDays: 400,
-      },
-      subs: [0.9167, 0.9127, 0.8704, 0.8047, 0.5479],
-      scoreX100: 437,
-      level: "trusted",
-    },
-    {
-      name: "F veteran",
-      in: {
-        raters: 100,
-        sumOfGiverMeans: 100 * 4.9,
-        eligibleOrders: 150,
-        failures: 1,
-        shipped: 148,
-        late: 4,
-        transactions: 100,
-        counterparties: 100,
-        tenureDays: 1000,
-      },
-      subs: [0.9643, 0.97, 0.943, 1, 1],
-      scoreX100: 485,
-      level: "excellent",
-    },
-    {
-      name: "C problem",
-      in: {
-        raters: 12,
-        sumOfGiverMeans: 12 * 3.9,
-        eligibleOrders: 30,
-        failures: 6,
-        shipped: 24,
-        late: 8,
-        transactions: 20,
-        counterparties: 15,
-        tenureDays: 300,
-      },
-      subs: [0.7324, 0.38, 0.5, 0.6597, 0.411],
-      scoreX100: 291,
-      level: "developing",
-    },
-  ];
-
-  it.each(cases)("$name scores $scoreX100 ($level)", (c) => {
-    const result = computeSellerTrust(inputs(c.in));
-    const comp = result.components;
-    expect([
-      comp.rating.subScore,
-      comp.reliability.subScore,
-      comp.onTime.subScore,
-      comp.volume.subScore,
-      comp.tenure.subScore,
-    ]).toEqual(c.subs.map((s) => expect.closeTo(s, 4)));
-    expect(result.scoreX100).toBe(c.scoreX100);
-    expect(sellerTrustLevel(result.scoreX100)).toBe(c.level);
-  });
-
   describe("minimum data (D2)", () => {
     it("A new: 3 sales and two 5-star ratings have no score", () => {
-      const result = computeSellerTrust(
-        inputs({
-          raters: 2,
-          sumOfGiverMeans: 10,
-          eligibleOrders: 3,
-          shipped: 3,
-          transactions: 3,
-          counterparties: 3,
-          tenureDays: 30,
-        }),
-      );
+      const aNew = SELLER_TRUST_GOLDEN_V1[0];
+      expect(aNew.key).toBe("aNew");
+      const result = computeSellerTrust(aNew.inputs);
       expect(result.scoreX100).toBeNull();
       expect(sellerTrustLevel(result.scoreX100)).toBe("new");
       // The breakdown is still kept for admin support.
@@ -238,6 +129,22 @@ describe("computeSellerTrust (formula v1)", () => {
     expect(comp.version).toBe(SELLER_TRUST_FORMULA_VERSION);
     expect(Object.keys(comp).sort()).toEqual(
       ["onTime", "rating", "reliability", "tenure", "version", "volume"].sort(),
+    );
+    // Admin reads these keys from stored rows: a rename is a version bump.
+    expect(Object.keys(comp.rating).sort()).toEqual(
+      ["raters", "smoothed", "subScore"].sort(),
+    );
+    expect(Object.keys(comp.reliability).sort()).toEqual(
+      ["eligibleOrders", "failures", "subScore"].sort(),
+    );
+    expect(Object.keys(comp.onTime).sort()).toEqual(
+      ["late", "shipped", "subScore"].sort(),
+    );
+    expect(Object.keys(comp.volume).sort()).toEqual(
+      ["counterparties", "subScore", "transactions"].sort(),
+    );
+    expect(Object.keys(comp.tenure).sort()).toEqual(
+      ["days", "subScore"].sort(),
     );
   });
 });

@@ -10,6 +10,7 @@ stored; a profile read is a primary-key lookup. Decision record: tarodan-ops
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Formula (pure) and its pinning specs                | `apps/api/src/modules/seller-trust/helpers/trust-formula.ts`, `.spec.ts`, `.v1-pin.spec.ts`                         |
 | Constants (v1)                                      | `seller-trust/helpers/trust-formula.constants.ts`                                                                   |
+| Golden scenarios (approved v1 outcomes)             | `seller-trust/helpers/trust-golden-v1.ts`, `trust-formula.golden.spec.ts`                                           |
 | Version, levels, thresholds, read shapes, formatter | `packages/types/src/seller-trust.ts`                                                                                |
 | Formula inputs, parameters, validator, explanation  | `packages/types/src/seller-trust-lab.ts` (API and admin only), `seller-trust/helpers/trust-explain.ts`              |
 | Table owner                                         | `seller-trust/seller-trust.service.ts` (`seller_trust_scores`)                                                      |
