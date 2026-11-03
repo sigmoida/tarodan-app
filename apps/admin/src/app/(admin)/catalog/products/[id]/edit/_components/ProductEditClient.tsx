@@ -133,7 +133,6 @@ export default function ProductEditClient({ id }: { id: string }) {
 
     const { newFormData } = buildListingFormData(record);
     form.reset(toEditListingValues(newFormData));
-    // eslint-disable-next-line no-console
     seedExistingImagesRef.current?.(record.images ?? [], id);
 
     const { saleData: nextSale, saleActive } = buildSaleDataFromListing(record);
@@ -230,7 +229,7 @@ export default function ProductEditClient({ id }: { id: string }) {
               },
             ]
           : [],
-    [models, record],
+    [models, record, brandSlug],
   );
 
   // Kartlar kayıt forma YAZILDIKTAN sonra monte olmalı; erken monte olurlarsa
