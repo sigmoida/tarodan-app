@@ -12,7 +12,11 @@ import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
 import { createOfferRow } from "../factories/offer.factory";
 import { signCallback } from "../mocks/paytr.mock";
-import { buyNow, latestPaymentOfOrder } from "../factories/flows";
+import {
+  buyNow,
+  latestPaymentOfOrder,
+  paymentsOfOrder,
+} from "../factories/flows";
 
 /**
  * Concurrency tests exercise the database's row-level locks (FOR UPDATE +
@@ -63,8 +67,11 @@ describe("Concurrency & Race Conditions (E2E)", () => {
       ]);
 
       const codes = [resA.status, resB.status].sort();
-      // Exactly one success, one stock failure
+      // Exactly one success, one stock failure (the stock lock refused it,
+      // not validation of the quote pins)
       expect(codes).toEqual([201, 400]);
+      const loser = resA.status === 400 ? resA : resB;
+      expect(loser.body.i18nKey).toBe("server.order.productOutOfStock");
 
       const prisma = getPrisma();
       const after = await prisma.product.findUnique({
@@ -170,11 +177,8 @@ describe("Concurrency & Race Conditions (E2E)", () => {
         orderAfter?.status,
       );
 
-      const completedPayments = await prisma.payment.findMany({
-        where: {
-          orderId: buyRes.body.orderId,
-          status: PaymentStatus.completed,
-        },
+      const completedPayments = await paymentsOfOrder(buyRes.body.orderId, {
+        status: PaymentStatus.completed,
       });
       expect(completedPayments).toHaveLength(1);
 

@@ -11,7 +11,11 @@ import { createUser, authHeader } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
-import { buyNow, latestPaymentOfOrder } from "../factories/flows";
+import {
+  buyNow,
+  latestPaymentOfOrder,
+  paymentsOfOrder,
+} from "../factories/flows";
 
 /**
  * Idempotency tests: every retry-prone path (PayTR callback, directBuy retry,
@@ -97,11 +101,9 @@ describe("Idempotency (E2E)", () => {
         .expect(201);
       expect(init2.body.paymentId).toBe(init1.body.paymentId);
 
-      const prisma = getPrisma();
-      const payments = await prisma.payment.findMany({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payments = await paymentsOfOrder(buyRes.body.orderId);
       expect(payments).toHaveLength(1);
+      expect(payments[0].id).toBe(init1.body.paymentId);
     });
   });
 
@@ -160,11 +162,8 @@ describe("Idempotency (E2E)", () => {
       });
       expect(orderAfterForged?.status).toBe(orderPaid?.status);
 
-      const completed = await prisma.payment.findMany({
-        where: {
-          orderId: buyRes.body.orderId,
-          status: PaymentStatus.completed,
-        },
+      const completed = await paymentsOfOrder(buyRes.body.orderId, {
+        status: PaymentStatus.completed,
       });
       expect(completed).toHaveLength(1);
     });

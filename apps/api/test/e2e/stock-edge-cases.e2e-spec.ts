@@ -120,6 +120,10 @@ describe("Stock edge cases — comprehensive (E2E)", () => {
       const codes = results.map((r) => r.status).sort();
       expect(codes.filter((c) => c === 201)).toHaveLength(3);
       expect(codes.filter((c) => c === 400)).toHaveLength(2);
+      // Both losers were refused by the stock lock, not by pin validation.
+      for (const res of results.filter((r) => r.status === 400)) {
+        expect(res.body.i18nKey).toBe("server.order.productOutOfStock");
+      }
 
       const p = await prisma.product.findUnique({ where: { id: product.id } });
       expect(p?.reservedQuantity).toBe(3); // never over-reserves

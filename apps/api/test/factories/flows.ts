@@ -16,7 +16,7 @@ import { extractCode, getLastEmailTo } from "../test-utils/mail";
 import { authHeader } from "./user.factory";
 import { createOfferRow } from "./offer.factory";
 import { paytrCallbackPath, signCallback } from "../mocks/paytr.mock";
-import { OfferStatus } from "@prisma/client";
+import { OfferStatus, Prisma } from "@prisma/client";
 
 type Auth = { accessToken: string };
 
@@ -210,26 +210,48 @@ export async function initiatePayment(
 }
 
 /**
- * The latest payment that charges `orderId`. Every order sits in a checkout
- * group (a direct buy opens a single-order group, a3588f12e) and an order's
- * payment is the group's single payment (df83a09fc), which carries
- * `checkoutGroupId` and no `orderId`; only legacy/offer payments are order-keyed.
+ * Where-clause for every payment that charges `orderId`. Every order sits in
+ * a checkout group (a direct buy opens a single-order group, a3588f12e) and an
+ * order's payment is the group's payment (df83a09fc), which carries
+ * `checkoutGroupId` and no `orderId`; only legacy/offer payments are
+ * order-keyed.
  */
-export async function latestPaymentOfOrder(orderId: string) {
-  const prisma = getPrisma();
-  const order = await prisma.order.findUnique({
+async function paymentsOfOrderWhere(
+  orderId: string,
+): Promise<Prisma.PaymentWhereInput> {
+  const order = await getPrisma().order.findUnique({
     where: { id: orderId },
     select: { checkoutGroupId: true },
   });
-  return prisma.payment.findFirst({
-    where: {
-      OR: [
-        { orderId },
-        ...(order?.checkoutGroupId
-          ? [{ checkoutGroupId: order.checkoutGroupId }]
-          : []),
-      ],
-    },
+  return {
+    OR: [
+      { orderId },
+      ...(order?.checkoutGroupId
+        ? [{ checkoutGroupId: order.checkoutGroupId }]
+        : []),
+    ],
+  };
+}
+
+/**
+ * Every payment row that charges `orderId` (see paymentsOfOrderWhere),
+ * optionally narrowed (e.g. by status). Exactly-once assertions count these:
+ * a lookup by `orderId` alone finds no group payment and would count zero.
+ */
+export async function paymentsOfOrder(
+  orderId: string,
+  where: Prisma.PaymentWhereInput = {},
+) {
+  return getPrisma().payment.findMany({
+    where: { AND: [await paymentsOfOrderWhere(orderId), where] },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+/** The latest payment that charges `orderId` (see paymentsOfOrderWhere). */
+export async function latestPaymentOfOrder(orderId: string) {
+  return getPrisma().payment.findFirst({
+    where: await paymentsOfOrderWhere(orderId),
     orderBy: { createdAt: "desc" },
   });
 }

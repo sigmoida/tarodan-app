@@ -12,7 +12,11 @@ import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
-import { buyNow, latestPaymentOfOrder } from "../factories/flows";
+import {
+  buyNow,
+  latestPaymentOfOrder,
+  paymentsOfOrder,
+} from "../factories/flows";
 
 describe("Purchase Flow (E2E)", () => {
   let ctx: E2ETestApp;
@@ -84,7 +88,12 @@ describe("Purchase Flow (E2E)", () => {
       });
       const address = await createAddress({ userId: buyer.id });
 
-      await buyNow(ctx, buyer, product.id, address.id).expect(400);
+      // Refused by the stock check, not by validation of the quote pins.
+      await buyNow(ctx, buyer, product.id, address.id)
+        .expect(400)
+        .expect((res) =>
+          expect(res.body.i18nKey).toBe("server.order.productOutOfStock"),
+        );
     });
 
     it("returns 403 when buyer tries to buy own product", async () => {
@@ -95,7 +104,11 @@ describe("Purchase Flow (E2E)", () => {
       });
       const address = await createAddress({ userId: seller.id });
 
-      await buyNow(ctx, seller, product.id, address.id).expect(403);
+      await buyNow(ctx, seller, product.id, address.id)
+        .expect(403)
+        .expect((res) =>
+          expect(res.body.i18nKey).toBe("server.order.cannotBuyOwnProduct"),
+        );
     });
 
     it("returns the existing pending order on retry rather than duplicating", async () => {
@@ -449,11 +462,8 @@ describe("Purchase Flow (E2E)", () => {
       expect(productAfter?.quantity).toBe(0);
       expect(productAfter?.reservedQuantity).toBe(0);
 
-      const completedPayments = await prisma.payment.findMany({
-        where: {
-          orderId: buyRes.body.orderId,
-          status: PaymentStatus.completed,
-        },
+      const completedPayments = await paymentsOfOrder(buyRes.body.orderId, {
+        status: PaymentStatus.completed,
       });
       expect(completedPayments).toHaveLength(1);
     });
