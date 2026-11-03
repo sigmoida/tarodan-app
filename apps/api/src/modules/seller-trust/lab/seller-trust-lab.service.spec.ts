@@ -390,6 +390,19 @@ describe("SellerTrustLabService (collaborators mocked)", () => {
       expect(t.sellerTrust.readStoredPage).not.toHaveBeenCalled();
     });
 
+    it("runs at exactly the cap (only more than the cap is refused)", async () => {
+      const t = build();
+      t.sellerTrust.countStored.mockResolvedValue(
+        SELLER_TRUST_LAB_POPULATION_MAX_ROWS,
+      );
+      t.sellerTrust.readStoredPage.mockResolvedValue([]);
+      await expect(
+        t.service.population(candidateParams(), {}),
+      ).resolves.toMatchObject({ summary: { rowsRead: 0 } });
+      expect(t.sellerTrust.readStoredPage).toHaveBeenCalledTimes(1);
+      expect(t.sellerTrust.readStoredPage.mock.calls[0][3]).toBe(2_000);
+    });
+
     it("reads keyset pages within the count and summarises against stored", async () => {
       const t = build();
       const golden = SELLER_TRUST_GOLDEN_V1.map((g, i) =>
@@ -484,13 +497,17 @@ describe("SellerTrustLabService (collaborators mocked)", () => {
  */
 describe("SellerTrustLabService over a Prisma double (no root access, no write)", () => {
   function build() {
+    // Fixed before the call: the service takes `now` when the call starts,
+    // so an account age taken inside the mock would be a few ms short of
+    // 400 days and floor to 399 (time-dependent).
+    const createdAt = new Date(Date.now() - 400 * DAY);
     const tx = {
       ...baseTx(),
       $queryRaw: jest.fn(async (...args: unknown[]) => {
         const text = sqlText(args);
         if (text.includes("set_config")) return [];
         if (text.includes('"is_test_account" = false')) {
-          return [{ id: "u1", createdAt: new Date(Date.now() - 400 * DAY) }];
+          return [{ id: "u1", createdAt }];
         }
         if (text.includes("guestEmail")) {
           // A guest counterparty: its key must never reach the response.
@@ -582,6 +599,35 @@ describe("SellerTrustLabService over a Prisma double (no root access, no write)"
       "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
     ]);
     expect(t.tx.sellerTrustScore.count).toHaveBeenCalledTimes(1);
+  });
+
+  it("pages stored rows and names the movers on the snapshot, never on the root client", async () => {
+    const t = build();
+    const stored = SELLER_TRUST_GOLDEN_V1.slice(0, 4).map((g, i) => ({
+      userId: `u${i}`,
+      scoreX100: computeSellerTrust(g.inputs).scoreX100,
+      formulaVersion: 1,
+      components: computeSellerTrust(g.inputs).components,
+      computedAt: new Date("2026-11-02T23:30:00.000Z"),
+    }));
+    t.tx.sellerTrustScore.count.mockResolvedValueOnce(stored.length);
+    t.tx.sellerTrustScore.findMany.mockResolvedValueOnce(stored as never);
+
+    const r = await t.service.population(candidateParams(), {});
+
+    expect(t.transaction).toHaveBeenCalledTimes(1);
+    expect(t.tx.executed).toEqual([
+      "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
+    ]);
+    expect(t.tx.sellerTrustScore.findMany).toHaveBeenCalledTimes(1);
+    expect(r.summary).toMatchObject({
+      rowsRead: stored.length,
+      rowsCompared: stored.length,
+      v1Consistency: { matched: stored.length, offByOne: 0, mismatched: 0 },
+    });
+    const movers = [...r.movers.up, ...r.movers.down];
+    expect(movers.length).toBeGreaterThan(0);
+    expect(t.tx.user.findMany).toHaveBeenCalledTimes(1);
   });
 
   it("serves params, scenarios and a scenario without touching the client", () => {
