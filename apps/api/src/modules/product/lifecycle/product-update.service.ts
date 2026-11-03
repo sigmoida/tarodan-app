@@ -15,6 +15,14 @@ import { resolveUpdatedStatus } from "../helpers/product-update-status";
 import { assertListingMayReopen } from "../helpers/product-reopen-gate";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
+import {
+  catalogReferenceLookups,
+  catalogReferenceUpdateData,
+  catalogReferenceViolation,
+  invalidCatalogReferenceError,
+  loadCatalogReferenceRows,
+  resolveCatalogReferenceChange,
+} from "../helpers/catalog-reference-rule";
 import { CacheService } from "../../cache/cache.service";
 import { SearchService } from "../../search/search.service";
 import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
@@ -298,40 +306,23 @@ export class ProductUpdateService {
       }
     }
 
-    if (
-      dto.brandId !== undefined ||
-      dto.carModelId !== undefined ||
-      dto.manufacturerId !== undefined
-    ) {
-      const nextBrandId = dto.brandId ?? product.brandId;
-      const nextCarModelId =
-        dto.carModelId !== undefined ? dto.carModelId : product.carModelId;
-      const nextManufacturerId = dto.manufacturerId ?? product.manufacturerId;
-      const [brand, carModel, manufacturer] = await Promise.all([
-        nextBrandId
-          ? this.prisma.brand.findUnique({ where: { id: nextBrandId } })
-          : null,
-        nextCarModelId
-          ? this.prisma.carModel.findUnique({ where: { id: nextCarModelId } })
-          : null,
-        nextManufacturerId
-          ? this.prisma.manufacturer.findUnique({
-              where: { id: nextManufacturerId },
-            })
-          : null,
-      ]);
-      if (
-        !brand ||
-        !brand.isActive ||
-        (nextCarModelId &&
-          (!carModel || !carModel.isActive || carModel.brandId !== brand.id)) ||
-        !manufacturer ||
-        !manufacturer.isActive
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.product.invalidBrandModelManufacturer"),
-        );
-      }
+    // Only the references this edit changes are validated: clients send the
+    // record's own references on every save, and a listing keeps a brand,
+    // model or manufacturer the catalog has deactivated since. The write below
+    // reads the same resolved values.
+    const catalogReferences = resolveCatalogReferenceChange(product, dto);
+    const catalogViolation = catalogReferenceViolation(
+      catalogReferences,
+      await loadCatalogReferenceRows(
+        this.prisma,
+        catalogReferenceLookups(catalogReferences),
+      ),
+    );
+    if (catalogViolation) {
+      this.logger.warn(
+        `Catalog reference refused on edit: product=${id} reason=${catalogViolation}`,
+      );
+      throw invalidCatalogReferenceError();
     }
 
     // NOT: Statü politikası resolveUpdatedStatus()'te merkezi olarak uygulanır.
@@ -587,22 +578,7 @@ export class ProductUpdateService {
       category: dto.categoryId
         ? { connect: { id: dto.categoryId } }
         : undefined,
-      brand: dto.brandId
-        ? { connect: { id: dto.brandId } }
-        : dto.brandId === null
-          ? { disconnect: true }
-          : undefined,
-      carModel: dto.carModelId
-        ? { connect: { id: dto.carModelId } }
-        : dto.carModelId === null
-          ? { disconnect: true }
-          : undefined,
-      manufacturer:
-        dto.manufacturerId !== undefined
-          ? dto.manufacturerId
-            ? { connect: { id: dto.manufacturerId } }
-            : { disconnect: true }
-          : undefined,
+      ...catalogReferenceUpdateData(catalogReferences),
       version: { increment: 1 },
       ...(releaseDateUpdate !== undefined
         ? { releaseDate: releaseDateUpdate }

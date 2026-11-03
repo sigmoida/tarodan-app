@@ -11,6 +11,13 @@ import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-
 import { emitListingPendingApproval } from "../helpers/listing-pending-approval-notice";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
+import {
+  catalogReferenceLookups,
+  catalogReferenceViolation,
+  invalidCatalogReferenceError,
+  loadCatalogReferenceRows,
+  resolveCatalogReferenceChange,
+} from "../helpers/catalog-reference-rule";
 import { CacheService } from "../../cache/cache.service";
 import { MembershipService } from "../../membership/membership.service";
 import { isCorporateSellingSuspended } from "../../membership/helpers/membership.util";
@@ -194,17 +201,17 @@ export class ProductCreateService {
       });
     }
 
-    // Verify required catalog references together. Car model is optional, but
-    // when supplied it must be active and belong to the selected brand.
-    const [category, brand, carModel, manufacturer] = await Promise.all([
+    // Verify the category and the catalog references together. A new listing
+    // counts every reference as changed (the rule shared with edit): an active
+    // brand and manufacturer are required; the car model is optional, but when
+    // supplied it must be active and belong to the selected brand.
+    const catalogReferences = resolveCatalogReferenceChange(null, dto);
+    const [category, catalogRows] = await Promise.all([
       this.prisma.category.findUnique({ where: { id: dto.categoryId } }),
-      this.prisma.brand.findUnique({ where: { id: dto.brandId } }),
-      dto.carModelId
-        ? this.prisma.carModel.findUnique({ where: { id: dto.carModelId } })
-        : null,
-      this.prisma.manufacturer.findUnique({
-        where: { id: dto.manufacturerId },
-      }),
+      loadCatalogReferenceRows(
+        this.prisma,
+        catalogReferenceLookups(catalogReferences),
+      ),
     ]);
 
     if (!category || !category.isActive) {
@@ -212,17 +219,15 @@ export class ProductCreateService {
         i18nMessage("server.product.invalidCategory"),
       );
     }
-    if (
-      !brand ||
-      !brand.isActive ||
-      (dto.carModelId &&
-        (!carModel || !carModel.isActive || carModel.brandId !== brand.id)) ||
-      !manufacturer ||
-      !manufacturer.isActive
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.product.invalidBrandModelManufacturer"),
+    const catalogViolation = catalogReferenceViolation(
+      catalogReferences,
+      catalogRows,
+    );
+    if (catalogViolation) {
+      this.logger.warn(
+        `Catalog reference refused on create: seller=${sellerId} reason=${catalogViolation}`,
       );
+      throw invalidCatalogReferenceError();
     }
 
     // ========================================================================
@@ -251,10 +256,11 @@ export class ProductCreateService {
         ? new Date(dto.year, 0, 1)
         : undefined;
 
-    // Normalize optional UUIDs: empty string causes Prisma FK error → use undefined
-    const brandId = dto.brandId?.trim() || undefined;
-    const carModelId = dto.carModelId?.trim() || undefined;
-    const manufacturerId = dto.manufacturerId?.trim() || undefined;
+    // The write uses the values the rule validated (an empty id is already
+    // resolved to "none"; `undefined` leaves the column to its null default).
+    const brandId = catalogReferences.next.brandId ?? undefined;
+    const carModelId = catalogReferences.next.carModelId ?? undefined;
+    const manufacturerId = catalogReferences.next.manufacturerId ?? undefined;
 
     // Yeni ilan: rankTier'ı (premium satıcı → 1) ve başlangıç popülerlik baseline'ını inline ver.
     // Böylece recompute (best-effort) başarısız olsa bile kademe doğru başlar; baseline ise
@@ -428,9 +434,7 @@ export class ProductCreateService {
     } catch (err: any) {
       const code = err?.code;
       if (code === "P2003") {
-        throw new BadRequestException(
-          i18nMessage("server.product.invalidBrandModelManufacturer"),
-        );
+        throw invalidCatalogReferenceError();
       }
       if (code === "P2002") {
         throw new BadRequestException(
