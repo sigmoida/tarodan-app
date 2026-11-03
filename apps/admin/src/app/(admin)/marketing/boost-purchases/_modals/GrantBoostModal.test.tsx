@@ -102,6 +102,7 @@ describe("GrantBoostModal", () => {
     });
     expect(h.toast.success).toHaveBeenCalledWith(
       "admin.marketing.boostPurchases.grant.done",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -123,6 +124,7 @@ describe("GrantBoostModal", () => {
 
     expect(h.toast.error).toHaveBeenCalledWith(
       "server:server.admin.boost.grantListingNotActive",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).not.toHaveBeenCalled();
   });

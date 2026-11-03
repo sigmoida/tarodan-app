@@ -78,6 +78,7 @@ describe("RevokeGrantModal", () => {
     expect(h.revokeBoostGrant).toHaveBeenCalledWith("g1", { reason: REASON });
     expect(h.toast.success).toHaveBeenCalledWith(
       "admin.marketing.boostPurchases.revoke.done",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -92,6 +93,7 @@ describe("RevokeGrantModal", () => {
 
     expect(h.toast.error).toHaveBeenCalledWith(
       "server:server.admin.boost.revokeGrantOnly",
+      expect.objectContaining({ id: expect.any(String) }),
     );
     expect(onClose).not.toHaveBeenCalled();
   });
