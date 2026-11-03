@@ -37,6 +37,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../../common/helpers/email-template-renderer";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
 import {
@@ -547,15 +548,16 @@ export class ProductUpdateService {
       modelCode:
         dto.modelCode !== undefined ? dto.modelCode?.trim() || null : undefined,
       color:
-        // `dto.colors` geldiyse `resolvedAttributes` doludur — `attributesChanged`
-        // aynı koşulu kapsıyor. İkinci kontrol derleyici içindir.
+        // When `dto.colors` is sent, `resolvedAttributes` is set
+        // (`attributesChanged` covers the same condition); the second check is
+        // for the compiler.
         dto.colors !== undefined && resolvedAttributes
           ? colorColumnValue(resolvedAttributes.colorLabels, dto.color)
           : dto.color?.trim(),
       isBoxed: dto.isBoxed,
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
-      // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
+      // An edited rejected listing goes back to review (re-submit -> pending).
       status: resolvedStatus,
       isTradeEnabled:
         dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
@@ -573,7 +575,8 @@ export class ProductUpdateService {
             ? null
             : Number(dto.quantity)
           : undefined,
-      // Boyut gönderilmediyse kargo alanlarına DOKUNULMAZ (kısmi güncelleme).
+      // Without a size in the body the shipping fields stay as they are
+      // (partial update).
       ...productShippingTierData(dto.shippingPackageTier, { partial: true }),
       category: dto.categoryId
         ? { connect: { id: dto.categoryId } }
@@ -903,10 +906,9 @@ export class ProductUpdateService {
       },
     });
 
-    // Filter users who accept marketing emails for email notifications
-    const usersToNotify = wishlistItems
-      .map((item) => (item as any).wishlist?.user)
-      .filter((user: any) => user !== null && user !== undefined);
+    // Everyone with this listing in a wishlist; the e-mail leg below checks
+    // acceptsMarketingEmails per user.
+    const usersToNotify = wishlistItems.map((item) => item.wishlist.user);
 
     if (usersToNotify.length === 0) {
       return;
@@ -972,14 +974,14 @@ export class ProductUpdateService {
               template: "wishlist-price-change",
             });
           }
-        } catch (emailError: any) {
+        } catch (emailError) {
           // Email failure shouldn't stop in-app notification
           this.logger.warn(
             `Failed to send price change email for user ${user.id}:`,
             emailError,
           );
         }
-      } catch (error: any) {
+      } catch (error) {
         this.logger.error(
           `Failed to send price change notification for user ${user.id}:`,
           error,
@@ -1073,16 +1075,16 @@ export class ProductUpdateService {
           // edildi" okuyordu.
           await this.notificationService
             .notifyOfferCancelledListingRemoved(offer.buyerId, id)
-            .catch((err: any) =>
+            .catch((err: unknown) =>
               this.logger.warn(
-                `offer-cancelled bildirimi başarısız (${offer.id}): ${err?.message}`,
+                `offer-cancelled notification failed (${offer.id}): ${errorMessage(err)}`,
               ),
             );
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `silinen ilanın teklifleri kapatılamadı (${id}): ${err?.message}`,
+        `could not close the offers of the removed listing (${id}): ${errorMessage(err)}`,
       );
     }
 

@@ -36,6 +36,10 @@ import {
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
 import { colorColumnValue } from "../../../common/helpers/attribute-groups";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 import { ProductRankingService } from "../ranking/product-ranking.service";
 import { ProductStatsService } from "../ranking/product-stats.service";
 import { productShippingTierData } from "../helpers/product-shipping-tier.helper";
@@ -431,8 +435,10 @@ export class ProductCreateService {
         );
       }
       return await this.common.formatProductResponse(productWithAttrs);
-    } catch (err: any) {
-      const code = err?.code;
+    } catch (err: unknown) {
+      const { code, status } = (
+        typeof err === "object" && err !== null ? err : {}
+      ) as { code?: unknown; status?: unknown };
       if (code === "P2003") {
         throw invalidCatalogReferenceError();
       }
@@ -441,17 +447,17 @@ export class ProductCreateService {
           i18nMessage("server.product.duplicateProduct"),
         );
       }
-      // Zaten HTTP exception ise (400, 403 vb.) aynen fırlat
-      if (err?.status && err?.status >= 400 && err?.status < 500) {
+      // An HTTP exception (400, 403, ...) is rethrown as it is.
+      if (typeof status === "number" && status >= 400 && status < 500) {
         throw err;
       }
-      // Diğer hataları logla ve 500 döndür (development'ta ham hata mesajı debug için
-      // korunur — kullanıcıya görünen katalog mesajı DEĞİLDİR, i18n dışı bırakıldı)
+      // Anything else is logged and becomes a 500. In development the raw
+      // message is kept for debugging; it is not catalog copy shown to users.
       this.logger.error(
         "Product create failed",
-        err?.stack || err?.message || err,
+        err instanceof Error ? errorStack(err) : errorMessage(err),
       );
-      if (isDevelopment() && err?.message) {
+      if (isDevelopment() && err instanceof Error && err.message) {
         throw new InternalServerErrorException(
           i18nMessage("server.product.createFailed", { reason: err.message }),
         );
