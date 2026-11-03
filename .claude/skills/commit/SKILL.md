@@ -56,7 +56,9 @@ Extra instruction (may be empty): $ARGUMENTS
    MSG
    ```
 
-4. lint-staged (eslint --fix + prettier) may rewrite staged files and
+4. lint-staged (eslint --fix + prettier, `--no-stash`) may rewrite staged files;
+   the hook refuses a partially staged file (stage it whole or commit the extra
+   edits first, never stash). Also,
    commitlint may reject the message. Fix and retry; confirm with
    `git log --oneline -1`.
 5. Report the subject line(s) and anything left uncommitted. A commit is not

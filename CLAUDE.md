@@ -124,7 +124,9 @@ Full rules: tarodan-ops: `docs/commit-and-branch-rules.md` (enforced by
 
 ## Verification
 
-1. **pre-commit:** lint-staged (`eslint --fix` + `prettier` on staged files).
+1. **pre-commit:** `scripts/check-partial-staging.sh` refuses partially staged files,
+   then lint-staged runs with `--no-stash` (`eslint --fix` + `prettier` on staged
+   files); the shared stash stack is never used.
 2. **commit-msg:** commitlint.
 3. **pre-push:** branch-name check; `development` pushes typecheck the affected
    apps (+ web/admin `test:api`) one at a time; no jest.
