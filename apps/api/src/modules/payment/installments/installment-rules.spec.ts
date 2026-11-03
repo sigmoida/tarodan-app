@@ -198,10 +198,12 @@ describe("resolveInstallmentRule (plan 4.6.3)", () => {
     ).toEqual(DEFAULT_INSTALLMENT_RULE);
   });
 
-  it("returns share 0 for a disallowing winner", () => {
+  it("returns share 0 for a disallowing winner, even if a stray share is stored", () => {
+    // The validator and the DB CHECK keep the share 0 when not allowed; the
+    // resolver must not depend on that to report no platform share.
     const off = rule({
       allowed: false,
-      platformSharePct: new Prisma.Decimal(0),
+      platformSharePct: new Prisma.Decimal(50),
     });
     expect(resolveInstallmentRule([off], "premium", 2, NOW)).toEqual({
       allowed: false,

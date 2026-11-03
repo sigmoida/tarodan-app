@@ -133,6 +133,21 @@ describe("installment pricing rules", () => {
     }
   });
 
+  it("does not push an exact kuruş installment up by k = 1/6's last digit", () => {
+    // Exact: 452 x (5 - 6 x 0.03) / (5 - 6 x 0.08) = 482.00, so 2 x 241.00.
+    // In 20-digit Decimal arithmetic the quotient is 241.00000000000000001;
+    // a bare ceiling would charge 482.02.
+    const p = priceInstallment({
+      ...base,
+      baseAmount: D("452.00"),
+      count: 2,
+      installmentRatePct: D("8"),
+    });
+    expect(p.chargedAmount.toFixed(2)).toBe("482.00");
+    expect(p.feeAmount.toFixed(2)).toBe("30.00");
+    expect(p.monthlyAmount.toFixed(2)).toBe("241.00");
+  });
+
   it("never charges below T and never reports a negative platform cost", () => {
     const p = priceInstallment({
       ...base,
@@ -186,6 +201,34 @@ describe("allocateInstallmentFee (largest remainder)", () => {
       D("400.00"),
     ]);
     expect(shares.map((s) => s.toFixed(2))).toEqual(["39.83", "26.55"]);
+  });
+
+  it("gives the left-over kuruş to the largest remainder, not to the first order", () => {
+    // 66.38 x 0.4 = 26.552 (remainder .2), 66.38 x 0.6 = 39.828 (remainder .8).
+    expect(
+      allocateInstallmentFee(D("66.38"), [D("400.00"), D("600.00")]).map((s) =>
+        s.toFixed(2),
+      ),
+    ).toEqual(["26.55", "39.83"]);
+    // 4 kuruş over 1 : 2 : 2 -> 0.8 / 1.6 / 1.6: floors 0 / 1 / 1, the two
+    // kuruş left go to the .8 and then the earlier of the two .6.
+    expect(
+      allocateInstallmentFee(D("0.04"), [D("1"), D("2"), D("2")]).map((s) =>
+        s.toFixed(2),
+      ),
+    ).toEqual(["0.01", "0.02", "0.01"]);
+  });
+
+  it("refuses a negative or sub-kuruş fee and negative weights", () => {
+    expect(() => allocateInstallmentFee(D("-0.01"), [D("1")])).toThrow(
+      RangeError,
+    );
+    expect(() => allocateInstallmentFee(D("1.001"), [D("1")])).toThrow(
+      RangeError,
+    );
+    expect(() => allocateInstallmentFee(D("1.00"), [D("2"), D("-1")])).toThrow(
+      RangeError,
+    );
   });
 
   it("always sums to the fee exactly and gives ties to the earlier order", () => {
