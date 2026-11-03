@@ -93,6 +93,12 @@ export interface TrustExplainRow extends TrustBreakdownRow {
   contribution: string;
 }
 
+/**
+ * Two percent decimals: a candidate weight has up to 4 decimals (0.1234 is
+ * "%12,34"), so weight x sub-score can be checked against the contribution.
+ */
+const pctExact = (ratio: number) => fmtPercent(ratio * 100, 2) ?? "";
+
 /** The explain table's rows: the breakdown rows plus rate and contribution. */
 export function trustExplainRows(
   explanation: SellerTrustExplanation,
@@ -102,11 +108,13 @@ export function trustExplainRows(
     SELLER_TRUST_COMPONENTS_V1.map((id) => [id, explanation[id].weight]),
   ) as Record<SellerTrustComponentKey, number>;
   const rate: Partial<Record<SellerTrustComponentKey, string | undefined>> = {
-    reliability: pct(explanation.reliability.failureRate),
-    onTime: pct(explanation.onTime.lateRate),
+    reliability: pctExact(explanation.reliability.failureRate),
+    onTime: pctExact(explanation.onTime.lateRate),
   };
   return trustBreakdownRows(explanation, t, weights).map((row) => ({
     ...row,
+    weight: pctExact(weights[row.id]),
+    subScore: pctExact(explanation[row.id].subScore),
     rate: rate[row.id],
     contribution: fmtDecimal(explanation[row.id].contribution) ?? "",
   }));
