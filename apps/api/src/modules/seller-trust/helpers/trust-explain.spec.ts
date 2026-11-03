@@ -7,6 +7,7 @@ import {
 import { explainSellerTrust } from "./trust-explain";
 import { computeSellerTrust } from "./trust-formula";
 import { TRUST_FORMULA_V1 } from "./trust-formula.constants";
+import { DISTINCT_TRUST_CANDIDATE } from "../testing/trust-candidates-fixture";
 import { loadV1PinInputs } from "../testing/trust-v1-pin-fixture";
 
 const pinInputs = loadV1PinInputs();
@@ -39,6 +40,7 @@ const candidates: Array<[string, SellerTrustFormulaParams]> = [
       minimum: { transactions: 20, counterparties: 10 },
     },
   ],
+  ["every value distinct", DISTINCT_TRUST_CANDIDATE],
 ];
 
 describe("explainSellerTrust", () => {
@@ -58,6 +60,43 @@ describe("explainSellerTrust", () => {
         );
       });
       expect(drift).toEqual([]);
+    },
+  );
+
+  it.each(candidates)(
+    "shows the parameters it computed with, and contribution = 5 x weight x sub-score (%s)",
+    (_name, p) => {
+      const i = pinInputs[0];
+      const e = explainSellerTrust(i, p);
+      expect(e).toMatchObject({
+        rating: {
+          priorMean: p.rating.priorMean,
+          priorWeight: p.rating.priorWeight,
+        },
+        reliability: {
+          priorRate: p.reliability.priorRate,
+          priorWeight: p.reliability.priorWeight,
+          zeroAt: p.reliability.zeroAt,
+        },
+        onTime: {
+          priorRate: p.onTime.priorRate,
+          priorWeight: p.onTime.priorWeight,
+          zeroAt: p.onTime.zeroAt,
+        },
+        volume: { saturation: p.volume.saturation },
+        tenure: { fullAtDays: p.tenure.fullAtDays },
+        minimum: {
+          transactions: p.minimum.transactions,
+          counterparties: p.minimum.counterparties,
+        },
+      });
+      for (const key of SELLER_TRUST_COMPONENTS_V1) {
+        expect([key, e[key].weight]).toEqual([key, p.weights[key]]);
+        expect([key, e[key].contribution]).toEqual([
+          key,
+          expect.closeTo(5 * p.weights[key] * e[key].subScore, 12),
+        ]);
+      }
     },
   );
 
