@@ -4,10 +4,14 @@ import {
   PaymentStatus,
   PaymentHoldStatus,
   OrderStatus,
+  RefundAttemptStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
 import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
 import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
+import { PaymentProviderEventService } from "../../src/modules/payment/payment-provider-event.service";
+import { ProviderRefundRejectedException } from "../../src/modules/payment-providers/refund-errors";
+import { paymentProviderRegistryFor } from "../mocks/paytr.mock";
 import {
   truncateAll,
   getPrisma,
@@ -16,17 +20,34 @@ import {
 } from "../test-utils/db";
 
 /**
- * #85 — order-refund yolu idempotent olmalı: PayTR createRefund idempotency anahtarı
- * taşımaz, persist hatası + reconciliation retry ÇİFT-İADE'ye yol açıyordu. Fix:
- * PayTR'den ÖNCE per-order refundInProgressOrders marker'ı yaz; marker varsa PayTR'yi
- * atla (persist-recovery); PayTR kesin başarısızsa marker'ı geri al. [P0]
+ * #85: the order refund path must be idempotent. PayTR's refund call carries
+ * no idempotency key, so a persist failure followed by a reconciliation retry
+ * used to refund twice.
  *
- * Hafif harness (ES/app bootstrap yok): gerçek DB + mock PayTR.
+ * The first fix was a per-order `refundInProgressOrders` marker on the payment.
+ * 14adf18e3 (fix(payment): add durable refund reconciliation) replaced it with
+ * the refund_attempts ledger: the intent is written before PayTR is called, a
+ * provider success is persisted as `succeeded` before any order/hold/ledger
+ * change, and a retry of a `succeeded` attempt only finalizes it. These tests
+ * pin that behaviour against a real database. [P0]
+ *
+ * Light harness (no ES/app boot): real DB, PayTR stubbed behind the real
+ * provider registry.
  */
 describe("Order refund idempotency (#85) [P0]", () => {
   let prisma: PrismaService;
   let refund: PaymentRefundService;
   const createRefund = jest.fn();
+  // Makes the refund's finalize transaction fail once, after PayTR has
+  // already refunded: the "provider done, persist failed" crash window.
+  let failNextLedgerWrite = false;
+  const ledgerWrite = async () => {
+    if (failNextLedgerWrite) {
+      failNextLedgerWrite = false;
+      throw new Error("simulated persist failure after the provider refund");
+    }
+    return { updated: false, fullyRefunded: false };
+  };
 
   const configStub = {
     get: (k: string) =>
@@ -42,22 +63,20 @@ describe("Order refund idempotency (#85) [P0]", () => {
 
   beforeAll(() => {
     prisma = getPrisma() as unknown as PrismaService;
-    const noop: any = {};
     refund = new PaymentRefundService(
       prisma,
       configStub as any,
-      { createRefund } as any, // paytrService
+      paymentProviderRegistryFor({ createRefund }), // paymentProviders
       { emitPaymentRefunded: async () => {} } as any, // eventService
       {
         createInAppNotification: async () => {},
         sendOrderCancelledEmails: async () => {},
       } as any, // notificationService
       {
-        // processRefund iade tx'inde ledger'ı işaretler. Kod tabanına göre markRefunded
-        // (tam) veya applyRefund (pro-rate, #88) çağrılabilir — ikisini de stub'la ki
-        // bu test #88 ile birlikte merge edildiğinde de kırılmasın (ileri-uyumlu).
-        markRefunded: async () => ({ updated: false }),
-        applyRefund: async () => ({ updated: false, fullyRefunded: false }),
+        // The refund transaction marks the ledger: markRefunded (full) or
+        // applyRefund (pro-rata, #88). Both are stubbed.
+        markRefunded: ledgerWrite,
+        applyRefund: ledgerWrite,
       } as any, // commissionLedger
       {
         handleOrderRefund: async () => {},
@@ -66,9 +85,9 @@ describe("Order refund idempotency (#85) [P0]", () => {
         issuePlatformSaleInvoice: async () => {},
       } as any, // invoicing
       { cancelSuratShipmentIfExists: async () => {} } as any, // paymentCommon
-      {} as any, // providerEvents
+      new PaymentProviderEventService(prisma), // providerEvents
       {} as any, // holdRelease
-      new PaymentRefundAttemptService(prisma as any), // attempts
+      new PaymentRefundAttemptService(prisma), // attempts
       {} as any, // tradeRefunds
       {} as any, // boostTimeline (not a boost order)
     );
@@ -83,11 +102,17 @@ describe("Order refund idempotency (#85) [P0]", () => {
     await seedBaseline();
     createRefund.mockReset();
     createRefund.mockResolvedValue({ status: "success", err_msg: null });
+    failNextLedgerWrite = false;
   });
 
-  async function setupPaidOrder(opts?: {
-    inProgressMarker?: boolean;
-  }): Promise<{ orderId: string; paymentId: string }> {
+  async function attemptsOf(paymentId: string, orderId: string) {
+    return prisma.refundAttempt.findMany({ where: { paymentId, orderId } });
+  }
+
+  async function setupPaidOrder(): Promise<{
+    orderId: string;
+    paymentId: string;
+  }> {
     const uniq = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const buyer = await prisma.user.create({
       data: { email: `b-${uniq}@t.local`, passwordHash: "x", displayName: "B" },
@@ -136,9 +161,7 @@ describe("Order refund idempotency (#85) [P0]", () => {
         providerConversationId: `oid-${uniq}`,
         amount: order.totalAmount,
         status: PaymentStatus.completed,
-        metadata: opts?.inProgressMarker
-          ? { refundInProgressOrders: { [order.id]: new Date().toISOString() } }
-          : {},
+        metadata: {},
       },
     });
     await prisma.paymentHold.create({
@@ -154,7 +177,7 @@ describe("Order refund idempotency (#85) [P0]", () => {
     return { orderId: order.id, paymentId: payment.id };
   }
 
-  it("taze iade: PayTR bir kez çağrılır, marker yazılır, payment refunded olur", async () => {
+  it("taze iade: PayTR bir kez çağrılır, deneme kesinleşir, payment refunded olur", async () => {
     const { orderId, paymentId } = await setupPaidOrder();
 
     await refund.processRefund(orderId, undefined, {
@@ -162,60 +185,100 @@ describe("Order refund idempotency (#85) [P0]", () => {
     });
 
     expect(createRefund).toHaveBeenCalledTimes(1);
+    expect(createRefund.mock.calls[0][1]).toBe(100); // full amount, TL
     const p = await prisma.payment.findUnique({ where: { id: paymentId } });
     expect(p!.status).toBe(PaymentStatus.refunded);
-    expect((p!.metadata as any).refundInProgressOrders[orderId]).toBeTruthy();
+    const attempts = await attemptsOf(paymentId, orderId);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].status).toBe(RefundAttemptStatus.finalized);
+    expect(Number(attempts[0].amount)).toBe(100);
+    expect(attempts[0].providerSucceededAt).toBeTruthy();
+    // The provider reference is the attempt id (echoed by the status inquiry).
+    expect(createRefund.mock.calls[0][2]).toBe(attempts[0].id);
   });
 
-  it("retry (marker önceden set = PayTR yapılmış ama persist başarısız): PayTR TEKRAR çağrılmaz, recovery ile refunded olur", async () => {
-    const { orderId, paymentId } = await setupPaidOrder({
-      inProgressMarker: true,
-    });
-
-    await refund.processRefund(orderId, undefined, {
-      cancelledBy: CancellationActor.platform,
-    });
-
-    // Kritik #85: ikinci kez PayTR çağrılmamalı → çift-iade yok.
-    expect(createRefund).not.toHaveBeenCalled();
-    const p = await prisma.payment.findUnique({ where: { id: paymentId } });
-    expect(p!.status).toBe(PaymentStatus.refunded);
-  });
-
-  it("PayTR kesin başarısız: marker geri alınır (retry PayTR yeniden çağırabilsin), payment completed kalır", async () => {
+  it("retry (PayTR iade etti ama persist başarısız): PayTR TEKRAR çağrılmaz, retry kesinleştirir", async () => {
     const { orderId, paymentId } = await setupPaidOrder();
-    createRefund.mockResolvedValueOnce({
-      status: "failed",
-      err_msg: "insufficient",
-    });
 
+    // 1st call: PayTR refunds, then the finalize transaction fails.
+    failNextLedgerWrite = true;
     await expect(
       refund.processRefund(orderId, undefined, {
         cancelledBy: CancellationActor.platform,
       }),
     ).rejects.toThrow();
+    expect(createRefund).toHaveBeenCalledTimes(1);
+    const [stuck] = await attemptsOf(paymentId, orderId);
+    // The provider success survived the failure: retry knows money moved.
+    expect(stuck.status).toBe(RefundAttemptStatus.succeeded);
+    const mid = await prisma.payment.findUnique({ where: { id: paymentId } });
+    expect(mid!.status).toBe(PaymentStatus.completed);
+
+    // 2nd call (reconciliation retry): finalizes without calling PayTR.
+    await refund.processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
+
+    // Kritik #85: PayTR ikinci kez çağrılmaz → çift iade yok.
+    expect(createRefund).toHaveBeenCalledTimes(1);
+    const p = await prisma.payment.findUnique({ where: { id: paymentId } });
+    expect(p!.status).toBe(PaymentStatus.refunded);
+    const attempts = await attemptsOf(paymentId, orderId);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].status).toBe(RefundAttemptStatus.finalized);
+  });
+
+  it("PayTR kesin reddederse: deneme yeniden denenebilir kalır, payment completed kalır, retry PayTR'yi yeniden çağırır", async () => {
+    const { orderId, paymentId } = await setupPaidOrder();
+    // The real PayTRService throws ProviderRefundRejectedException when PayTR
+    // answers non-success (9d29eb51e); it never returns a failed status.
+    createRefund.mockRejectedValueOnce(
+      new ProviderRefundRejectedException("insufficient"),
+    );
+
+    await expect(
+      refund.processRefund(orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      }),
+    ).rejects.toBeInstanceOf(ProviderRefundRejectedException);
 
     expect(createRefund).toHaveBeenCalledTimes(1);
     const p = await prisma.payment.findUnique({ where: { id: paymentId } });
     expect(p!.status).toBe(PaymentStatus.completed); // iade olmadı
-    const inProg = (p!.metadata as any).refundInProgressOrders || {};
-    expect(inProg[orderId]).toBeUndefined(); // marker temizlendi → retry mümkün
+    const [failed] = await attemptsOf(paymentId, orderId);
+    // No money moved: a retryable `failed`, not a manual review.
+    expect(failed.status).toBe(RefundAttemptStatus.failed);
+
+    // Retry is allowed and reaches PayTR again.
+    await refund.processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
+    expect(createRefund).toHaveBeenCalledTimes(2);
+    const after = await prisma.payment.findUnique({ where: { id: paymentId } });
+    expect(after!.status).toBe(PaymentStatus.refunded);
+    const attempts = await attemptsOf(paymentId, orderId);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].status).toBe(RefundAttemptStatus.finalized);
   });
 
   it("reconciliation-retry simülasyonu: iki ardışık processRefund çağrısı toplam TEK PayTR iadesi yapar", async () => {
-    const { orderId } = await setupPaidOrder();
+    const { orderId, paymentId } = await setupPaidOrder();
 
     await refund.processRefund(orderId, undefined, {
       cancelledBy: CancellationActor.platform,
     }); // 1. çağrı: PayTR + refunded
-    // 2. çağrı: payment artık refunded → status=completed filtresi eşleşmez → NotFound.
-    // (Marker + status guard birlikte çift-iadeyi engeller.)
-    await expect(
-      refund.processRefund(orderId, undefined, {
-        cancelledBy: CancellationActor.platform,
-      }),
-    ).rejects.toThrow();
+    // 2. call: the finalized attempt answers idempotently, with no new charge
+    // back. (Before 14adf18e3 the second call failed with NotFound; the
+    // refund_attempts ledger made it an idempotent success.)
+    const second = await refund.processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
 
+    expect(second).toEqual(
+      expect.objectContaining({ success: true, idempotent: true }),
+    );
     expect(createRefund).toHaveBeenCalledTimes(1);
+    const p = await prisma.payment.findUnique({ where: { id: paymentId } });
+    expect(p!.status).toBe(PaymentStatus.refunded);
   });
 });
