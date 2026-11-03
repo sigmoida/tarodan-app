@@ -36,6 +36,8 @@ const SOURCE_KIND_BY_TYPE: Record<FiscalInvoiceType, InvoiceSourceKind> = {
   seller_platform_fee: "package_or_order",
   seller_shipping: "package_or_order",
   platform_sale: "package_or_order",
+  // One document per package (Σ Order.installmentFeeAmount of the package).
+  buyer_installment_fee: "package_or_order",
   membership: "membership",
   boost: "boost",
   trade_commission: "trade_payment",

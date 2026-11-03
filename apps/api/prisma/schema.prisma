@@ -2058,6 +2058,14 @@ model Order {
   buyerServiceFeeAmount      Decimal                  @default(0) @map("buyer_service_fee_amount") @db.Decimal(10, 2)
   sellerCommissionAmount     Decimal                  @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
   sellerPlatformFeeAmount    Decimal                  @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
+  /// Installment fee (vade farkı) the buyer paid for THIS order on top of
+  /// `totalAmount`: the payment's `installmentFeeAmount` allocated to its
+  /// orders by `totalAmount`, largest remainder, at capture (ADR 0019). PSP
+  /// scale only: the order charged total is `totalAmount + this`; commission,
+  /// hold, seller net and the refund policy stay on `totalAmount`. Drives the
+  /// ledger `installment_fee` line, the refund fee share, the transfer slice
+  /// and the `buyer_installment_fee` invoice. 0 = single payment or legacy.
+  installmentFeeAmount       Decimal                  @default(0) @map("installment_fee_amount") @db.Decimal(10, 2)
   // Kargo tutarının taraflara dağılımı. shippingCost geriye uyumlu alıcı payıdır;
   // tam paket bedeli OrderPackage.fullShippingAmount snapshot'ında tutulur.
   buyerShippingAmount        Decimal                  @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
@@ -2252,35 +2260,53 @@ model CommissionLedger {
 }
 
 model Payment {
-  id                     String            @id @default(uuid())
-  orderId                String?           @unique @map("order_id")
-  checkoutGroupId        String?           @unique @map("checkout_group_id")
-  tradeCashPaymentId     String?           @unique @map("trade_cash_payment_id")
+  id                     String                 @id @default(uuid())
+  orderId                String?                @unique @map("order_id")
+  checkoutGroupId        String?                @unique @map("checkout_group_id")
+  tradeCashPaymentId     String?                @unique @map("trade_cash_payment_id")
   provider               String
   // Çekimin yapıldığı PayTR mağazası (bkz. PaytrMerchant). Ödeme oluşturulurken
   // amaçtan türetilir (`resolvePaytrMerchant`); sonraki her PayTR çağrısı
   // (durum-sorgu, iade, mutabakat) oid önekine değil BU kolona bakar.
-  paytrMerchant          PaytrMerchant     @default(marketplace) @map("paytr_merchant")
-  providerPaymentId      String?           @map("provider_payment_id")
-  providerConversationId String?           @map("provider_conversation_id")
-  amount                 Decimal           @db.Decimal(10, 2)
-  currency               String            @default("TRY")
-  installmentCount       Int               @default(1) @map("installment_count")
-  status                 PaymentStatus     @default(pending)
-  failureReason          String?           @map("failure_reason")
+  paytrMerchant          PaytrMerchant          @default(marketplace) @map("paytr_merchant")
+  providerPaymentId      String?                @map("provider_payment_id")
+  providerConversationId String?                @map("provider_conversation_id")
+  amount                 Decimal                @db.Decimal(10, 2)
+  currency               String                 @default("TRY")
+  installmentCount       Int                    @default(1) @map("installment_count")
+  /// Installment fee (vade farkı, F) the buyer paid on top of `amount` (ADR
+  /// 0019). `amount` keeps meaning the goods-scale total T; PayTR saw
+  /// `amount + installmentFeeAmount`. Written at capture from the captured
+  /// charge attempt; 0 = single payment or legacy.
+  installmentFeeAmount   Decimal                @default(0) @map("installment_fee_amount") @db.Decimal(10, 2)
+  /// What PayTR charged (C = T + F), written at capture from the captured
+  /// attempt. NULL = legacy or not captured through an attempt: read it as
+  /// `amount`, only through `payment/helpers/charged-amount.ts`
+  /// (`chargedAmountOf`). DB CHECK `payments_charged_amount_check`:
+  /// NULL or exactly `amount + installment_fee_amount`.
+  chargedAmount          Decimal?               @map("charged_amount") @db.Decimal(10, 2)
+  /// The charge attempt (signed merchant_oid) that captured this payment: the
+  /// pricing evidence (rates, segment, rule version, share, platform cost,
+  /// card family). A DB trigger requires it to belong to this payment and to
+  /// carry the same charged amount and fee.
+  chargeAttemptId        String?                @unique @map("charge_attempt_id")
+  status                 PaymentStatus          @default(pending)
+  failureReason          String?                @map("failure_reason")
   metadata               Json?
-  paidAt                 DateTime?         @map("paid_at")
-  createdAt              DateTime          @default(now()) @map("created_at")
+  paidAt                 DateTime?              @map("paid_at")
+  createdAt              DateTime               @default(now()) @map("created_at")
   // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
   // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
   // payout bu bayrakla test kayıtlarını dışlar.
-  isTest                 Boolean           @default(false) @map("is_test")
-  updatedAt              DateTime          @updatedAt @map("updated_at")
+  isTest                 Boolean                @default(false) @map("is_test")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
   paymentHolds           PaymentHold[]
   refundAttempts         RefundAttempt[]
-  order                  Order?            @relation(fields: [orderId], references: [id])
-  checkoutGroup          CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id])
-  tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
+  chargeAttempts         PaymentChargeAttempt[] @relation("PaymentChargeAttempts")
+  chargeAttempt          PaymentChargeAttempt?  @relation("PaymentCapturedChargeAttempt", fields: [chargeAttemptId], references: [id], onDelete: Restrict)
+  order                  Order?                 @relation(fields: [orderId], references: [id])
+  checkoutGroup          CheckoutGroup?         @relation(fields: [checkoutGroupId], references: [id])
+  tradeCashPayment       TradeCashPayment?      @relation(fields: [tradeCashPaymentId], references: [id])
 
   // Tahsilat dönem metriği (ödenen sipariş) ve PayTR dökümünde karşılığı
   // olmayan ödeme alarmı bu iki kolondan tarar; tabloda hiç indeks yoktu.
@@ -2293,37 +2319,197 @@ model Payment {
 }
 
 model RefundAttempt {
-  id                  String              @id @default(uuid())
-  paymentId           String              @map("payment_id")
-  orderId             String?             @map("order_id")
-  tradeId             String?             @map("trade_id")
-  idempotencyKey      String              @unique @map("idempotency_key")
-  amount              Decimal             @db.Decimal(10, 2)
-  provider            String
-  providerReference   String?             @map("provider_reference")
-  providerRefundId    String?             @map("provider_refund_id")
-  providerResponse    Json?               @map("provider_response")
-  status              RefundAttemptStatus @default(prepared)
-  failureReason       String?             @map("failure_reason")
+  id                   String              @id @default(uuid())
+  paymentId            String              @map("payment_id")
+  orderId              String?             @map("order_id")
+  tradeId              String?             @map("trade_id")
+  idempotencyKey       String              @unique @map("idempotency_key")
+  /// PSP scale: the `return_amount` sent to PayTR (goods part + fee share).
+  amount               Decimal             @db.Decimal(10, 2)
+  /// The part of `amount` that is the installment fee (vade farkı) given back
+  /// pro rata to the cash refunded (ADR 0019, D7); the goods part is
+  /// `amount - installmentFeeAmount`. 0 = single payment or legacy. CHECK:
+  /// 0 <= this <= amount.
+  installmentFeeAmount Decimal             @default(0) @map("installment_fee_amount") @db.Decimal(10, 2)
+  provider             String
+  providerReference    String?             @map("provider_reference")
+  providerRefundId     String?             @map("provider_refund_id")
+  providerResponse     Json?               @map("provider_response")
+  status               RefundAttemptStatus @default(prepared)
+  failureReason        String?             @map("failure_reason")
   /// Consecutive definite provider failures (rejected or never sent) of this
   /// attempt. The refund retry sweeps wait 10 min * 2^(n-1), at most 6 h,
   /// after `updatedAt` before resending it. A requeue by the status inquiry
   /// keeps the count (no evidence a resend now succeeds); an attempt that
   /// only ever went to review has 0 and waits 10 min.
-  failureCount        Int                 @default(0) @map("failure_count")
-  requestStartedAt    DateTime?           @map("request_started_at")
-  providerSucceededAt DateTime?           @map("provider_succeeded_at")
-  finalizedAt         DateTime?           @map("finalized_at")
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
-  payment             Payment             @relation(fields: [paymentId], references: [id], onDelete: Restrict)
-  order               Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  trade               Trade?              @relation(fields: [tradeId], references: [id], onDelete: Restrict)
+  failureCount         Int                 @default(0) @map("failure_count")
+  requestStartedAt     DateTime?           @map("request_started_at")
+  providerSucceededAt  DateTime?           @map("provider_succeeded_at")
+  finalizedAt          DateTime?           @map("finalized_at")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  payment              Payment             @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  order                Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  trade                Trade?              @relation(fields: [tradeId], references: [id], onDelete: Restrict)
 
   @@index([paymentId, orderId])
   @@index([paymentId, tradeId])
   @@index([status, updatedAt])
   @@map("refund_attempts")
+}
+
+// ---------------------------------------------------------------------------
+// Installment payments (ADR 0019, tarodan-ops plan 2026-11-03). Two scales:
+// goods (T: Payment.amount, Order.totalAmount) and PSP (C = T + F: what PayTR
+// charges). Inert while the `installments_enabled` setting is off.
+// ---------------------------------------------------------------------------
+
+/// Buyer segment an installment rule targets. A logged-in buyer's segment is
+/// the effective membership tier (`effectiveMembershipTierType`); a guest
+/// purchase is `guest`, never the shared system account's tier. `all` matches
+/// every buyer, guests included.
+enum InstallmentSegment {
+  all
+  guest
+  free
+  basic
+  premium
+  business
+}
+
+/// Admin installment advantage rule, one immutable VERSION per row. "Edit" =
+/// archive the current version and insert `version + 1` with the same
+/// `lineageId`, in one transaction; "remove" = archive. No matching rule =
+/// count allowed, buyer pays the whole fee (code default, no row). DB guards:
+/// value columns never change (only archive stamps, once); rows cannot be
+/// deleted; at most one unarchived version per lineage; CHECKs on the count
+/// range (2..12) and the share (0..100, 0 when not allowed).
+model InstallmentRule {
+  id               String                 @id @default(uuid())
+  /// Shared by every version of one rule: the first version's `id`.
+  lineageId        String                 @map("lineage_id")
+  version          Int
+  /// Admin label, e.g. "Premium 3 taksit vade farksız".
+  name             String
+  segment          InstallmentSegment
+  /// Inclusive count range the rule applies to, 2 <= min <= max <= 12.
+  minCount         Int                    @map("min_count")
+  maxCount         Int                    @map("max_count")
+  /// false = the counts in the range are not offered to the segment.
+  allowed          Boolean                @default(true)
+  /// Platform share of the installment cost, 0-100 (s_n = this / 100). 100 =
+  /// "vade farksız"; the absorbed part is a platform cost, never the seller's.
+  platformSharePct Decimal                @default(0) @map("platform_share_pct") @db.Decimal(5, 2)
+  /// Higher wins; ties: the specific segment over `all`, then newest.
+  priority         Int                    @default(0)
+  /// Inclusive.
+  validFrom        DateTime               @map("valid_from")
+  /// Exclusive; null = open-ended.
+  validUntil       DateTime?              @map("valid_until")
+  /// AdminUser.id of the author; no FK so the history survives staff removal.
+  createdBy        String                 @map("created_by")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  /// Set once when the version is replaced by a new one or removed.
+  archivedAt       DateTime?              @map("archived_at")
+  /// AdminUser.id; no FK (see `createdBy`).
+  archivedBy       String?                @map("archived_by")
+  chargeAttempts   PaymentChargeAttempt[]
+
+  @@unique([lineageId, version])
+  // Rule resolution: unarchived versions of a segment valid at "now".
+  @@index([archivedAt, segment, validFrom])
+  @@map("installment_rules")
+}
+
+/// Daily PayTR installment rate table (`taksit-oranlari`) of one store,
+/// append-only (a DB trigger rejects UPDATE). Every installment charge points
+/// to the snapshot it was priced from.
+model InstallmentRateSnapshot {
+  id                        String                 @id @default(uuid())
+  paytrMerchant             PaytrMerchant          @map("paytr_merchant")
+  fetchedAt                 DateTime               @map("fetched_at")
+  /// PayTR `max_inst_non_bus`: the store's maximum count for non-business cards.
+  maxInstallmentNonBusiness Int?                   @map("max_installment_non_business")
+  /// Single-payment deduction rate r1, percent of the charged amount.
+  singleRatePct             Decimal                @map("single_rate_pct") @db.Decimal(6, 3)
+  /// Normalized `{ family: { "2": pct, ..., "12": pct } }` (A1 parser).
+  rates                     Json
+  /// PayTR response as received (no credentials, no card data).
+  raw                       Json
+  createdAt                 DateTime               @default(now()) @map("created_at")
+  chargeAttempts            PaymentChargeAttempt[]
+
+  // "Latest snapshot of the store".
+  @@index([paytrMerchant, fetchedAt])
+  @@map("installment_rate_snapshots")
+}
+
+/// One row per signed PayTR form (merchant_oid) of a payment, single payments
+/// included: what was signed and why. The callback, recovery and statement
+/// line of ANY oid (also a superseded one) are checked against their own
+/// attempt; refunds, the PSP-fee split and admin read this snapshot, never
+/// today's rules or rates. A DB trigger keeps the pricing columns immutable
+/// (only `capturedAt` is set, once) and allows DELETE only for the test-lane
+/// purge. CHECKs: C = T + F, counts 1..12, rates and shares 0..100, single
+/// payments carry no fee and no platform cost, installments need a snapshot.
+model PaymentChargeAttempt {
+  id                   String                   @id @default(uuid())
+  paymentId            String                   @map("payment_id")
+  /// The PayTR merchant_oid signed for this attempt (built and parsed only in
+  /// `@tarodan/types` `paytr-merchant-oid.ts`).
+  merchantOid          String                   @unique @map("merchant_oid")
+  paytrMerchant        PaytrMerchant            @map("paytr_merchant")
+  /// 1 = single payment (PayTR `installment_count = 0`), else 2..12.
+  installmentCount     Int                      @map("installment_count")
+  /// T: the payment's goods-scale amount at signing.
+  baseAmount           Decimal                  @map("base_amount") @db.Decimal(10, 2)
+  /// F: installment fee (vade farkı) the buyer pays, VAT included.
+  installmentFeeAmount Decimal                  @map("installment_fee_amount") @db.Decimal(10, 2)
+  /// C = T + F: the signed `payment_amount`.
+  chargedAmount        Decimal                  @map("charged_amount") @db.Decimal(10, 2)
+  /// P: expected platform installment cost under the rule's share; booked as
+  /// `installment_platform_cost` when PayTR deducts it (statement line).
+  platformCostAmount   Decimal                  @default(0) @map("platform_cost_amount") @db.Decimal(10, 2)
+  /// r1: single-payment deduction rate used, percent.
+  singleRatePct        Decimal?                 @map("single_rate_pct") @db.Decimal(6, 3)
+  /// rn: deduction rate for `installmentCount` of the card family, percent.
+  installmentRatePct   Decimal?                 @map("installment_rate_pct") @db.Decimal(6, 3)
+  /// v: VAT rate inside F, percent (k = v / (1 + v)).
+  feeVatRatePct        Decimal                  @map("fee_vat_rate_pct") @db.Decimal(5, 2)
+  /// The buyer's segment at signing, resolved on the server.
+  buyerSegment         InstallmentSegment       @map("buyer_segment")
+  /// The winning rule VERSION; null = code default (buyer pays all).
+  installmentRuleId    String?                  @map("installment_rule_id")
+  /// s_n x 100 from the rule; 0 without a rule.
+  platformSharePct     Decimal                  @default(0) @map("platform_share_pct") @db.Decimal(5, 2)
+  /// PayTR BIN `brand` (card family, e.g. `world`), sent as `card_type`.
+  cardFamily           String?                  @map("card_family")
+  /// PayTR BIN `bank`.
+  cardBank             String?                  @map("card_bank")
+  /// PayTR BIN `cardType`: `credit` / `debit`.
+  cardType             String?                  @map("card_type")
+  /// PayTR BIN `businessCard`.
+  businessCard         Boolean?                 @map("business_card")
+  /// First 6 digits of the quoted card only (never 8, never next to a last-4),
+  /// for the statement card-mismatch check. Not logged, not sent to Sentry.
+  bin6                 String?
+  /// Saved card used, if any. Soft link (no FK): saved cards are deleted with
+  /// the account, the attempt is financial evidence and stays.
+  savedCardId          String?                  @map("saved_card_id")
+  /// Rate table priced from; null only for single payments.
+  rateSnapshotId       String?                  @map("rate_snapshot_id")
+  /// Set once when this attempt's charge was captured (callback or recovery).
+  capturedAt           DateTime?                @map("captured_at")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  payment              Payment                  @relation("PaymentChargeAttempts", fields: [paymentId], references: [id], onDelete: Restrict)
+  installmentRule      InstallmentRule?         @relation(fields: [installmentRuleId], references: [id], onDelete: Restrict)
+  rateSnapshot         InstallmentRateSnapshot? @relation(fields: [rateSnapshotId], references: [id], onDelete: Restrict)
+  capturedPayment      Payment?                 @relation("PaymentCapturedChargeAttempt")
+
+  @@index([paymentId, createdAt])
+  @@index([installmentRuleId])
+  @@index([rateSnapshotId])
+  @@map("payment_charge_attempts")
 }
 
 model PaymentHold {
@@ -2962,6 +3148,12 @@ enum FiscalInvoiceType {
   /// faturalanır. Hizmet bedeli platformda kalır (mevcut belgesi durur), komisyon
   /// ise iade faturasıyla geri verilir. Kaynak = RefundRequest.id.
   penalty
+  /// Installment fee (vade farkı) the buyer paid, invoiced to the buyer per
+  /// package as its own document, VAT INCLUDED (split out of the fee at the
+  /// charge attempt's `feeVatRatePct`), reversed pro rata on refunds (ADR 0019,
+  /// D4). Only the buyer-paid part: a platform-absorbed share is never charged
+  /// and never invoiced.
+  buyer_installment_fee
 
   // DB tipi bilerek tarihsel adında (bkz. FiscalInvoice).
   @@map("ElogoInvoiceType")
@@ -4884,6 +5076,8 @@ enum LedgerAccount {
   psp_fee // PSP (PayTR) işlem kesintisi — tahsilattan hiç bize ulaşmayan gider
   seller_debt_recovery // satıcı borcu tahsilatı (kargo açığı/iade kargosu) — escrow'dan platforma
   shipping_income // tahsil edilen kargo bedeli (takas v2) — gelir değil, taşıyıcıya geçiş kalemi
+  installment_fee // installment fee (vade farkı) the buyer paid on top of the goods total: platform income, VAT included (ADR 0019)
+  installment_platform_cost // installment cost the platform absorbs under a segment rule share: platform expense, booked from the PayTR deduction (ADR 0019)
 }
 
 enum LedgerDirection {

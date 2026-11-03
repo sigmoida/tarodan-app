@@ -37,6 +37,12 @@ export const VAT_SOURCE_BY_TYPE: Record<FiscalInvoiceType, InvoiceVatSource> = {
   penalty: "service",
   membership: "standard",
   boost: "standard",
+  // Installment fee (ADR 0019 D4): a platform charge with no category and not
+  // collected under the service-fee VAT toggle. The rate actually collected
+  // is snapshotted per charge (`PaymentChargeAttempt.feeVatRatePct`); the
+  // document issuer (task A6) must read that snapshot. Nothing issues this
+  // type before A6.
+  buyer_installment_fee: "standard",
   // İade faturası kaynak faturanın oranını AYNEN taşır (snapshot); bu değer
   // yalnız kaynak çözülemediğinde devreye girer.
   return_invoice: "standard",

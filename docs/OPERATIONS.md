@@ -500,6 +500,77 @@ at the next nightly run. The author still sees it on the order, flagged
   and the enum value are harmless if left; dropping the columns needs a new
   migration.
 
+### Installment payments: schema
+
+Reference: tarodan-ops ADR 0019 and plan `2026-11-03-installment-payments`
+(the full installment runbook, with the flag flip and the assumptions
+register, comes with the refund and reconciliation task). Migrations
+`20261103120000_installment_payments_schema` and
+`20261103120100_installment_payments_validate_constraints` add the tables
+`installment_rules`, `installment_rate_snapshots` and
+`payment_charge_attempts`; the columns `installment_fee_amount` on
+`payments`, `orders` and `refund_attempts`; `charged_amount` and
+`charge_attempt_id` on `payments`; the ledger accounts `installment_fee` and
+`installment_platform_cost`; and the invoice type `buyer_installment_fee`.
+Nothing writes them until the installment code ships, and installments stay
+off until a super admin turns on `installments_enabled` (no row = off).
+
+- **Deploy (no manual step, no backfill).** Both migrations run at boot. The
+  first holds short ACCESS EXCLUSIVE locks on `payments`, `orders` and
+  `refund_attempts` (metadata-only columns, CHECKs and the FK added
+  `NOT VALID`, one unique index build on an all-NULL column). The second only
+  validates them, under SHARE UPDATE EXCLUSIVE (reads and writes continue).
+  Existing rows read as single payments: fee 0, `charged_amount` NULL (read as
+  `amount`).
+- **Before the deploy (dry run, read-only).** On the environment about to be
+  deployed (staging before the push; production only with the user's
+  approval), check the table sizes and that no long transaction would hold
+  the first migration's locks:
+
+  ```sql
+  SELECT relname, n_live_tup FROM pg_stat_user_tables
+  WHERE relname IN ('payments', 'orders', 'refund_attempts');
+  SELECT pid, now() - xact_start AS age, state, left(query, 60)
+  FROM pg_stat_activity
+  WHERE xact_start IS NOT NULL AND now() - xact_start > interval '30 seconds'
+  ORDER BY age DESC;
+  SELECT to_regclass('public.payment_charge_attempts'),
+         to_regclass('public.installment_rules'),
+         to_regclass('public.installment_rate_snapshots');
+  ```
+
+  Expect no long transactions and three NULLs. Deploy at a quiet time if the
+  tables are large or a long transaction is open.
+
+- **After the deploy.** All five constraints are validated, and no payment
+  carries a charged amount yet:
+
+  ```sql
+  SELECT conname, convalidated FROM pg_constraint
+  WHERE conname IN ('payments_charged_amount_check',
+    'payments_installment_fee_amount_check', 'payments_charge_attempt_id_fkey',
+    'orders_installment_fee_amount_check',
+    'refund_attempts_installment_fee_amount_check');
+  SELECT count(*) FROM payments WHERE charged_amount IS NOT NULL;
+  ```
+
+- **If a migration fails.** Each migration is one transaction and rolls back
+  completely; Prisma then refuses later deploys (P3009) until the failed one
+  is marked rolled back:
+  `npx prisma migrate resolve --rolled-back <migration_name>` in the API
+  container (in production only with the user's approval), then redeploy.
+  A failed validation means a row breaks a money invariant: inspect it and
+  do not drop the constraint.
+- **DB guards to know about.** Rule versions and the pricing columns of a
+  charge attempt cannot be updated, and neither can be deleted (edit = archive
+  plus new version); a rate snapshot cannot be updated; a payment's captured
+  attempt is final. The test-lane reset deletes attempts of test payments
+  through the same `app.test_lane_purge` gate as the refund components.
+- **Rollback.** Keep the flag off: the tables and columns are inert. Once any
+  installment payment exists, roll forward only. Before that, a rollback is a
+  new migration that drops the triggers, the tables, the columns and the
+  `InstallmentSegment` type (enum values stay, unused).
+
 ### One-off: saved-search tier limits
 
 Reference: `docs/SAVED_SEARCHES.md`. Migration `20261021174800_saved_searches`

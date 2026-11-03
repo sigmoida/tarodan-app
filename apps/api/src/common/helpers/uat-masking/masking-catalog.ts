@@ -582,6 +582,13 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
     columns: { masked_pan: NULL },
   },
   {
+    table: "payment_charge_attempts",
+    action: "mask",
+    reason:
+      "First 6 card digits of the quoted card: card data staging does not need.",
+    columns: { bin6: NULL },
+  },
+  {
     table: "refund_requests",
     action: "mask",
     reason: "İade kargo etiketi (gönderenin adı/adresi/telefonu basılı).",
@@ -680,6 +687,10 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "trade_cash_payments.payer_id",
       "trade_cash_payments.recipient_id",
       "trade_cash_payments.trade_fee_campaign_id",
+      "installment_rules.lineage_id",
+      "installment_rules.created_by",
+      "installment_rules.archived_by",
+      "payment_charge_attempts.saved_card_id",
       "trade_disputes.raised_by_id",
       "trade_disputes.resolved_by_id",
       "trade_messages.sender_id",
@@ -796,6 +807,10 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "paytr_statement_lines.currency",
       "paytr_statement_lines.card_brand",
       "paytr_statement_lines.payment_type",
+      "payment_charge_attempts.merchant_oid",
+      "payment_charge_attempts.card_family",
+      "payment_charge_attempts.card_bank",
+      "payment_charge_attempts.card_type",
       "paytr_settlements.currency",
       "paytr_settlement_items.merchant_oid",
       "paytr_settlement_items.currency",
@@ -944,6 +959,7 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "shipping_package_tiers.label",
       "commission_rule_sets.name",
       "commission_rules.name",
+      "installment_rules.name",
       "tax_regions.name",
       "tax_regions.country_code",
       "tax_regions.region_code",
@@ -1065,6 +1081,10 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       // only, built field by field in `computeSellerTrust`; no ids, names,
       // e-mails or hashes.
       "seller_trust_scores.components",
+      // PayTR installment rate table of Tarodan's own store (normalized and as
+      // received): rates per card family and count, no buyer data.
+      "installment_rate_snapshots.rates",
+      "installment_rate_snapshots.raw",
     ],
   },
 ];

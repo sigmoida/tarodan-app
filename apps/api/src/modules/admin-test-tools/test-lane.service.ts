@@ -169,7 +169,7 @@ export class TestLaneService {
   /**
    * Test şeridinin işlem geçmişini temizler. Sıra FK zincirini izler:
    * kargo mahsubu → iade → hold/payout → kargo → fatura/komisyon →
-   * ödeme → sipariş → paket → sepet grubu → takas → teklif → sepet.
+   * çekim denemesi → ödeme → sipariş → paket → sepet grubu → takas → teklif → sepet.
    * Hesaplar ve ilanlar kalır.
    */
   async resetLane(): Promise<TestLaneResetResult> {
@@ -293,6 +293,20 @@ export class TestLaneService {
           "providerEvents",
           await tx.paymentProviderEvent.deleteMany({
             where: { paymentId: { in: paymentIds } },
+          }),
+        );
+        // Charge attempts reference the payment and the payment points back to
+        // its captured attempt (both Restrict). The DB guards let the purge
+        // gate above clear that pointer and delete the attempts of test-lane
+        // payments only (20261103120000_installment_payments_schema).
+        await tx.payment.updateMany({
+          where: { ...testPayment, chargeAttemptId: { not: null } },
+          data: { chargeAttemptId: null },
+        });
+        count(
+          "paymentChargeAttempts",
+          await tx.paymentChargeAttempt.deleteMany({
+            where: { payment: testPayment },
           }),
         );
         count("payments", await tx.payment.deleteMany({ where: testPayment }));

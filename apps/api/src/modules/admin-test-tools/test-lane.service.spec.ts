@@ -32,7 +32,14 @@ describe("TestLaneService", () => {
       invoice: del("invoice"),
       commissionLedger: del("commissionLedger"),
       paymentProviderEvent: del("paymentProviderEvent"),
-      payment: del("payment", 2),
+      payment: {
+        ...del("payment", 2),
+        updateMany: jest.fn(async () => {
+          calls.push("payment.clearChargeAttempt");
+          return { count: 1 };
+        }),
+      },
+      paymentChargeAttempt: del("paymentChargeAttempt"),
       order: del("order", 3),
       packageShippingSettlement: del("packageShippingSettlement"),
       orderPackage: del("orderPackage"),
@@ -166,6 +173,10 @@ describe("TestLaneService", () => {
         "invoice",
         "commissionLedger",
         "paymentProviderEvent",
+        // payments.charge_attempt_id -> attempt and attempt.payment_id ->
+        // payment are both Restrict: clear the pointer, then the attempts.
+        "payment.clearChargeAttempt",
+        "paymentChargeAttempt",
         "payment",
         "order",
         "orderPackage",
@@ -189,6 +200,14 @@ describe("TestLaneService", () => {
       });
       expect(tx.payment.deleteMany).toHaveBeenCalledWith({
         where: { isTest: true },
+      });
+      // Only test-lane payments, and only the attempts of test-lane payments.
+      expect(tx.payment.updateMany).toHaveBeenCalledWith({
+        where: { isTest: true, chargeAttemptId: { not: null } },
+        data: { chargeAttemptId: null },
+      });
+      expect(tx.paymentChargeAttempt.deleteMany).toHaveBeenCalledWith({
+        where: { payment: { isTest: true } },
       });
       expect(tx.order.deleteMany).toHaveBeenCalledWith({
         where: { isTest: true },
