@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
@@ -249,6 +250,26 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       });
     });
 
+    it("never logs the BIN when the lookup fails", async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      fetchSpy.mockRejectedValueOnce(new Error("timeout"));
+
+      await service.lookupBin("4546711234567890");
+
+      const logged = [...warn.mock.calls, ...error.mock.calls]
+        .map((call) => String(call[0]))
+        .join("\n");
+      expect(logged).toContain("timeout");
+      expect(logged).not.toContain("454671");
+      warn.mockRestore();
+      error.mockRestore();
+    });
+
     it("refuses fewer than 6 digits without calling PayTR", async () => {
       const r = await service.lookupBin("45467");
       expect(r).toMatchObject({ ok: false, outcome: "error" });
@@ -365,7 +386,25 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       expect(r).toEqual({ ok: false, errMsg: "socket hang up" });
     });
 
-    it.each([[""], ["x".repeat(33)]])(
+    it("accepts a request_id of exactly 32 characters", async () => {
+      const id = "r".repeat(32);
+      answer({ status: "success", request_id: id, oranlar: {} });
+      const r = await service.getInstallmentRates(id);
+      expect(r.ok).toBe(true);
+      expect(bodyOf().get("request_id")).toBe(id);
+    });
+
+    it("reads a case-variant Success status like success", async () => {
+      answer({
+        status: "Success",
+        request_id: "req7",
+        oranlar: { axess: { taksit_2: "2.8" } },
+      });
+      const r = await service.getInstallmentRates("req7");
+      expect(r.ok).toBe(true);
+    });
+
+    it.each([[""], ["x".repeat(33)], ["   "]])(
       "refuses a request_id that is empty or longer than 32 (%p) without calling PayTR",
       async (id) => {
         const r = await service.getInstallmentRates(id);

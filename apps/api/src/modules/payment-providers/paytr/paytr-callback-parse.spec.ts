@@ -1,3 +1,4 @@
+import type { ConfigService } from "@nestjs/config";
 import { PayTRService, PayTRCallbackData } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
@@ -9,7 +10,7 @@ import { PayTRTransferService } from "./paytr-transfer.service";
  * parseCallback bunları tiplenmiş biçimde döndürmeli (önceden yalnız paymentType).
  */
 describe("PayTRService.parseCallback — rich field extraction", () => {
-  const config = { get: () => "" } as any;
+  const config = { get: () => "" } as unknown as ConfigService;
   const svc = new PayTRService(
     new PayTRCredentials(config),
     new PayTRReportService(new PayTRCredentials(config)),
@@ -60,6 +61,20 @@ describe("PayTRService.parseCallback — rich field extraction", () => {
 
   // Same validation as the status inquiry's `taksit`, so the stored count
   // does not depend on which path completed the payment.
+  it.each([
+    ["0", 0],
+    ["1", 1],
+    ["2", 2],
+    ["12", 12],
+  ])("keeps installment_count %p as %p", (installment_count, expected) => {
+    const r = svc.parseCallback({ ...base, installment_count });
+    expect(r.installmentCount).toBe(expected);
+  });
+
+  it("leaves installmentCount undefined when the field is missing", () => {
+    expect(svc.parseCallback(base).installmentCount).toBeUndefined();
+  });
+
   it.each([["13"], ["-1"], ["2x"], ["2.5"], [""]])(
     "drops an installment_count that is not 0-12 (%p)",
     (installment_count) => {
