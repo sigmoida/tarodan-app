@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   extractErrorI18nKey,
   extractErrorMessage,
+  isForbiddenError,
   isNotFoundError,
   isRefundOutcomeUnknown,
+  isThrottledError,
+  isUnprocessableError,
 } from "./error";
 
 function axiosError(data: unknown, status?: number) {
@@ -108,5 +111,17 @@ describe("isRefundOutcomeUnknown", () => {
     expect(isRefundOutcomeUnknown(axiosError({}, 400))).toBe(false);
     expect(isRefundOutcomeUnknown(axiosError({}, 403))).toBe(false);
     expect(isRefundOutcomeUnknown(axiosError({}, 409))).toBe(false);
+  });
+});
+
+describe("isForbiddenError / isThrottledError", () => {
+  it("match only their own status", () => {
+    expect(isForbiddenError(axiosError({}, 403))).toBe(true);
+    expect(isForbiddenError(axiosError({}, 429))).toBe(false);
+    expect(isThrottledError(axiosError({}, 429))).toBe(true);
+    expect(isThrottledError(axiosError({}, 500))).toBe(false);
+    expect(isThrottledError(new Error("offline"))).toBe(false);
+    expect(isUnprocessableError(axiosError({}, 422))).toBe(true);
+    expect(isUnprocessableError(axiosError({}, 400))).toBe(false);
   });
 });

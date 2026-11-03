@@ -58,6 +58,20 @@ export function isNotFoundError(error: unknown): boolean {
   return statusOf(error) === 404;
 }
 
+export function isForbiddenError(error: unknown): boolean {
+  return statusOf(error) === 403;
+}
+
+/** The request was understood but refused on its content (HTTP 422). */
+export function isUnprocessableError(error: unknown): boolean {
+  return statusOf(error) === 422;
+}
+
+/** The API's rate limit (HTTP 429). */
+export function isThrottledError(error: unknown): boolean {
+  return statusOf(error) === 429;
+}
+
 /**
  * A refund call whose outcome the screen cannot know. The API answers 503
  * (`RefundPendingReconciliationException`) when PayTR may have moved the
