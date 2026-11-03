@@ -4,12 +4,14 @@ import containerQueries from "@tailwindcss/container-queries";
 import {
   colors,
   containers,
+  mediaRatios,
   radius,
   spacing,
   shadows,
   motion,
   typography,
   zIndex,
+  type MediaRatio,
 } from "./index";
 
 /**
@@ -37,6 +39,10 @@ const toRem = (obj: Record<string, number>): Record<string, string> =>
   Object.fromEntries(
     Object.entries(obj).map(([k, v]) => [k, v === 0 ? "0px" : `${v / 16}rem`]),
   );
+
+/** A `MediaRatio` token as a CSS `aspect-ratio` value ("16 / 10"). */
+const toAspectRatio = ({ width, height }: MediaRatio): string =>
+  `${width} / ${height}`;
 
 /**
  * Güvenli alan (safe area) yardımcıları.
@@ -170,6 +176,12 @@ const tarodanPreset: Partial<Config> = {
       // Named container sizes from `containers.ts` (rem, like spacing).
       containers: {
         "card-wide": `${containers.cardWide / 16}rem`,
+      },
+      // Media box ratios from `media.ts`. `extend` keeps Tailwind's own
+      // `aspect-auto`, `aspect-square` and `aspect-video`.
+      aspectRatio: {
+        "hero-compact": toAspectRatio(mediaRatios.heroCompact),
+        "hero-split": toAspectRatio(mediaRatios.heroSplit),
       },
       borderRadius: toPx(radius),
       spacing: toRem(spacing),
