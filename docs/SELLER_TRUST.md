@@ -17,11 +17,13 @@ stored; a profile read is a primary-key lookup. Decision record: tarodan-ops
 | Batch                                               | `seller-trust/jobs/seller-trust-scheduler.service.ts` (`seller-trust-refresh`)                                      |
 | Input read (one path for the batch and read tools)  | `seller-trust/inputs/seller-trust-inputs.reader.ts` (`SellerTrustInputsReader`)                                     |
 | Aggregates, one per owning domain                   | `order/stats/`, `refund/stats/`, `rating/stats/`, `trade/stats/`, `user/stats/` (`*-seller-trust-stats.service.ts`) |
+| Admin lab (read-only)                               | `seller-trust/lab/` (`SellerTrustLabService`), `admin/users/seller-trust-lab/` (controller, audit)                  |
 
 Any change to a definition or a constant below is a product decision and bumps
-`SELLER_TRUST_FORMULA_VERSION`. Until the first production release, v1 may
-still be changed by the user's decision without a bump (the staging
-calibration, and the oversold-after-payment failure added on 2026-10-21).
+`SELLER_TRUST_FORMULA_VERSION`. v1 is live in production since the release
+`app-2026.10.25-1`, so a change is now always a v2: a version bump, a staging
+calibration, a user decision and an ADR (ADR 0014). The admin lab ("Lab",
+below) produces the evidence for such a decision; it never changes v1.
 
 ## Data rules (apply everywhere)
 
@@ -174,7 +176,60 @@ The profile counters (`stats.totalSales`, `totalTrades`, `averageRating`,
 `totalRatings`) stay live counts and are not the score's inputs.
 `users.show_trust_score` is still accepted from old clients and has no effect.
 
+## Lab (admin, read-only)
+
+Admin > System > "Güven skoru laboratuvarı" explains, recomputes and simulates
+the score with the same formula code as the batch (tarodan-ops plan
+`plans/2026-11-03-seller-trust-score-lab.md`). It works on every environment,
+production included, and never writes a score, a ranking or a cache entry.
+Candidates are evidence for a v2 decision; the weights are never live.
+
+Access: super admin and admin through the permission `seller_trust_lab`
+(Hesaplar > Roller, System group). The controller also requires the
+`super_admin` or `admin` role, so a moderator is refused even if the matrix
+lists the key. An environment that stores a role matrix from before the key
+keeps the lab closed to admin until a super admin ticks it once (fail closed).
+
+| Route (`/admin/seller-trust-lab`) | Does                                                                                                                                                                                                                                                 | Reads                                                 | Audit                         | Limit/min |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------- | --------- |
+| `GET params`                      | v1 params, limits, component order, version, environment (`env`, `isProd`)                                                                                                                                                                           | none                                                  | no                            | 60        |
+| `GET scenarios`                   | the ten approved golden scenarios (`helpers/trust-golden-v1.ts`) with their v1 explanation                                                                                                                                                           | none                                                  | no                            | 60        |
+| `POST scenario`                   | `{ inputs, params? }`: hypothetical inputs, v1 and the candidate                                                                                                                                                                                     | none                                                  | no (no real data)             | 60        |
+| `POST sellers/:userId`            | `{ asOf?: "now" \| "stored", params? }`: the stored row, the live inputs read by `SellerTrustInputsReader`, v1 and the candidate explained, the inputs that changed since the stored run; not scored (deleted, banned, test lane) instead of a score | one snapshot, about 7 indexed statements for one id   | `seller_trust_lab_seller`     | 30        |
+| `POST population`                 | `{ params, filters?: { levels?, minTransactions? } }`: the candidate against every stored row: level and score distributions, level matrix, top 20 movers each way, v1 consistency, an id-free proposal                                              | `seller_trust_scores` only, plus at most 40 usernames | `seller_trust_lab_population` | 6         |
+
+- **Read-only, proven.** Every read runs in one `inReadOnlySnapshot` (READ
+  ONLY, REPEATABLE READ; 5 s statement timeout; 10 s per seller, 20 s per
+  population), so Postgres refuses a write. A contract spec
+  (`lab/seller-trust-lab.readonly.contract.spec.ts`) forbids write, cache,
+  queue, event and outbox calls in the lab code; a Prisma-double spec fails
+  any read outside the snapshot; the e2e (`test/e2e/seller-trust-lab.e2e-spec.ts`)
+  calls every route and checks that the score table, the product ranking
+  columns and the scheduled queue are unchanged, and that the only new rows
+  are the audit rows.
+- **Validation.** `params` and `inputs` are validated once by the shared
+  validators (`validateSellerTrustParams`, `validateSellerTrustInputs` in
+  `@tarodan/types`) on a plain copy, which is what the lab computes with: 400
+  `server.sellerTrustLab.invalidParams` or `invalidInputs` naming the field.
+  Windows, the late grace, the per-counterparty cap and the version are not
+  parameters (decision D3) and are refused.
+- **Population source.** Stored rows only (decision D2): every input is in the
+  stored breakdown except the rating sum, rebuilt from the smoothed mean and
+  the v1 prior. The rebuilt v1 score can miss the stored one by 0.01 at an
+  exact rounding boundary; `v1Consistency` counts `matched`, `offByOne` and
+  `mismatched` (drift). Rows of another version or an unreadable breakdown are
+  skipped and counted. More than 20,000 matching rows is a 422
+  `server.sellerTrustLab.populationTooLarge`, answered before any row is read.
+- **Privacy.** Responses carry user id and username (as admin user detail
+  does), counts and sub-scores; never a counterparty key, an order or trade
+  id, a buyer name or an e-mail (hash). The proposal export has no user id or
+  username. Every seller and population call writes a fail-closed audit row
+  (actor, action, entity, numeric params or a params hash): no audit, no
+  result. Responses are `Cache-Control: no-store`.
+- **Logs.** One `info` line per population run (rows, consistency counts,
+  duration; no ids). 5xx reach Sentry through `SentryInterceptor`.
+
 ## Operations
 
-See `docs/OPERATIONS.md`, "Seller trust score": the bootstrap run, a manual run
-and the calibration queries.
+See `docs/OPERATIONS.md`, "Seller trust score": the bootstrap run, a manual run,
+the calibration queries and the lab.
