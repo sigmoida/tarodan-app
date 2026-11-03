@@ -411,6 +411,33 @@ describe("SellerTrustSchedulerService.runRefresh", () => {
       "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
       "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
     ]);
+    // Every domain read, the guest buyer lookup included, ran once on the
+    // snapshot's tx: none went to the plain client outside a snapshot.
+    const reads = Object.entries({
+      ...t.orderStats,
+      ...t.refundStats,
+      ...t.ratingStats,
+      ...t.tradeStats,
+      ...t.userStats,
+    }) as Array<[string, jest.Mock]>;
+    expect(reads.map(([name]) => name).sort()).toEqual([
+      "activeSellerIds",
+      "activeTraderIds",
+      "fulfilmentStats",
+      "guestBuyerId",
+      "salesCounterparties",
+      "sellerFaultOrderIds",
+      "sellerRatingStats",
+      "tradeCounterparties",
+      "trustEligibleUsers",
+    ]);
+    expect(
+      reads.map(([name, read]) => ({
+        name,
+        calls: read.mock.calls.length,
+        onSnapshotTx: read.mock.calls.every((c) => c[0] === t.prisma.tx),
+      })),
+    ).toEqual(reads.map(([name]) => ({ name, calls: 1, onSnapshotTx: true })));
   });
 });
 
