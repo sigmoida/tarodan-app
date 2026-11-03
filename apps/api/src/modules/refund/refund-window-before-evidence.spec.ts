@@ -237,7 +237,99 @@ describe("RefundCreationService - window check runs before the evidence check", 
     });
   });
 
+  describe("every phase that opened a cooling-off request still opens one", () => {
+    // The reorder and the default-closed gate must not refuse any phase that
+    // the old decision table routed to the cooling-off path.
+    const inWindowPhases: Array<[string, Record<string, unknown>]> = [
+      [
+        "paid, already handed to the carrier",
+        {
+          status: OrderStatus.paid,
+          deliveredAt: null,
+          returnWindowEndsAt: null,
+          shipment: {
+            status: ShipmentStatus.pending,
+            deliveredAt: null,
+            shippedAt: daysAgo(1),
+          },
+        },
+      ],
+      [
+        "shipped",
+        {
+          status: OrderStatus.shipped,
+          deliveredAt: null,
+          returnWindowEndsAt: null,
+          shipment: {
+            status: ShipmentStatus.in_transit,
+            deliveredAt: null,
+            shippedAt: daysAgo(1),
+          },
+        },
+      ],
+      [
+        "delivered without a delivery date",
+        { ...inWindowOrder, deliveredAt: null, returnWindowEndsAt: null },
+      ],
+      [
+        "awaiting buyer confirmation inside the window",
+        { ...inWindowOrder, status: OrderStatus.awaiting_buyer_confirmation },
+      ],
+      [
+        "completed inside the window",
+        { ...inWindowOrder, status: OrderStatus.completed },
+      ],
+    ];
+
+    it.each(inWindowPhases)(
+      "%s: opens a changed-mind request on the cooling-off path",
+      async (_label, overrides) => {
+        const { service, instant, coolingOff } = makeService(overrides);
+
+        await expect(
+          service.createRefundRequest("order-1", "buyer-1", {
+            reason: RefundReason.changed_mind,
+          }),
+        ).resolves.toEqual({ path: "cooling_off" });
+        expect(coolingOff).toHaveBeenCalledTimes(1);
+        expect(instant).not.toHaveBeenCalled();
+      },
+    );
+
+    it("completed past the window: refuses with the window error", async () => {
+      const { service, coolingOff } = makeService({
+        ...pastWindowOrder,
+        status: OrderStatus.completed,
+      });
+
+      await expect(
+        refusalKey(service, {
+          reason: RefundReason.damaged,
+          evidencePhotoUrls: PHOTO,
+        }),
+      ).resolves.toBe("server.refund.coolingOffExpired");
+      expect(coolingOff).not.toHaveBeenCalled();
+    });
+  });
+
   describe("an order status no refund can start from", () => {
+    // Without the default-closed gate this request needs no evidence and
+    // would open a cooling-off refund: the money-relevant case.
+    it("never opens a request, even when no evidence is needed", async () => {
+      const { service, instant, coolingOff } = makeService(
+        ineligibleStatusOrder,
+      );
+
+      await expect(
+        refusalKey(service, {
+          reason: RefundReason.changed_mind,
+          evidencePhotoUrls: PHOTO,
+        }),
+      ).resolves.toBe("server.refund.orderStatusNotEligible");
+      expect(instant).not.toHaveBeenCalled();
+      expect(coolingOff).not.toHaveBeenCalled();
+    });
+
     it("refuses with the status error before asking for a photo", async () => {
       const { service, instant, coolingOff } = makeService(
         ineligibleStatusOrder,
