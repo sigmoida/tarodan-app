@@ -243,6 +243,164 @@ export function isValidSellerTrustParams(
   return validateSellerTrustParams(p).length === 0;
 }
 
+/** One formula input by name, e.g. `raters`, `sumOfGiverMeans`. */
+export type SellerTrustInputField = keyof SellerTrustInputs;
+
+/**
+ * Every formula input, in `SellerTrustInputs` order, and whether it is a
+ * count (a whole number). Only the rating sum is fractional.
+ */
+export const SELLER_TRUST_INPUT_FIELDS = {
+  raters: { integer: true },
+  sumOfGiverMeans: { integer: false },
+  eligibleOrders: { integer: true },
+  failures: { integer: true },
+  shipped: { integer: true },
+  late: { integer: true },
+  transactions: { integer: true },
+  counterparties: { integer: true },
+  tenureDays: { integer: true },
+} as const satisfies Record<SellerTrustInputField, { integer: boolean }>;
+
+/**
+ * The rating sum may leave `[raters, 5 x raters]` by at most this per rater
+ * (binary noise of a mean times a count, e.g. `12 * 4.8`).
+ */
+export const SELLER_TRUST_RATING_SUM_TOLERANCE = 1e-9;
+
+export type SellerTrustInputIssueCode =
+  /** The inputs are not an object. */
+  | "notAnObject"
+  /** A key that is not a formula input. */
+  | "unknownField"
+  /** Missing, not a number, NaN or Infinity. */
+  | "invalidNumber"
+  /** A count that is not a safe whole number. */
+  | "notInteger"
+  | "negative"
+  /** `sumOfGiverMeans` is outside `[raters, 5 x raters]` (each mean is 1 to 5). */
+  | "ratingSumOutOfRange"
+  /** `failures` or `shipped` is above `eligibleOrders` (both are subsets of E). */
+  | "aboveEligibleOrders"
+  /** `late` is above `shipped` (L is a subset of S). */
+  | "aboveShipped"
+  /** `counterparties` is above `transactions` (each one has a transaction). */
+  | "aboveTransactions";
+
+export interface SellerTrustInputIssue {
+  /** The offending input, an unknown key, or `""` for the inputs themselves. */
+  field: string;
+  code: SellerTrustInputIssueCode;
+}
+
+/**
+ * Checks hypothetical formula inputs (the lab's scenario calculator). Pure;
+ * takes `unknown` like `validateSellerTrustParams`. An empty list means the
+ * value is a `SellerTrustInputs` with no extra keys, every count a
+ * non-negative whole number and the relations real data always has, so the
+ * formula never divides by zero or returns NaN.
+ *
+ * `failures` and `shipped` are each bounded by `eligibleOrders`, not their
+ * sum: a seller-fault refund of a shipped order is both a failure and
+ * shipped, so real data can have `failures + shipped > eligibleOrders`.
+ */
+export function validateSellerTrustInputs(i: unknown): SellerTrustInputIssue[] {
+  if (!isRecord(i)) return [{ field: "", code: "notAnObject" }];
+
+  const fields = Object.keys(SELLER_TRUST_INPUT_FIELDS);
+  const issues: SellerTrustInputIssue[] = [];
+  const valid = new Map<string, number>();
+
+  for (const key of Object.keys(i)) {
+    if (!fields.includes(key))
+      issues.push({ field: key, code: "unknownField" });
+  }
+  for (const [field, rule] of Object.entries(SELLER_TRUST_INPUT_FIELDS)) {
+    const value = i[field];
+    let code: SellerTrustInputIssueCode | null = null;
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      code = "invalidNumber";
+    } else if (rule.integer && !Number.isSafeInteger(value)) {
+      code = "notInteger";
+    } else if (value < 0) {
+      code = "negative";
+    }
+    if (code) issues.push({ field, code });
+    else valid.set(field, value as number);
+  }
+
+  const bound = (
+    field: SellerTrustInputField,
+    limitField: SellerTrustInputField,
+    code: SellerTrustInputIssueCode,
+  ) => {
+    const value = valid.get(field);
+    const limit = valid.get(limitField);
+    if (value !== undefined && limit !== undefined && value > limit) {
+      issues.push({ field, code });
+    }
+  };
+
+  const raters = valid.get("raters");
+  const sum = valid.get("sumOfGiverMeans");
+  if (raters !== undefined && sum !== undefined) {
+    const tolerance = SELLER_TRUST_RATING_SUM_TOLERANCE * Math.max(1, raters);
+    if (sum < raters - tolerance || sum > 5 * raters + tolerance) {
+      issues.push({ field: "sumOfGiverMeans", code: "ratingSumOutOfRange" });
+    }
+  }
+  bound("failures", "eligibleOrders", "aboveEligibleOrders");
+  bound("shipped", "eligibleOrders", "aboveEligibleOrders");
+  bound("late", "shipped", "aboveShipped");
+  bound("counterparties", "transactions", "aboveTransactions");
+
+  return issues;
+}
+
+export type SellerTrustParseResult<T, Issue> =
+  { ok: true; value: T } | { ok: false; issues: Issue[] };
+
+/**
+ * A plain-data copy of a request value: own enumerable data only, every
+ * getter and `toJSON` read once, no prototype, NaN and Infinity turned into
+ * `null` (which the validators refuse). `undefined` for a value JSON cannot
+ * hold (undefined, a cycle, a BigInt).
+ */
+function plainJsonCopy(raw: unknown): unknown {
+  try {
+    const json = JSON.stringify(raw);
+    return json === undefined ? undefined : JSON.parse(json);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Validates a candidate parameter set once and returns the validated copy:
+ * the caller computes with exactly the values that were checked, never with
+ * the request object, which could answer a second read differently.
+ */
+export function parseSellerTrustParams(
+  raw: unknown,
+): SellerTrustParseResult<SellerTrustFormulaParams, SellerTrustParamIssue> {
+  const copy = plainJsonCopy(raw);
+  const issues = validateSellerTrustParams(copy);
+  return issues.length > 0
+    ? { ok: false, issues }
+    : { ok: true, value: copy as SellerTrustFormulaParams };
+}
+
+/** As `parseSellerTrustParams`, for scenario inputs. */
+export function parseSellerTrustInputs(
+  raw: unknown,
+): SellerTrustParseResult<SellerTrustInputs, SellerTrustInputIssue> {
+  const copy = plainJsonCopy(raw);
+  const issues = validateSellerTrustInputs(copy);
+  return issues.length > 0
+    ? { ok: false, issues }
+    : { ok: true, value: copy as SellerTrustInputs };
+}
+
 /**
  * Copies exactly the parameter fields of a superset (the API's
  * `TRUST_FORMULA_V1` also holds the version, windows, grace and cap), e.g.
