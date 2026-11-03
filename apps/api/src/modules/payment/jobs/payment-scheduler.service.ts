@@ -18,6 +18,7 @@ import { PaytrReportSyncService } from "../reconciliation/paytr-report-sync.serv
 import { PaytrReportMatchingService } from "../reconciliation/paytr-report-matching.service";
 import { PaytrSyncStateService } from "../reconciliation/paytr-sync-state.service";
 import { PayoutService } from "../../payout/payout.service";
+import { InstallmentRatesService } from "../installments/installment-rates.service";
 
 /**
  * Senkron izinin durumu: bazı mağazaların rapor senkronu düştüyse (diğerleri
@@ -49,6 +50,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     private readonly paytrReportSync: PaytrReportSyncService,
     private readonly paytrReportMatching: PaytrReportMatchingService,
     private readonly paytrSyncState: PaytrSyncStateService,
+    private readonly installmentRates: InstallmentRatesService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     @Optional() private readonly payoutService?: PayoutService,
   ) {}
@@ -86,6 +88,19 @@ export class PaymentSchedulerService implements OnModuleInit {
       "30 5 * * *",
       this.logger,
     );
+    // PayTR installment rates ("oranlar gunluk olarak degisebilir"): one
+    // snapshot a night for installment pricing (ADR 0019).
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "paytr-installment-rates",
+      "30 3 * * *",
+      this.logger,
+    );
+  }
+
+  /** Real work: Bull processor 'paytr-installment-rates' calls this. */
+  async runInstallmentRatesRefresh(log: (msg: string) => void = () => {}) {
+    return this.installmentRates.runDailyRefresh(log);
   }
 
   /** Gerçek iş — Bull processor 'paytr-statement-sync' buradan çağırır. */

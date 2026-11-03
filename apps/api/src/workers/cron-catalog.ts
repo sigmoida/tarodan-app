@@ -129,6 +129,13 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
   {
+    key: "paytr-installment-rates",
+    label: "PayTR taksit oranları",
+    description:
+      "PayTR taksit oranı tablosunu çekip günlük oran anlık görüntüsünü saklar (taksit fiyatlaması)",
+    triggerable: true,
+  },
+  {
     key: "paytr-settlement-sync",
     label: "PayTR hakediş senkronu",
     description: "PayTR hakediş (settlement) verisini senkronlar",

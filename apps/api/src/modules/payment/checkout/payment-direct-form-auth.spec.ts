@@ -62,6 +62,7 @@ describe("PaymentController.prepareDirectForm — optional auth", () => {
       config as never,
       {} as never,
       new PaymentOptionalAuthService(jwt, prisma as never),
+      {} as never,
     );
     return { controller, paymentService };
   }

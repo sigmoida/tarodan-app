@@ -38,6 +38,10 @@ import { OrderFulfillmentListener } from "./fulfillment/order-fulfillment.listen
 import { EscrowHoldService } from "./fulfillment/escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment/fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./fulfillment/virtual-order-fulfillment.service";
+import { InstallmentSettingsService } from "./installments/installment-settings.service";
+import { InstallmentRatesService } from "./installments/installment-rates.service";
+import { InstallmentRulesService } from "./installments/installment-rules.service";
+import { InstallmentOptionsService } from "./installments/installment-options.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -129,6 +133,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,
     RawBodyMiddleware,
+    InstallmentSettingsService,
+    InstallmentRatesService,
+    InstallmentRulesService,
+    InstallmentOptionsService,
   ],
   exports: [
     PaymentService,
@@ -139,6 +147,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     // Admin PSP mutabakat ekranı: tek satır yeniden eşleme + senkron durumu.
     PaytrReportMatchingService,
     PaytrSyncStateService,
+    // Admin Finance > Installments: settings, rule versions, preview.
+    InstallmentSettingsService,
+    InstallmentRatesService,
+    InstallmentRulesService,
   ],
 })
 export class PaymentModule implements NestModule {

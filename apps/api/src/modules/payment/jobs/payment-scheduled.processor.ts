@@ -37,6 +37,13 @@ export class PaymentScheduledProcessor {
     );
   }
 
+  @Process("paytr-installment-rates")
+  async handlePaytrInstallmentRates(job: Job) {
+    return runTrackedJob(job, "paytr-installment-rates", (log) =>
+      this.scheduler.runInstallmentRatesRefresh(log),
+    );
+  }
+
   @Process("paytr-settlement-sync")
   async handlePaytrSettlementSync(job: Job) {
     return runTrackedJob(job, "paytr-settlement-sync", (log) =>

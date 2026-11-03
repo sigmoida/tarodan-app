@@ -44,7 +44,15 @@ import {
   RetryPaymentResponseDto,
   DirectPaymentDto,
   PaymentQueryDto,
+  InstallmentOptionsDto,
 } from "./dto";
+import type {
+  InstallmentOptionsResponse,
+  PaymentsInstallmentsConfig,
+} from "@tarodan/types";
+import { InstallmentOptionsService } from "./installments/installment-options.service";
+import { INSTALLMENT_OPTIONS_IP_LIMIT_PER_MINUTE } from "./installments/installment-config";
+import { clientIpThrottle } from "../../common/helpers/client-ip";
 import { isProduction } from "../../config/environment";
 import { PaytrMerchant } from "@prisma/client";
 import {
@@ -79,6 +87,7 @@ export class PaymentController {
     private readonly configService: ConfigService,
     private readonly i18n: I18nService,
     private readonly optionalAuth: PaymentOptionalAuthService,
+    private readonly installmentOptions: InstallmentOptionsService,
   ) {}
 
   /**
@@ -160,9 +169,9 @@ export class PaymentController {
   @ApiResponse({
     status: HttpStatus.OK,
     description:
-      "bypassEnabled + per-purpose card storage / recurring capabilities",
+      "bypassEnabled, per-purpose card storage / recurring capabilities and installments { enabled, minAmount }",
   })
-  getPublicConfig(): {
+  async getPublicConfig(): Promise<{
     bypassEnabled: boolean;
     cardStorageEnabled: boolean;
     recurringEnabled: boolean;
@@ -170,7 +179,9 @@ export class PaymentController {
       PaymentPurpose,
       { cardStorageEnabled: boolean; recurringEnabled: boolean }
     >;
-  } {
+    /** Installment payments (ADR 0019): the kill switch and the minimum T. */
+    installments: PaymentsInstallmentsConfig;
+  }> {
     // Yetenekler ödeme AMACINA göre: sepet ödemesi pazaryeri mağazasında, üyelik
     // ödemesi (ve kullanıcısız yenileme) üyelik mağazasında. Kart saklama ile
     // non-3D recurring ayrı PayTR yetkileridir.
@@ -198,6 +209,7 @@ export class PaymentController {
       cardStorageEnabled: purposes.checkout.cardStorageEnabled,
       recurringEnabled: purposes.membership.recurringEnabled,
       purposes,
+      installments: await this.installmentOptions.publicConfig(),
     };
   }
 
@@ -318,6 +330,57 @@ export class PaymentController {
       req,
       capabilityAuthorized,
     );
+  }
+
+  /**
+   * POST /payments/installment-options - the counts a card may be paid in,
+   * priced (ADR 0019). Read-only; never signs. With `paymentId` the
+   * direct-form access rule applies (the buyer, or the guest's payment
+   * capability); with `amount` (web checkout before the order exists) the
+   * prices are display-only. Any failure answers a single payment with a
+   * reason. PCI: at most the first 8 card digits.
+   */
+  @Post("installment-options")
+  @HttpCode(HttpStatus.OK)
+  @Throttle(clientIpThrottle(INSTALLMENT_OPTIONS_IP_LIMIT_PER_MINUTE))
+  @Public()
+  @ApiOperation({
+    summary: "Installment options for a card and a payment or amount",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "InstallmentOptionsResponse: enabled, reason, card, baseAmount, minAmount, options (count 1 first)",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "Not exactly one card and one target, or a BIN that is not 6-8 digits",
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description:
+      "Not the payment's buyer and no payment capability; saved card without login",
+  })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: "More than 30/min per client IP or 20/min per payment",
+  })
+  async getInstallmentOptions(
+    @Body() dto: InstallmentOptionsDto,
+    @Req() req: Request,
+  ): Promise<InstallmentOptionsResponse> {
+    this.assertNoRawCardData(req.body);
+    const capabilityAuthorized =
+      !!dto.paymentId && this.hasPaymentCapability(req, dto.paymentId);
+    const auth = await this.optionalAuth.resolve(req);
+    if (auth.kind === "invalid" && !capabilityAuthorized) {
+      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
+    }
+    return this.installmentOptions.getOptions(dto, {
+      userId: auth.kind === "user" ? auth.userId : null,
+      capabilityAuthorized,
+    });
   }
 
   /**
