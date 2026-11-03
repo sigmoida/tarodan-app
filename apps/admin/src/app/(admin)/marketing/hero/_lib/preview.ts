@@ -15,6 +15,8 @@ const pair = (tr: string, en: string): LocalizedText | null =>
 
 export interface HeroPreviewModel {
   imageUrl: string;
+  /** Phone image; empty when the desktop image is used on phones too. */
+  mobileImageUrl: string;
   imageSide: HeroImageSide;
   title: string;
   subtitle: string;
@@ -32,6 +34,7 @@ export function heroPreviewModel(
     previewText(pair(tr ?? "", en ?? ""), lang);
   return {
     imageUrl: v.imageUrl?.trim() ?? "",
+    mobileImageUrl: v.mobileImageUrl?.trim() ?? "",
     imageSide: v.imageSide ?? "right",
     title: field(v.titleTr, v.titleEn),
     subtitle: field(v.subtitleTr, v.subtitleEn),
