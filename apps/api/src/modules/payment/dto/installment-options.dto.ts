@@ -9,6 +9,7 @@ import {
   Min,
 } from "class-validator";
 import type { InstallmentOptionsRequest } from "@tarodan/types";
+import { JsonNumber } from "../../../common/transforms";
 
 /**
  * `POST /payments/installment-options`. Exactly one of `bin` | `savedCardId`
@@ -46,6 +47,7 @@ export class InstallmentOptionsDto implements InstallmentOptionsRequest {
     example: 1000,
   })
   @IsOptional()
+  @JsonNumber()
   @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 })
   @Min(0.01)
   @Max(1_000_000)

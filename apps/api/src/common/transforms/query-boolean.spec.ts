@@ -21,6 +21,7 @@ import {
   DeletedUserIdentityQueryDto,
 } from "../../modules/admin/dto/deleted-user-identity.dto";
 import { PspStatementLinesQueryDto } from "../../modules/admin/finance/dto/psp-reconciliation.dto";
+import { InstallmentPreviewQueryDto } from "../../modules/admin/finance/dto/installments.dto";
 import { ProductQueryDto } from "../../modules/product/dto/product-query.dto";
 import { DiscountQueryDto } from "../../modules/discount/dto/discount-query.dto";
 import { AdminBrandManufacturerQueryDto } from "../../modules/admin/dto/catalog-query.dto";
@@ -103,6 +104,10 @@ const DTOS: Record<
     base: { year: "2026", month: "9" },
   },
   PspStatementLinesQueryDto: { metatype: PspStatementLinesQueryDto },
+  InstallmentPreviewQueryDto: {
+    metatype: InstallmentPreviewQueryDto,
+    base: { segment: "premium", amount: "1000", family: "world" },
+  },
   ProductQueryDto: { metatype: ProductQueryDto },
   DiscountQueryDto: { metatype: DiscountQueryDto },
   AdminBrandManufacturerQueryDto: { metatype: AdminBrandManufacturerQueryDto },

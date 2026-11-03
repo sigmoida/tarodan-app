@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform, Type } from "class-transformer";
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsIn,
@@ -22,12 +22,21 @@ import {
   type InstallmentRuleInput,
   type InstallmentSegment,
 } from "@tarodan/types";
+import {
+  JsonBoolean,
+  JsonNumber,
+  QueryBoolean,
+} from "../../../../common/transforms";
 
 /**
  * Admin Finance > Installments (ADR 0019). The DTOs fix the shape; the
  * business rules (count range, share, validity) are `validateInstallmentRule`
  * and `validateInstallmentMinAmount` from `@tarodan/types`, which the admin
  * form also runs. The services re-check them (authoritative).
+ *
+ * JSON booleans and numbers are read raw (`JsonBoolean`, `JsonNumber`): the
+ * global pipe's implicit conversion would turn `"false"` into `true` (the
+ * kill switch ON) and `""` into 0 (a 0 TL minimum).
  */
 
 const BUYER_SEGMENTS = INSTALLMENT_SEGMENTS.filter(
@@ -38,6 +47,7 @@ const BUYER_SEGMENTS = INSTALLMENT_SEGMENTS.filter(
 export class UpdateInstallmentSettingsDto implements AdminInstallmentSettingsPatch {
   @ApiPropertyOptional({ description: "installments_enabled: the kill switch" })
   @IsOptional()
+  @JsonBoolean()
   @IsBoolean()
   enabled?: boolean;
 
@@ -47,6 +57,7 @@ export class UpdateInstallmentSettingsDto implements AdminInstallmentSettingsPat
     example: 500,
   })
   @IsOptional()
+  @JsonNumber()
   @IsNumber({ allowNaN: false, allowInfinity: false })
   minAmount?: number;
 }
@@ -63,24 +74,29 @@ export class InstallmentRuleDto implements InstallmentRuleInput {
   segment: InstallmentSegment;
 
   @ApiProperty({ example: 2, description: "Inclusive, 2..12" })
+  @JsonNumber()
   @IsInt()
   minCount: number;
 
   @ApiProperty({ example: 3, description: "Inclusive, 2..12" })
+  @JsonNumber()
   @IsInt()
   maxCount: number;
 
   @ApiProperty({
     description: "false: the counts are not offered to the segment",
   })
+  @JsonBoolean()
   @IsBoolean()
   allowed: boolean;
 
   @ApiProperty({ example: 100, description: "0..100; 0 when not allowed" })
+  @JsonNumber()
   @IsNumber({ allowNaN: false, allowInfinity: false })
   platformSharePct: number;
 
   @ApiProperty({ example: 0, description: "Higher wins" })
+  @JsonNumber()
   @IsInt()
   priority: number;
 
@@ -100,13 +116,6 @@ export class InstallmentRuleDto implements InstallmentRuleInput {
   @IsISO8601({ strict: true })
   validUntil?: string | null;
 }
-
-const toBoolean = ({ value }: { value: unknown }) =>
-  value === "true" || value === true
-    ? true
-    : value === "false" || value === false
-      ? false
-      : value;
 
 /**
  * `GET /admin/installments/preview`. With `draftMinCount` the draft rule is
@@ -148,7 +157,7 @@ export class InstallmentPreviewQueryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @Transform(toBoolean)
+  @QueryBoolean()
   @IsBoolean()
   draftAllowed?: boolean;
 
