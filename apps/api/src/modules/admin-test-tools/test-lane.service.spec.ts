@@ -216,7 +216,11 @@ describe("TestLaneService", () => {
       // Only test-lane payments, and only the attempts of test-lane payments.
       expect(tx.payment.updateMany).toHaveBeenCalledWith({
         where: { isTest: true, chargeAttemptId: { not: null } },
-        data: { chargeAttemptId: null },
+        data: {
+          chargeAttemptId: null,
+          chargedAmount: null,
+          installmentFeeAmount: 0,
+        },
       });
       expect(tx.paymentChargeAttempt.deleteMany).toHaveBeenCalledWith({
         where: { payment: { isTest: true } },

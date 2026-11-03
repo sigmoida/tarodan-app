@@ -167,10 +167,10 @@ export class TestLaneService {
   }
 
   /**
-   * Test şeridinin işlem geçmişini temizler. Sıra FK zincirini izler:
-   * kargo mahsubu → iade → hold/payout → kargo → fatura/komisyon →
-   * çekim denemesi → ödeme → sipariş → paket → sepet grubu → takas → teklif → sepet.
-   * Hesaplar ve ilanlar kalır.
+   * Clears the test lane's transaction history. The order follows the FK
+   * chain: shipping settlement -> refund -> hold/payout -> shipment ->
+   * invoice/commission -> charge attempt -> payment -> order -> package ->
+   * checkout group -> trade -> offer -> cart. Accounts and listings stay.
    */
   async resetLane(): Promise<TestLaneResetResult> {
     const accounts = await this.prisma.user.findMany({
@@ -298,10 +298,16 @@ export class TestLaneService {
         // Charge attempts reference the payment and the payment points back to
         // its captured attempt (both Restrict). The DB guards let the purge
         // gate above clear that pointer and delete the attempts of test-lane
-        // payments only (20261103120000_installment_payments_schema).
+        // payments only (20261103120000_installment_payments_schema). The
+        // charged amount and fee go with the pointer: a fee without an
+        // attempt breaks `payments_charged_amount_check`.
         await tx.payment.updateMany({
           where: { ...testPayment, chargeAttemptId: { not: null } },
-          data: { chargeAttemptId: null },
+          data: {
+            chargeAttemptId: null,
+            chargedAmount: null,
+            installmentFeeAmount: 0,
+          },
         });
         count(
           "paymentChargeAttempts",

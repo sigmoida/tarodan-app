@@ -1,0 +1,16 @@
+-- Installment payments: the unique index behind `Payment.chargeAttemptId
+-- @unique` (one payment per captured charge attempt).
+--
+-- Its own migration on purpose: building it inside
+-- 20261103120000_installment_payments_schema would scan `payments` while that
+-- transaction holds ACCESS EXCLUSIVE locks on payments, orders and
+-- refund_attempts (no reads or writes). Here the build takes a SHARE lock on
+-- `payments` only: reads continue, writes to payments wait for the build. The
+-- column is NULL on every row, so the build is one sequential scan. (Prisma
+-- runs a migration in a transaction, so CREATE INDEX CONCURRENTLY is not used;
+-- same plain-index precedent as 20261006100000.)
+--
+-- Safe on live data: no row changes; NULLs never collide in a unique index.
+-- Rollback: DROP INDEX "payments_charge_attempt_id_key"; (only together with
+-- the rest of the installment schema, see 20261103120000).
+CREATE UNIQUE INDEX "payments_charge_attempt_id_key" ON "payments"("charge_attempt_id");

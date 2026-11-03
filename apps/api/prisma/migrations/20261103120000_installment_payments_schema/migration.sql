@@ -21,14 +21,13 @@
 -- * Existing tables are altered in the application's lock order (payments,
 --   then orders, then refund_attempts; `payment/helpers/payment-order-lock.ts`)
 --   so the migration cannot deadlock with a running payment transaction. The
---   locks are held only for this short transaction; the only scan is the
---   unique index build on `payments.charge_attempt_id` (all NULL), the same
---   plain-index precedent as 20261006100000.
+--   locks are held only for this short, scan-free transaction. The unique
+--   index on `payments.charge_attempt_id` is built by its own migration
+--   (20261103120200), under a SHARE lock on `payments` only.
 -- * New enum values are not used in this transaction (PostgreSQL 12+ rule).
 -- * New tables are empty. Old code never writes the new columns: their
---   defaults satisfy every CHECK and trigger, and the payments trigger only
---   fires when `charge_attempt_id`, `charged_amount` or
---   `installment_fee_amount` is written.
+--   defaults satisfy every CHECK and trigger, and the payments trigger does
+--   nothing while `charge_attempt_id` stays NULL.
 --
 -- Rollback: the flag stays off and every new table and column is inert. Once
 -- any installment payment exists, roll FORWARD only (refund, payout and
@@ -58,11 +57,13 @@ ALTER TABLE "payments"
   ADD COLUMN "charged_amount" DECIMAL(10,2),
   ADD COLUMN "charge_attempt_id" TEXT;
 
--- C = T + F whenever the charged amount is known; NULL = legacy (read as
--- `amount`).
+-- NULL charged amount = legacy (read as `amount`), which carries no fee.
+-- Otherwise C = T + F, and a fee only comes from a priced charge attempt.
 ALTER TABLE "payments"
   ADD CONSTRAINT "payments_charged_amount_check"
-  CHECK ("charged_amount" IS NULL OR "charged_amount" = "amount" + "installment_fee_amount") NOT VALID;
+  CHECK (("charged_amount" IS NULL AND "installment_fee_amount" = 0)
+         OR ("charged_amount" = "amount" + "installment_fee_amount"
+             AND ("installment_fee_amount" = 0 OR "charge_attempt_id" IS NOT NULL))) NOT VALID;
 ALTER TABLE "payments"
   ADD CONSTRAINT "payments_installment_fee_amount_check"
   CHECK ("installment_fee_amount" >= 0) NOT VALID;
@@ -215,7 +216,8 @@ CREATE INDEX "payment_charge_attempts_payment_id_created_at_idx" ON "payment_cha
 CREATE INDEX "payment_charge_attempts_installment_rule_id_idx" ON "payment_charge_attempts"("installment_rule_id");
 CREATE INDEX "payment_charge_attempts_rate_snapshot_id_idx" ON "payment_charge_attempts"("rate_snapshot_id");
 
-CREATE UNIQUE INDEX "payments_charge_attempt_id_key" ON "payments"("charge_attempt_id");
+-- `payments_charge_attempt_id_key` (unique) is built by
+-- 20261103120200_installment_payments_charge_attempt_index.
 
 -- ---------------------------------------------------------------------------
 -- Foreign keys (financial evidence: RESTRICT). The one on `payments` is NOT
@@ -283,8 +285,10 @@ CREATE TRIGGER installment_rate_snapshots_append_only
   BEFORE UPDATE ON "installment_rate_snapshots"
   FOR EACH ROW EXECUTE FUNCTION installment_rate_snapshots_append_only();
 
--- payment_charge_attempts: the pricing snapshot is frozen at signing; the
--- only write is `captured_at`, once. Columns added later are not frozen by
+-- payment_charge_attempts: an attempt belongs to its payment's PayTR store and
+-- is priced from that store's rate table (checked at INSERT; later PayTR calls
+-- use `payments.paytr_merchant`). The pricing snapshot is frozen at signing;
+-- the only write is `captured_at`, once. Columns added later are not frozen by
 -- this list on purpose (e.g. a statement-matching flag). DELETE only through
 -- the test-lane purge gate (same gate as 20260922150000_test_lane_purge_gate:
 -- the session says `app.test_lane_purge = 'on'` AND the payment is a
@@ -293,7 +297,26 @@ CREATE OR REPLACE FUNCTION payment_charge_attempts_guard() RETURNS trigger AS $$
 DECLARE
   purging boolean;
   test_row boolean;
+  payment_merchant "PaytrMerchant";
+  snapshot_merchant "PaytrMerchant";
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT p."paytr_merchant" INTO payment_merchant
+    FROM "payments" p WHERE p.id = NEW."payment_id";
+    IF payment_merchant IS DISTINCT FROM NEW."paytr_merchant" THEN
+      RAISE EXCEPTION 'payment_charge_attempts: attempt store % differs from the store of payment %', NEW."paytr_merchant", NEW."payment_id"
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW."rate_snapshot_id" IS NOT NULL THEN
+      SELECT r."paytr_merchant" INTO snapshot_merchant
+      FROM "installment_rate_snapshots" r WHERE r.id = NEW."rate_snapshot_id";
+      IF snapshot_merchant IS DISTINCT FROM NEW."paytr_merchant" THEN
+        RAISE EXCEPTION 'payment_charge_attempts: rate snapshot % belongs to another store', NEW."rate_snapshot_id"
+          USING ERRCODE = 'check_violation';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'DELETE' THEN
     purging := COALESCE(current_setting('app.test_lane_purge', true), 'off') = 'on';
     IF purging THEN
@@ -342,22 +365,27 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER payment_charge_attempts_guard
-  BEFORE UPDATE OR DELETE ON "payment_charge_attempts"
+  BEFORE INSERT OR UPDATE OR DELETE ON "payment_charge_attempts"
   FOR EACH ROW EXECUTE FUNCTION payment_charge_attempts_guard();
 
--- payments: the captured attempt must be one of THIS payment's attempts and
--- carry the same charged amount and fee (with the CHECK above this also pins
--- the attempt's T to `amount`). Once set it is final; only the test-lane
--- purge (gate as above, test payment) may clear it before deleting the
--- attempts. Fires only when one of the three columns is written, so the old
--- image and today's payment writes never reach it.
+-- payments: the captured attempt must be one of THIS payment's attempts, of
+-- the same PayTR store, and carry the same charged amount, fee and
+-- installment count (with the CHECK above this also pins the attempt's T to
+-- `amount`). Once set it is final; only the test-lane purge (gate as above,
+-- test payment) may clear it before deleting the attempts. Checked on INSERT
+-- too, so a new row cannot claim another payment's attempt. While
+-- `charge_attempt_id` stays NULL (the old image, today's writes) it does
+-- nothing.
 CREATE OR REPLACE FUNCTION payments_charge_attempt_guard() RETURNS trigger AS $$
 DECLARE
   attempt_payment_id text;
+  attempt_merchant "PaytrMerchant";
+  attempt_count integer;
   attempt_charged numeric;
   attempt_fee numeric;
 BEGIN
-  IF OLD."charge_attempt_id" IS NOT NULL
+  IF TG_OP = 'UPDATE'
+     AND OLD."charge_attempt_id" IS NOT NULL
      AND NEW."charge_attempt_id" IS DISTINCT FROM OLD."charge_attempt_id" THEN
     IF NEW."charge_attempt_id" IS NULL
        AND OLD."is_test"
@@ -368,10 +396,14 @@ BEGIN
       USING ERRCODE = 'restrict_violation';
   END IF;
   IF NEW."charge_attempt_id" IS NOT NULL THEN
-    SELECT a."payment_id", a."charged_amount", a."installment_fee_amount"
-      INTO attempt_payment_id, attempt_charged, attempt_fee
+    SELECT a."payment_id", a."paytr_merchant", a."installment_count",
+           a."charged_amount", a."installment_fee_amount"
+      INTO attempt_payment_id, attempt_merchant, attempt_count,
+           attempt_charged, attempt_fee
     FROM "payment_charge_attempts" a WHERE a.id = NEW."charge_attempt_id";
     IF attempt_payment_id IS DISTINCT FROM NEW."id"
+       OR attempt_merchant IS DISTINCT FROM NEW."paytr_merchant"
+       OR attempt_count IS DISTINCT FROM NEW."installment_count"
        OR NEW."charged_amount" IS DISTINCT FROM attempt_charged
        OR NEW."installment_fee_amount" IS DISTINCT FROM attempt_fee THEN
       RAISE EXCEPTION 'payments: payment % does not match charge attempt %', NEW."id", NEW."charge_attempt_id"
@@ -383,5 +415,5 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER payments_charge_attempt_guard
-  BEFORE UPDATE OF "charge_attempt_id", "charged_amount", "installment_fee_amount" ON "payments"
+  BEFORE INSERT OR UPDATE OF "charge_attempt_id", "charged_amount", "installment_fee_amount", "installment_count", "paytr_merchant" ON "payments"
   FOR EACH ROW EXECUTE FUNCTION payments_charge_attempt_guard();

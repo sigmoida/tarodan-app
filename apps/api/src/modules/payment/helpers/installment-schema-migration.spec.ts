@@ -12,6 +12,7 @@ import { apiAppRoot } from "../../../common/helpers/app-root";
 const MIGRATIONS_DIR = join(apiAppRoot(), "prisma/migrations");
 const SCHEMA = "20261103120000_installment_payments_schema";
 const VALIDATE = "20261103120100_installment_payments_validate_constraints";
+const INDEX = "20261103120200_installment_payments_charge_attempt_index";
 /** The latest migration on `development` when these were written. */
 const BASE = "20261023170000_refund_attempt_failure_count";
 
@@ -22,11 +23,12 @@ const read = (dir: string) =>
   );
 const schemaSql = read(SCHEMA);
 const validateSql = read(VALIDATE);
+const indexSql = read(INDEX);
 
 /** The ALTER TABLE statements on tables that existed before. */
 const EXISTING_TABLES = ["payments", "orders", "refund_attempts"] as const;
 
-describe(`migrations ${SCHEMA} + ${VALIDATE}`, () => {
+describe(`migrations ${SCHEMA}, ${VALIDATE}, ${INDEX}`, () => {
   it("sort after the latest migration they were written on, schema before validation", () => {
     const dirs = readdirSync(MIGRATIONS_DIR)
       .filter((d) => /^\d{14}_/.test(d))
@@ -34,10 +36,11 @@ describe(`migrations ${SCHEMA} + ${VALIDATE}`, () => {
     expect(dirs.indexOf(SCHEMA)).toBeGreaterThan(dirs.indexOf(BASE));
     expect(dirs.indexOf(BASE)).toBeGreaterThan(-1);
     expect(dirs.indexOf(VALIDATE)).toBe(dirs.indexOf(SCHEMA) + 1);
+    expect(dirs.indexOf(INDEX)).toBe(dirs.indexOf(SCHEMA) + 2);
   });
 
   it("are additive: no drop, rename, row write or NOT NULL without a default on an existing table", () => {
-    for (const sql of [schemaSql, validateSql]) {
+    for (const sql of [schemaSql, validateSql, indexSql]) {
       expect(sql).not.toMatch(/\bDROP\b/i);
       expect(sql).not.toMatch(/\bRENAME\b/i);
       expect(sql).not.toMatch(/\bUPDATE\s+"?\w+"?\s+SET\b/i);
@@ -91,9 +94,9 @@ describe(`migrations ${SCHEMA} + ${VALIDATE}`, () => {
     expect(statements).toHaveLength(onExisting.length);
   });
 
-  it("keeps the charged-amount rule: NULL (legacy) or exactly amount + fee", () => {
-    expect(schemaSql).toMatch(
-      /CHECK \("charged_amount" IS NULL OR "charged_amount" = "amount" \+ "installment_fee_amount"\) NOT VALID/,
+  it("keeps the charged-amount rule: NULL (legacy, no fee) or exactly amount + fee, a fee only through an attempt", () => {
+    expect(schemaSql.replace(/\s+/g, " ")).toContain(
+      'CHECK (("charged_amount" IS NULL AND "installment_fee_amount" = 0) OR ("charged_amount" = "amount" + "installment_fee_amount" AND ("installment_fee_amount" = 0 OR "charge_attempt_id" IS NOT NULL))) NOT VALID',
     );
     expect(schemaSql).toMatch(/ADD COLUMN "charged_amount" DECIMAL\(10,2\),/);
   });
@@ -116,12 +119,12 @@ describe(`migrations ${SCHEMA} + ${VALIDATE}`, () => {
       /CREATE TRIGGER installment_rate_snapshots_append_only\s+BEFORE UPDATE ON "installment_rate_snapshots"/,
     );
     expect(schemaSql).toMatch(
-      /CREATE TRIGGER payment_charge_attempts_guard\s+BEFORE UPDATE OR DELETE ON "payment_charge_attempts"/,
+      /CREATE TRIGGER payment_charge_attempts_guard\s+BEFORE INSERT OR UPDATE OR DELETE ON "payment_charge_attempts"/,
     );
-    // Only when the capture columns are written: today's payment writes
-    // never reach the trigger.
+    // On INSERT (a new row cannot claim another payment's attempt) and when a
+    // capture column is written; a no-op while charge_attempt_id is NULL.
     expect(schemaSql).toMatch(
-      /CREATE TRIGGER payments_charge_attempt_guard\s+BEFORE UPDATE OF "charge_attempt_id", "charged_amount", "installment_fee_amount" ON "payments"/,
+      /CREATE TRIGGER payments_charge_attempt_guard\s+BEFORE INSERT OR UPDATE OF "charge_attempt_id", "charged_amount", "installment_fee_amount", "installment_count", "paytr_merchant" ON "payments"/,
     );
     expect(schemaSql).toMatch(
       /CREATE UNIQUE INDEX "installment_rules_one_live_version_per_lineage"\s+ON "installment_rules"\("lineage_id"\) WHERE "archived_at" IS NULL;/,
@@ -140,6 +143,17 @@ describe(`migrations ${SCHEMA} + ${VALIDATE}`, () => {
     expect(schemaSql).not.toMatch(
       /prevent_refund_financial_component_mutation/,
     );
+  });
+
+  it("builds the payments unique index in its own migration, outside the ACCESS EXCLUSIVE window", () => {
+    expect(schemaSql).not.toMatch(/CREATE (UNIQUE )?INDEX[^;]*ON "payments"/);
+    const statements = indexSql
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    expect(statements).toEqual([
+      'CREATE UNIQUE INDEX "payments_charge_attempt_id_key" ON "payments"("charge_attempt_id")',
+    ]);
   });
 
   it("restricts every financial reference (no cascade)", () => {

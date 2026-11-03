@@ -2061,8 +2061,9 @@ model Order {
   /// Installment fee (vade farkı) the buyer paid for THIS order on top of
   /// `totalAmount`: the payment's `installmentFeeAmount` allocated to its
   /// orders by `totalAmount`, largest remainder, at capture (ADR 0019). PSP
-  /// scale only: the order charged total is `totalAmount + this`; commission,
-  /// hold, seller net and the refund policy stay on `totalAmount`. Drives the
+  /// scale only: the order charged total is `orderChargedTotalOf`
+  /// (`payment/helpers/charged-amount.ts`, never inline); commission, hold,
+  /// seller net and the refund policy stay on `totalAmount`. Drives the
   /// ledger `installment_fee` line, the refund fee share, the transfer slice
   /// and the `buyer_installment_fee` invoice. 0 = single payment or legacy.
   installmentFeeAmount       Decimal                  @default(0) @map("installment_fee_amount") @db.Decimal(10, 2)
@@ -2282,13 +2283,15 @@ model Payment {
   /// What PayTR charged (C = T + F), written at capture from the captured
   /// attempt. NULL = legacy or not captured through an attempt: read it as
   /// `amount`, only through `payment/helpers/charged-amount.ts`
-  /// (`chargedAmountOf`). DB CHECK `payments_charged_amount_check`:
-  /// NULL or exactly `amount + installment_fee_amount`.
+  /// (`chargedAmountOf`). DB CHECK `payments_charged_amount_check`: NULL with
+  /// no fee, or exactly `amount + installment_fee_amount`, a fee only with a
+  /// captured attempt.
   chargedAmount          Decimal?               @map("charged_amount") @db.Decimal(10, 2)
   /// The charge attempt (signed merchant_oid) that captured this payment: the
   /// pricing evidence (rates, segment, rule version, share, platform cost,
-  /// card family). A DB trigger requires it to belong to this payment and to
-  /// carry the same charged amount and fee.
+  /// card family). A DB trigger requires it to belong to this payment, to be
+  /// of the same PayTR store and to carry the same charged amount, fee and
+  /// installment count; once set it is final.
   chargeAttemptId        String?                @unique @map("charge_attempt_id")
   status                 PaymentStatus          @default(pending)
   failureReason          String?                @map("failure_reason")
@@ -2328,7 +2331,8 @@ model RefundAttempt {
   amount               Decimal             @db.Decimal(10, 2)
   /// The part of `amount` that is the installment fee (vade farkı) given back
   /// pro rata to the cash refunded (ADR 0019, D7); the goods part is
-  /// `amount - installmentFeeAmount`. 0 = single payment or legacy. CHECK:
+  /// `refundGoodsPartOf` (`payment/helpers/charged-amount.ts`). 0 = single
+  /// payment or legacy. CHECK:
   /// 0 <= this <= amount.
   installmentFeeAmount Decimal             @default(0) @map("installment_fee_amount") @db.Decimal(10, 2)
   provider             String
@@ -2448,9 +2452,10 @@ model InstallmentRateSnapshot {
 /// included: what was signed and why. The callback, recovery and statement
 /// line of ANY oid (also a superseded one) are checked against their own
 /// attempt; refunds, the PSP-fee split and admin read this snapshot, never
-/// today's rules or rates. A DB trigger keeps the pricing columns immutable
-/// (only `capturedAt` is set, once) and allows DELETE only for the test-lane
-/// purge. CHECKs: C = T + F, counts 1..12, rates and shares 0..100, single
+/// today's rules or rates. DB triggers check at INSERT that the attempt and
+/// its rate snapshot belong to the payment's PayTR store, keep the pricing
+/// columns immutable (only `capturedAt` is set, once) and allow DELETE only
+/// for the test-lane purge. CHECKs: C = T + F, counts 1..12, rates and shares 0..100, single
 /// payments carry no fee and no platform cost, installments need a snapshot.
 model PaymentChargeAttempt {
   id                   String                   @id @default(uuid())

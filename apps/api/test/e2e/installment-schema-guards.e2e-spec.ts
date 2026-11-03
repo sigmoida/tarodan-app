@@ -121,9 +121,48 @@ describe("installment schema DB guarantees (E2E)", () => {
       await expect(
         prisma.payment.update({
           where: { id: paymentId },
-          data: { installmentFeeAmount: d("-1.00") },
+          data: {
+            installmentFeeAmount: d("-1.00"),
+            chargedAmount: d("999.00"),
+          },
         }),
-      ).rejects.toThrow(/payments_installment_fee_amount_check/);
+      ).rejects.toThrow(
+        /payments_(charged_amount|installment_fee_amount)_check/,
+      );
+    });
+
+    it("refuses a fee without a charged amount (chargedAmountOf would read T)", async () => {
+      const { paymentId } = await createGroupPayment();
+      await expect(
+        prisma.payment.update({
+          where: { id: paymentId },
+          data: { installmentFeeAmount: d("66.38") },
+        }),
+      ).rejects.toThrow(/payments_charged_amount_check/);
+    });
+
+    it("refuses a fee that no charge attempt priced", async () => {
+      const { paymentId } = await createGroupPayment();
+      await expect(
+        prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            installmentFeeAmount: d("66.38"),
+            chargedAmount: d("1066.38"),
+          },
+        }),
+      ).rejects.toThrow(/payments_charged_amount_check/);
+    });
+
+    it("accepts a charged amount equal to the goods total without an attempt", async () => {
+      // A single payment captured without an attempt (e.g. a form signed
+      // before the installment code): C = T, no fee.
+      const { paymentId } = await createGroupPayment();
+      const payment = await prisma.payment.update({
+        where: { id: paymentId },
+        data: { chargedAmount: d("1000.00") },
+      });
+      expect(payment.chargedAmount?.toFixed(2)).toBe("1000.00");
     });
   });
 
@@ -142,6 +181,28 @@ describe("installment schema DB guarantees (E2E)", () => {
       });
       expect(installment.chargedAmount.toFixed(2)).toBe("1066.38");
       expect(single.platformCostAmount.toFixed(2)).toBe("0.00");
+    });
+
+    it("refuses an attempt for another PayTR store than its payment's", async () => {
+      const { paymentId } = await createGroupPayment();
+      await expect(
+        createChargeAttempt(paymentId, null, {
+          paytrMerchant: "membership",
+          installmentCount: 1,
+          installmentFeeAmount: d("0"),
+          chargedAmount: d("1000.00"),
+        }),
+      ).rejects.toThrow(/differs from the store of payment/);
+    });
+
+    it("refuses a rate snapshot of another PayTR store", async () => {
+      const { paymentId } = await createGroupPayment();
+      const snapshot = await createRateSnapshot({
+        paytrMerchant: "membership",
+      });
+      await expect(createChargeAttempt(paymentId, snapshot.id)).rejects.toThrow(
+        /belongs to another store/,
+      );
     });
 
     it("keeps merchant_oid unique", async () => {
@@ -339,6 +400,56 @@ describe("installment schema DB guarantees (E2E)", () => {
       expect(payment.installmentFeeAmount.toFixed(2)).toBe("66.38");
     });
 
+    it("refuses a capture whose installment count differs from the attempt", async () => {
+      const { paymentId } = await createGroupPayment();
+      const attempt = await createChargeAttempt(
+        paymentId,
+        (await createRateSnapshot()).id,
+      );
+      await expect(
+        prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            chargeAttemptId: attempt.id,
+            chargedAmount: attempt.chargedAmount,
+            installmentFeeAmount: attempt.installmentFeeAmount,
+            installmentCount: 1,
+          },
+        }),
+      ).rejects.toThrow(/does not match charge attempt/);
+    });
+
+    it("refuses a new payment row that claims another payment's attempt", async () => {
+      const owner = await createGroupPayment();
+      const attempt = await createChargeAttempt(
+        owner.paymentId,
+        (await createRateSnapshot()).id,
+      );
+      const other = await createGroupPayment();
+      // A second payment for the same cart cannot exist (unique group), so
+      // the intruder is a fresh group of the other buyer.
+      const intruderGroup = await prisma.checkoutGroup.create({
+        data: {
+          groupNumber: `TG-INTRUDER-${Math.random().toString(36).slice(2)}`,
+          buyerId: other.buyerId,
+          totalAmount: d("1000.00"),
+        },
+      });
+      await expect(
+        prisma.payment.create({
+          data: {
+            checkoutGroupId: intruderGroup.id,
+            provider: "paytr",
+            amount: d("1000.00"),
+            installmentCount: 3,
+            chargeAttemptId: attempt.id,
+            chargedAmount: attempt.chargedAmount,
+            installmentFeeAmount: attempt.installmentFeeAmount,
+          },
+        }),
+      ).rejects.toThrow(/does not match charge attempt/);
+    });
+
     it("refuses another payment's attempt", async () => {
       const a = await createGroupPayment();
       const b = await createGroupPayment();
@@ -424,7 +535,11 @@ describe("installment schema DB guarantees (E2E)", () => {
       await withPurgeGate(async (tx) => {
         await tx.payment.updateMany({
           where: { id: paymentId, chargeAttemptId: { not: null } },
-          data: { chargeAttemptId: null },
+          data: {
+            chargeAttemptId: null,
+            chargedAmount: null,
+            installmentFeeAmount: 0,
+          },
         });
         await tx.paymentChargeAttempt.deleteMany({
           where: { payment: { id: paymentId, isTest: true } },

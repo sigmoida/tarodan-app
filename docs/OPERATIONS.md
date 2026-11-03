@@ -505,8 +505,9 @@ at the next nightly run. The author still sees it on the order, flagged
 Reference: tarodan-ops ADR 0019 and plan `2026-11-03-installment-payments`
 (the full installment runbook, with the flag flip and the assumptions
 register, comes with the refund and reconciliation task). Migrations
-`20261103120000_installment_payments_schema` and
-`20261103120100_installment_payments_validate_constraints` add the tables
+`20261103120000_installment_payments_schema`,
+`20261103120100_installment_payments_validate_constraints` and
+`20261103120200_installment_payments_charge_attempt_index` add the tables
 `installment_rules`, `installment_rate_snapshots` and
 `payment_charge_attempts`; the columns `installment_fee_amount` on
 `payments`, `orders` and `refund_attempts`; `charged_amount` and
@@ -515,11 +516,13 @@ register, comes with the refund and reconciliation task). Migrations
 Nothing writes them until the installment code ships, and installments stay
 off until a super admin turns on `installments_enabled` (no row = off).
 
-- **Deploy (no manual step, no backfill).** Both migrations run at boot. The
-  first holds short ACCESS EXCLUSIVE locks on `payments`, `orders` and
-  `refund_attempts` (metadata-only columns, CHECKs and the FK added
-  `NOT VALID`, one unique index build on an all-NULL column). The second only
-  validates them, under SHARE UPDATE EXCLUSIVE (reads and writes continue).
+- **Deploy (no manual step, no backfill).** The three migrations run at
+  boot, each in its own transaction. The first holds short ACCESS EXCLUSIVE
+  locks on `payments`, `orders` and `refund_attempts` without scanning them
+  (metadata-only columns, CHECKs and the FK added `NOT VALID`). The second only
+  validates them, under SHARE UPDATE EXCLUSIVE (reads and writes continue). The
+  third builds the unique index on `payments.charge_attempt_id` (all NULL)
+  under a SHARE lock: reads continue, payment writes wait for one scan.
   Existing rows read as single payments: fee 0, `charged_amount` NULL (read as
   `amount`).
 - **Before the deploy (dry run, read-only).** On the environment about to be
@@ -563,8 +566,10 @@ off until a super admin turns on `installments_enabled` (no row = off).
   do not drop the constraint.
 - **DB guards to know about.** Rule versions and the pricing columns of a
   charge attempt cannot be updated, and neither can be deleted (edit = archive
-  plus new version); a rate snapshot cannot be updated; a payment's captured
-  attempt is final. The test-lane reset deletes attempts of test payments
+  plus new version); a rate snapshot cannot be updated; an attempt and its
+  rate snapshot must be of the payment's PayTR store; a payment's captured
+  attempt is final and must match its charged amount, fee and installment
+  count; a fee needs a charged amount and a captured attempt. The test-lane reset deletes attempts of test payments
   through the same `app.test_lane_purge` gate as the refund components.
 - **Rollback.** Keep the flag off: the tables and columns are inert. Once any
   installment payment exists, roll forward only. Before that, a rollback is a
