@@ -9,6 +9,7 @@
 import {
   SELLER_TRUST_COMPONENTS_V1,
   type SellerTrustComponentKey,
+  type SellerTrustComponentsV1,
   type SellerTrustLevel,
 } from "./seller-trust";
 
@@ -499,4 +500,244 @@ export interface SellerTrustExplanation {
   scoreX100: number | null;
   level: SellerTrustLevel;
   minimum: { transactions: number; counterparties: number; met: boolean };
+}
+
+// ── Lab API (`/admin/seller-trust-lab/*`) ──────────────────────────────────
+//
+// Read-only, admin only (permission `seller_trust_lab`). Nothing here is ever
+// stored or cached. A response never carries a counterparty key, an order or
+// trade id, a buyer name or an e-mail (hash).
+
+/** The deployment the lab runs on, for the page's environment badge. */
+export interface SellerTrustLabEnvironment {
+  /** `APP_ENV` (`staging`, `production`), else the run mode. */
+  env: string;
+  /** The live marketplace: real sellers. */
+  isProd: boolean;
+}
+
+/** A population run reads at most this many stored rows; more is a 422. */
+export const SELLER_TRUST_LAB_POPULATION_MAX_ROWS = 20_000;
+
+/** Movers listed in each direction of a population run. */
+export const SELLER_TRUST_LAB_MOVERS = 20;
+
+/** Width of one score histogram bucket, in hundredths (0.5 points). */
+export const SELLER_TRUST_LAB_HISTOGRAM_STEP_X100 = 50;
+
+/**
+ * As-of instant of a seller explain: `now`, or the stored row's
+ * `computedAt` (reproduces the last nightly run).
+ */
+export const SELLER_TRUST_LAB_AS_OF = ["now", "stored"] as const;
+export type SellerTrustLabAsOf = (typeof SELLER_TRUST_LAB_AS_OF)[number];
+
+/** `GET /admin/seller-trust-lab/params`. */
+export interface SellerTrustLabParamsResponse {
+  formulaVersion: number;
+  /** The live parameter set, the starting point of every candidate. */
+  v1: SellerTrustFormulaParams;
+  limits: Record<SellerTrustParamField, SellerTrustParamLimit>;
+  weightSumTolerance: number;
+  /** Component order (formula and display). */
+  components: readonly SellerTrustComponentKey[];
+  populationMaxRows: number;
+  environment: SellerTrustLabEnvironment;
+}
+
+/** One golden scenario (`GET /admin/seller-trust-lab/scenarios`). */
+export interface SellerTrustLabScenarioPreset {
+  /** 1 to 10, the row of the approved table. */
+  id: number;
+  /** Stable identifier for the preset's copy. */
+  key: string;
+  inputs: SellerTrustInputs;
+  /** The approved v1 outcome (decision D7). */
+  approved: { scoreX100: number | null; level: SellerTrustLevel };
+  v1: SellerTrustExplanation;
+}
+
+/** `POST /admin/seller-trust-lab/scenario` body. */
+export interface SellerTrustLabScenarioRequest {
+  inputs: SellerTrustInputs;
+  params?: SellerTrustFormulaParams;
+}
+
+/** `POST /admin/seller-trust-lab/scenario`: no real data is read. */
+export interface SellerTrustLabScenarioResult {
+  v1: SellerTrustExplanation;
+  /** With the candidate params; null when none were sent. */
+  candidate: SellerTrustExplanation | null;
+}
+
+/** Why an account gets no score (the batch leaves it out). */
+export type SellerTrustLabNotScoredReason = "deleted" | "banned" | "testLane";
+
+/** A half-open window `[since, until)`, ISO instants. */
+export interface SellerTrustLabWindow {
+  since: string;
+  until: string;
+}
+
+/** The seller's `seller_trust_scores` row. */
+export interface SellerTrustLabStoredRow {
+  scoreX100: number | null;
+  level: SellerTrustLevel;
+  formulaVersion: number;
+  computedAt: string;
+  components: SellerTrustComponentsV1;
+}
+
+/**
+ * An input the stored breakdown also holds. The rating sum is not stored,
+ * so its smoothed mean (4 decimals) stands in for it.
+ */
+export type SellerTrustLabComparedField =
+  Exclude<SellerTrustInputField, "sumOfGiverMeans"> | "smoothed";
+
+export interface SellerTrustLabInputChange {
+  field: SellerTrustLabComparedField;
+  /** Null when the stored breakdown lacks the value. */
+  stored: number | null;
+  live: number;
+}
+
+/** `POST /admin/seller-trust-lab/sellers/:userId` body. */
+export interface SellerTrustLabSellerRequest {
+  /** Default `now`. */
+  asOf?: SellerTrustLabAsOf;
+  params?: SellerTrustFormulaParams;
+}
+
+/** The live read of a scored account. */
+export interface SellerTrustLabLive {
+  inputs: SellerTrustInputs;
+  /** The batch writes a row for these inputs (a rating, order or transaction). */
+  hasActivity: boolean;
+  v1: SellerTrustExplanation;
+  /** With the candidate params; null when none were sent. Never stored. */
+  candidate: SellerTrustExplanation | null;
+  /** v1 against the stored row; null without a stored row. */
+  comparison: {
+    sameScore: boolean;
+    changedInputs: SellerTrustLabInputChange[];
+  } | null;
+}
+
+/** `POST /admin/seller-trust-lab/sellers/:userId`. */
+export interface SellerTrustLabSeller {
+  userId: string;
+  username: string;
+  asOf: {
+    requested: SellerTrustLabAsOf;
+    /** `now` when `stored` was asked but there is no stored row. */
+    used: SellerTrustLabAsOf;
+    at: string;
+  };
+  windows: Record<"rating" | "operations" | "volume", SellerTrustLabWindow>;
+  stored: SellerTrustLabStoredRow | null;
+  /** Set for an account the batch never scores; `live` is then null. */
+  notScored: SellerTrustLabNotScoredReason | null;
+  live: SellerTrustLabLive | null;
+}
+
+/** Optional narrowing of a population run, on the stored rows. */
+export interface SellerTrustLabPopulationFilters {
+  /** Stored levels to include; all when absent. */
+  levels?: SellerTrustLevel[];
+  /** Stored counted transactions at least this. */
+  minTransactions?: number;
+}
+
+/** `POST /admin/seller-trust-lab/population` body. */
+export interface SellerTrustLabPopulationRequest {
+  params: SellerTrustFormulaParams;
+  filters?: SellerTrustLabPopulationFilters;
+}
+
+export type SellerTrustLabLevelCounts = Record<SellerTrustLevel, number>;
+
+/** `[fromX100, toX100)`; the last bucket also holds 500. */
+export interface SellerTrustLabHistogramBucket {
+  fromX100: number;
+  toX100: number;
+  stored: number;
+  candidate: number;
+}
+
+/**
+ * Aggregates of a population run: counts only, no seller identifier, so it
+ * is also the body of the proposal export.
+ */
+export interface SellerTrustLabPopulationSummary {
+  /** Stored rows read (every version). */
+  rowsRead: number;
+  /** Rows of another formula version, left out of everything below. */
+  skippedOtherVersion: number;
+  /** Rows whose stored breakdown could not be turned back into inputs. */
+  skippedUnreadable: number;
+  /** Rows compared below. */
+  rowsCompared: number;
+  /** Spread of the compared rows' `computedAt`; min != max means a run was in progress. */
+  computedAt: { min: string | null; max: string | null };
+  /**
+   * v1 recomputed from the stored breakdown against the stored score: equal,
+   * off by 0.01 (the rebuilt rating sum at a rounding boundary), or
+   * otherwise different (storage and formula drifted).
+   */
+  v1Consistency: { matched: number; offByOne: number; mismatched: number };
+  levels: {
+    stored: SellerTrustLabLevelCounts;
+    candidate: SellerTrustLabLevelCounts;
+  };
+  histogram: {
+    buckets: SellerTrustLabHistogramBucket[];
+    /** Rows without a score. */
+    new: { stored: number; candidate: number };
+  };
+  /** `levelMatrix[stored][candidate]` = rows. */
+  levelMatrix: Record<SellerTrustLevel, SellerTrustLabLevelCounts>;
+  newToScored: number;
+  scoredToNew: number;
+  /** Over rows scored both stored and as the candidate. */
+  changes: {
+    bothScored: number;
+    changed: number;
+    meanAbsX100: number;
+    maxAbsX100: number;
+  };
+}
+
+/** One seller whose score moves most; ranks are dense among scored sellers. */
+export interface SellerTrustLabMover {
+  userId: string;
+  username: string;
+  storedX100: number;
+  candidateX100: number;
+  storedRank: number;
+  candidateRank: number;
+}
+
+/**
+ * The downloadable proposal: the input of a v2 ADR. It carries the params,
+ * the filters and the aggregate summary only, never a user id or username.
+ */
+export interface SellerTrustLabProposal {
+  kind: "seller-trust-candidate-proposal";
+  /** The formula version the candidate was compared with. */
+  baseVersion: number;
+  generatedAt: string;
+  environment: SellerTrustLabEnvironment;
+  params: SellerTrustFormulaParams;
+  filters: SellerTrustLabPopulationFilters;
+  summary: SellerTrustLabPopulationSummary;
+}
+
+/** `POST /admin/seller-trust-lab/population`. */
+export interface SellerTrustLabPopulation {
+  params: SellerTrustFormulaParams;
+  filters: SellerTrustLabPopulationFilters;
+  summary: SellerTrustLabPopulationSummary;
+  movers: { up: SellerTrustLabMover[]; down: SellerTrustLabMover[] };
+  proposal: SellerTrustLabProposal;
 }

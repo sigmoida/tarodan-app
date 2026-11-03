@@ -46,6 +46,9 @@ import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./users/admin-user.service";
 import { UserModule } from "../user/user.module";
 import { SellerTrustModule } from "../seller-trust";
+import { SellerTrustLabModule } from "../seller-trust/lab/seller-trust-lab.module";
+import { AdminSellerTrustLabController } from "./users/seller-trust-lab/admin-seller-trust-lab.controller";
+import { AdminSellerTrustLabService } from "./users/seller-trust-lab/admin-seller-trust-lab.service";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
 import { AdminConsentService } from "./users/admin-consent.service";
@@ -197,6 +200,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     UserModule,
     // User detail: the stored trust score and its breakdown. A leaf, no cycle.
     SellerTrustModule,
+    SellerTrustLabModule,
     ModerationModule,
     InvoicingModule,
     ShippingTariffModule,
@@ -226,6 +230,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDeletedIdentityController,
     AdminConsentController,
     AdminLegalIdentityController,
+    AdminSellerTrustLabController,
     AdminUserSignInMethodsController,
     AdminGibReportController,
     AdminProductController,
@@ -278,6 +283,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDeletedIdentityService,
     AdminConsentService,
     AdminLegalIdentityService,
+    AdminSellerTrustLabService,
     AdminUserSignInMethodsService,
     AdminGibReportService,
     AdminStaffService,

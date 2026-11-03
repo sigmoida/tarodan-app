@@ -1,5 +1,5 @@
 import { SELLER_TRUST_FORMULA_VERSION } from "@tarodan/types";
-import { SellerTrustService } from "./seller-trust.service";
+import { SellerTrustService, storedFilterWhere } from "./seller-trust.service";
 
 /**
  * Read side of `seller_trust_scores` (ADR 0014): every read is one query on
@@ -106,5 +106,89 @@ describe("SellerTrustService reads", () => {
         computedAt: true,
       },
     });
+  });
+});
+
+/**
+ * The admin lab's reads (plan 2026-11-03): always on the caller's read-only
+ * snapshot (`tx`), never on the root client, and filtered by the same level
+ * thresholds as `sellerTrustLevel`.
+ */
+describe("SellerTrustService lab reads", () => {
+  const make = () => {
+    const tx = {
+      sellerTrustScore: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    // The root client has no table at all: a read there would throw.
+    const service = new SellerTrustService({} as never);
+    return { tx, txc: tx as never, service };
+  };
+  const select = {
+    userId: true,
+    scoreX100: true,
+    formulaVersion: true,
+    components: true,
+    computedAt: true,
+  };
+
+  it("readStoredRow is one primary-key lookup on the snapshot", async () => {
+    const { tx, txc, service } = make();
+    await service.readStoredRow(txc, "u1");
+    expect(tx.sellerTrustScore.findUnique).toHaveBeenCalledWith({
+      where: { userId: "u1" },
+      select,
+    });
+  });
+
+  it("readStoredPage pages in primary-key order after the last id", async () => {
+    const { tx, txc, service } = make();
+    await service.readStoredPage(txc, {}, null, 2000);
+    await service.readStoredPage(txc, {}, "u9", 2000);
+    expect(tx.sellerTrustScore.findMany.mock.calls).toEqual([
+      [{ where: {}, orderBy: { userId: "asc" }, take: 2000, select }],
+      [
+        {
+          where: { AND: [{}, { userId: { gt: "u9" } }] },
+          orderBy: { userId: "asc" },
+          take: 2000,
+          select,
+        },
+      ],
+    ]);
+  });
+
+  it("countStored counts with the same filter as the pages", async () => {
+    const { tx, txc, service } = make();
+    await service.countStored(txc, { minTransactions: 5 });
+    expect(tx.sellerTrustScore.count).toHaveBeenCalledWith({
+      where: storedFilterWhere({ minTransactions: 5 }),
+    });
+  });
+
+  it("filters levels by the shared thresholds and transactions by the stored breakdown", () => {
+    expect(
+      storedFilterWhere({
+        levels: ["excellent", "trusted", "fair", "developing", "new", "new"],
+        minTransactions: 10,
+      }),
+    ).toEqual({
+      AND: [
+        {
+          OR: [
+            { scoreX100: { gte: 450 } },
+            { scoreX100: { gte: 400, lt: 450 } },
+            { scoreX100: { gte: 300, lt: 400 } },
+            { scoreX100: { lt: 300 } },
+            { scoreX100: null },
+          ],
+        },
+        { components: { path: ["volume", "transactions"], gte: 10 } },
+      ],
+    });
+    expect(storedFilterWhere({})).toEqual({});
   });
 });
