@@ -27,7 +27,9 @@ export interface SellerTrustTerms {
   lateRate: number;
   /** Each 0 to 1. */
   subScores: Record<SellerTrustComponentKey, number>;
-  /** `5 x` the weighted sum of the sub-scores, before rounding. */
+  /** `weight x subScore` of each component: the terms the score adds up. */
+  weighted: Record<SellerTrustComponentKey, number>;
+  /** `5 x` the sum of the weighted terms, before rounding. */
   score: number;
   /** The minimum data rule is met. */
   enoughData: boolean;
@@ -74,13 +76,21 @@ export function computeTrustTerms(
 
   const s5 = Math.min(1, inputs.tenureDays / p.tenure.fullAtDays);
 
+  const weighted = {
+    rating: p.weights.rating * s1,
+    reliability: p.weights.reliability * s2,
+    onTime: p.weights.onTime * s3,
+    volume: p.weights.volume * s4,
+    tenure: p.weights.tenure * s5,
+  };
+  // Summed left to right in component order, exactly as v1 always did.
   const score =
     5 *
-    (p.weights.rating * s1 +
-      p.weights.reliability * s2 +
-      p.weights.onTime * s3 +
-      p.weights.volume * s4 +
-      p.weights.tenure * s5);
+    (weighted.rating +
+      weighted.reliability +
+      weighted.onTime +
+      weighted.volume +
+      weighted.tenure);
 
   const enoughData =
     inputs.transactions >= p.minimum.transactions &&
@@ -97,6 +107,7 @@ export function computeTrustTerms(
       volume: s4,
       tenure: s5,
     },
+    weighted,
     score,
     enoughData,
   };
@@ -106,8 +117,10 @@ export function computeTrustTerms(
  * Seller trust formula v1 (`docs/SELLER_TRUST.md`). Pure. The nightly batch
  * calls it with the inputs only, so it always computes v1. The admin lab
  * passes a validated candidate (`validateSellerTrustParams`); the breakdown
- * shape stays `SellerTrustComponentsV1` and the lab, not this result, labels
- * a candidate.
+ * shape stays `SellerTrustComponentsV1`, so `components.version` is 1 even
+ * for a candidate. A candidate result is never stored or cached; the lab
+ * labels it, and shows candidates through `explainSellerTrust`, which
+ * carries no version.
  */
 export function computeSellerTrust(
   inputs: SellerTrustInputs,

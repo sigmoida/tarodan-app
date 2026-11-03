@@ -30,7 +30,7 @@ export function explainSellerTrust(
       smoothed: t.smoothed,
       subScore: s.rating,
       weight: w.rating,
-      contribution: 5 * w.rating * s.rating,
+      contribution: 5 * t.weighted.rating,
     },
     reliability: {
       eligibleOrders: inputs.eligibleOrders,
@@ -41,7 +41,7 @@ export function explainSellerTrust(
       failureRate: t.failureRate,
       subScore: s.reliability,
       weight: w.reliability,
-      contribution: 5 * w.reliability * s.reliability,
+      contribution: 5 * t.weighted.reliability,
     },
     onTime: {
       shipped: inputs.shipped,
@@ -52,7 +52,7 @@ export function explainSellerTrust(
       lateRate: t.lateRate,
       subScore: s.onTime,
       weight: w.onTime,
-      contribution: 5 * w.onTime * s.onTime,
+      contribution: 5 * t.weighted.onTime,
     },
     volume: {
       transactions: inputs.transactions,
@@ -60,14 +60,14 @@ export function explainSellerTrust(
       saturation: params.volume.saturation,
       subScore: s.volume,
       weight: w.volume,
-      contribution: 5 * w.volume * s.volume,
+      contribution: 5 * t.weighted.volume,
     },
     tenure: {
       days: inputs.tenureDays,
       fullAtDays: params.tenure.fullAtDays,
       subScore: s.tenure,
       weight: w.tenure,
-      contribution: 5 * w.tenure * s.tenure,
+      contribution: 5 * t.weighted.tenure,
     },
     score: t.score,
     roundedX100,
