@@ -81,7 +81,7 @@ function ImageFrame({
         </div>
       )}
       {loss > CROP_WARN_PERCENT ? (
-        <Alert variant="warning" className="p-2 text-xs">
+        <Alert variant="warning" className="p-2">
           {t("admin.marketing.hero.preview.cropWarning", {
             percent: Math.round(loss),
           })}
@@ -93,9 +93,10 @@ function ImageFrame({
 }
 
 /**
- * Formdan beslenen sadeleştirilmiş hero maketi: başlık, alt başlık, iki düğme
- * ve görselin telefon ile masaüstü/tablet çerçevesindeki gerçek kırpılışı.
- * Yalnız yerleşimi gösterir; gerçek hero'nun yerine geçmez.
+ * Simplified hero mock fed by the form. The top row is the desktop and tablet
+ * layout (text beside the 4:3 image, on the chosen side); below it the 16:10
+ * phone frame. Both frames crop like the real hero, so the admin sees what
+ * each screen shows. A layout sketch only, not the real hero.
  */
 export function HeroPreview({ lang }: { lang: LocaleLang }) {
   const t = useTranslations();
@@ -110,27 +111,41 @@ export function HeroPreview({ lang }: { lang: LocaleLang }) {
         {t("admin.marketing.hero.preview.title")}
       </p>
       <div className="space-y-4 rounded-lg bg-surface p-4">
-        <div className="min-w-0 space-y-2">
-          <p className="break-words text-lg font-semibold text-heading">
-            {m.title || t("admin.marketing.hero.preview.titlePlaceholder")}
-          </p>
-          {m.subtitle ? (
-            <p className="break-words text-sm text-muted">{m.subtitle}</p>
-          ) : null}
-          <div className="flex flex-wrap gap-2 pt-1">
-            {primary ? (
-              <Button type="button" size="sm" tabIndex={-1}>
-                {primary}
-              </Button>
+        <div
+          className={cn(
+            "grid grid-cols-2 items-center gap-4",
+            m.imageSide === "left" && "[&>*:first-child]:order-2",
+          )}
+        >
+          <div className="min-w-0 space-y-2">
+            <p className="break-words text-lg font-semibold text-heading">
+              {m.title || t("admin.marketing.hero.preview.titlePlaceholder")}
+            </p>
+            {m.subtitle ? (
+              <p className="break-words text-sm text-muted">{m.subtitle}</p>
             ) : null}
-            {secondary ? (
-              <Button type="button" size="sm" variant="outline" tabIndex={-1}>
-                {secondary}
-              </Button>
-            ) : null}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {primary ? (
+                <Button type="button" size="sm" tabIndex={-1}>
+                  {primary}
+                </Button>
+              ) : null}
+              {secondary ? (
+                <Button type="button" size="sm" variant="outline" tabIndex={-1}>
+                  {secondary}
+                </Button>
+              ) : null}
+            </div>
           </div>
+          <ImageFrame
+            label={t("admin.marketing.hero.preview.desktop")}
+            imageUrl={m.imageUrl}
+            imageAlt={m.imageAlt}
+            box={mediaRatios.heroSplit}
+            aspectClass="aspect-hero-split"
+          />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="w-1/2">
           <ImageFrame
             label={t("admin.marketing.hero.preview.phone")}
             imageUrl={phoneUrl}
@@ -146,13 +161,6 @@ export function HeroPreview({ lang }: { lang: LocaleLang }) {
                     height: MOBILE_IMAGE_SPEC.height,
                   })
             }
-          />
-          <ImageFrame
-            label={t("admin.marketing.hero.preview.desktop")}
-            imageUrl={m.imageUrl}
-            imageAlt={m.imageAlt}
-            box={mediaRatios.heroSplit}
-            aspectClass="aspect-hero-split"
           />
         </div>
       </div>

@@ -59,7 +59,7 @@ describe("cropLossFor", () => {
     expect(cropLossFor(0, 0, { width: 4, height: 3 })).toBe(0);
   });
 
-  it("keeps a 16:10 image under the warning threshold in the 4:3 box", () => {
+  it("puts a 16:10 image over the warning threshold in the 4:3 box", () => {
     expect(cropLossFor(1600, 1000, { width: 4, height: 3 })).toBeGreaterThan(
       CROP_WARN_PERCENT,
     );
