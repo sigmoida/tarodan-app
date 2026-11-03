@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { PaytrMerchant, Prisma, SavedCardStatus } from "@prisma/client";
 import * as Sentry from "@sentry/node";
+import { INSTALLMENT_SETTINGS } from "@tarodan/types";
 import type {
   InstallmentOption,
   InstallmentOptionsCard,
@@ -17,6 +18,7 @@ import type {
   PaymentsInstallmentsConfig,
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { CacheService } from "../../cache/cache.service";
 import { i18nMessage } from "../../i18n";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
@@ -190,8 +192,21 @@ export class InstallmentOptionsService {
 
   /** `GET /payments/config` -> `installments`. */
   async publicConfig(): Promise<PaymentsInstallmentsConfig> {
-    const { enabled, minAmount } = await this.settings.read();
-    return { enabled, minAmount: money(minAmount) };
+    try {
+      const { enabled, minAmount } = await this.settings.read();
+      return { enabled, minAmount: money(minAmount) };
+    } catch (error: unknown) {
+      // The config endpoint also carries the bypass and card-storage flags
+      // the pay screen needs: a settings read error must not fail it.
+      // Installments show as off; direct-form re-reads the settings anyway.
+      this.logger.warn(
+        `Installment settings unreadable for /payments/config: ${errorMessage(error)}`,
+      );
+      return {
+        enabled: false,
+        minAmount: INSTALLMENT_SETTINGS.minAmount.default,
+      };
+    }
   }
 
   async getOptions(
@@ -360,14 +375,13 @@ export class InstallmentOptionsService {
 
   /**
    * The payment, with the same access rule as `direct-form`: its buyer, or a
-   * valid payment capability for it (guests). 20 calls per payment per
+   * valid payment capability for it (guests). Then 20 calls per payment per
    * minute on top of the per-IP throttle.
    */
   private async paymentTarget(
     paymentId: string,
     caller: InstallmentOptionsCaller,
   ): Promise<PricingTarget> {
-    await this.consumePaymentBudget(paymentId);
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       select: PAYMENT_SELECT,
@@ -388,6 +402,9 @@ export class InstallmentOptionsService {
         i18nMessage("server.payment.viewPaymentForbidden"),
       );
     }
+    // Charged only after the access check: a stranger who knows the id
+    // cannot spend the buyer's budget.
+    await this.consumePaymentBudget(paymentId);
     const guest = payment.checkoutGroup
       ? payment.checkoutGroup.isGuest
       : isGuestAddress(payment.order?.shippingAddress ?? null);

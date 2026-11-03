@@ -266,6 +266,17 @@ describe("InstallmentOptionsService.getOptions", () => {
       );
     });
 
+    it("charges the per-payment budget only after the access check", async () => {
+      const { service, cache } = setup({ payment: orderPayment() });
+      await expect(
+        service.getOptions(
+          { bin: "45467112", paymentId: "pay-1" },
+          { userId: "someone-else", capabilityAuthorized: false },
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(cache.checkRateLimit).not.toHaveBeenCalled();
+    });
+
     it("keeps answering when the per-payment counter is down (the IP throttle still applies)", async () => {
       const { service, cache } = setup({ payment: orderPayment() });
       cache.checkRateLimit.mockRejectedValueOnce(new Error("redis down"));
@@ -754,5 +765,29 @@ describe("InstallmentOptionsService.lookupCard (BIN cache)", () => {
       .map(String)
       .join("\n");
     expect(logged).not.toContain("454671");
+  });
+});
+
+describe("InstallmentOptionsService.publicConfig", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("serves the two settings", async () => {
+    const { service } = setup({ enabled: true, minAmount: "750.50" });
+    expect(await service.publicConfig()).toEqual({
+      enabled: true,
+      minAmount: 750.5,
+    });
+  });
+
+  it("answers installments off instead of failing /payments/config when the read fails", async () => {
+    jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+    const { service } = setup();
+    (
+      service as unknown as { settings: { read: jest.Mock } }
+    ).settings.read.mockRejectedValueOnce(new Error("pool timeout"));
+    expect(await service.publicConfig()).toEqual({
+      enabled: false,
+      minAmount: 500,
+    });
   });
 });
