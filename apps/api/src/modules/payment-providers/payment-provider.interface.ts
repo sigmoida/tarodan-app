@@ -63,7 +63,11 @@ export interface IPaymentProvider {
    */
   getInstallmentRates(
     requestId: string,
-    options?: { singleRatio?: boolean; abroadRatio?: boolean },
+    options?: {
+      singleRatio?: boolean;
+      abroadRatio?: boolean;
+      timeoutMs?: number;
+    },
   ): Promise<PaytrInstallmentRatesResult>;
 
   verifyCallback(callback: PayTRCallbackData): boolean;

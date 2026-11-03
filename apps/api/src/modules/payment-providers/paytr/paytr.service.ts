@@ -768,7 +768,12 @@ export class PayTRService implements IPaymentProvider {
    */
   async getInstallmentRates(
     requestId: string,
-    options?: { singleRatio?: boolean; abroadRatio?: boolean },
+    options?: {
+      singleRatio?: boolean;
+      abroadRatio?: boolean;
+      /** Abort after this many ms; default: the global PayTR HTTP timeout. */
+      timeoutMs?: number;
+    },
   ): Promise<PaytrInstallmentRatesResult> {
     if (!this.isConfigured) {
       return { ok: false, errMsg: "PayTR not configured" };
@@ -793,7 +798,7 @@ export class PayTRService implements IPaymentProvider {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: form.toString(),
-          signal: AbortSignal.timeout(this.httpTimeoutMs),
+          signal: AbortSignal.timeout(options?.timeoutMs ?? this.httpTimeoutMs),
         },
       );
       const data = this.parsePaytrJson<Record<string, unknown>>(

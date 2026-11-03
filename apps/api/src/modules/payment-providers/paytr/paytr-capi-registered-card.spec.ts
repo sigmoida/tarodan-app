@@ -388,6 +388,14 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       expect(r.raw.single_ratio).toBe("1");
     });
 
+    it("aborts after the caller's timeout when one is given", async () => {
+      const timeout = jest.spyOn(AbortSignal, "timeout");
+      answer({ status: "success", request_id: "req9", oranlar: {} });
+      await service.getInstallmentRates("req9", { timeoutMs: 3000 });
+      expect(timeout).toHaveBeenLastCalledWith(3000);
+      timeout.mockRestore();
+    });
+
     it("never throws on unknown keys inside oranlar", async () => {
       answer({
         status: "success",
