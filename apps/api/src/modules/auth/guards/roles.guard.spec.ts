@@ -706,7 +706,9 @@ describe("RolesGuard — URL map entries stay any-of", () => {
 describe("RolesGuard — seller trust lab permission", () => {
   @Roles("super_admin", "admin")
   class Lab {
-    params() {}
+    params() {
+      return null;
+    }
   }
 
   const guard = (perms: Record<string, string[]> | null) =>
