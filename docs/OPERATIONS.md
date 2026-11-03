@@ -576,6 +576,44 @@ off until a super admin turns on `installments_enabled` (no row = off).
   new migration that drops the triggers, the tables, the columns and the
   `InstallmentSegment` type (enum values stay, unused).
 
+### Installment payments: options, rates and settings
+
+Reference: tarodan-ops ADR 0019, plan `2026-11-03-installment-payments` (task
+A3). Ships inert: `installments_enabled` has no row (off) and the options
+endpoint answers `reason: "disabled"` until a super admin turns it on, which
+happens only after the release checklist of the plan (assumptions register
+cleared, mobile with the selector live).
+
+- **Settings.** `installments_enabled` (kill switch) and
+  `installment_min_amount` (default 500 TL) are written only through
+  `PATCH /admin/installments/settings` (super_admin, audited); the generic
+  settings endpoint refuses them. Turning the switch off is the rollback: it
+  acts on the next options or signing call (no cache).
+- **Rates cron `paytr-installment-rates`** (03:30 Europe/Istanbul) stores a
+  snapshot of the marketplace store's PayTR rate table in
+  `installment_rate_snapshots`; pricing refuses a snapshot older than 36 h and
+  then tries one on-demand fetch. `INSTALLMENT_RATES_STALE` (no snapshot
+  younger than 24 h) is an error log while installments are on, a warning
+  while they are off. Check the latest snapshot (read-only):
+
+  ```sql
+  SELECT id, fetched_at, max_installment_non_business, single_rate_pct,
+         jsonb_object_keys(rates) AS family
+  FROM installment_rate_snapshots
+  WHERE paytr_merchant = 'marketplace'
+  ORDER BY fetched_at DESC LIMIT 12;
+  ```
+
+- **Until the staging capture (plan S0) no snapshot is stored.** A snapshot
+  needs the single-payment rate, and the PayTR docs do not say where
+  `single_ratio=1` returns it. The capture names the field; adding it to
+  `PAYTR_SINGLE_RATE_FIELDS` (`payment-providers/paytr/paytr-installments.ts`)
+  is the one code change. Until then the cron logs "single rate missing" at
+  warn and installments stay unavailable even if switched on.
+- **BIN cache.** PayTR BIN answers are cached in Redis under
+  `paytr:bin:<bin>` (success 7 days, "not defined" 1 day; errors and timeouts
+  never). Deleting the keys is safe; they refill on demand.
+
 ### One-off: saved-search tier limits
 
 Reference: `docs/SAVED_SEARCHES.md`. Migration `20261021174800_saved_searches`
