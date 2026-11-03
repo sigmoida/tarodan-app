@@ -10,6 +10,9 @@ unstaged=$(git diff --name-only)
 [ -z "$unstaged" ] && exit 0
 
 both=""
+# No pathname expansion in the unquoted loop below: a staged path such as
+# app/[id]/page.tsx is a glob and would otherwise match a sibling path.
+set -f
 old_ifs=$IFS
 IFS='
 '
