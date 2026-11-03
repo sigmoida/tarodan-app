@@ -46,6 +46,18 @@ interface AdminMutationContext {
 }
 
 /**
+ * Toast id derived from the message. react-hot-toast replaces a toast that has
+ * the same id instead of stacking another one, so two writes through this hook
+ * that end with the same message show ONE toast (its timer restarts). This
+ * covers only the hook's own toasts. It does not stop a double submit from
+ * sending a second request: the hook runs concurrent per-row writes, so a
+ * screen that must send one request per submit guards its own submit
+ * (see the product edit form).
+ */
+const toastId = (kind: "success" | "error", message: string) =>
+  `admin-mutation:${kind}:${message}`;
+
+/**
  * Refreshes every query of each resource (all lists + details) and its count
  * queries (`<resource>-count`: tab badges, header summaries).
  */
@@ -142,7 +154,11 @@ export function useAdminMutation<TData, TVars = void>(
     },
     onSuccess: (data, vars) => {
       invalidateAdminResources(queryClient, invalidates);
-      if (successMessage) toast.success(successMessage);
+      if (successMessage) {
+        toast.success(successMessage, {
+          id: toastId("success", successMessage),
+        });
+      }
       onSuccess?.(data, vars);
     },
     onError: (error, _vars, context) => {
@@ -153,7 +169,10 @@ export function useAdminMutation<TData, TVars = void>(
         typeof showErrorToast === "function"
           ? showErrorToast(error)
           : showErrorToast;
-      if (toastIt) toast.error(extractErrorMessage(error, errorMessage));
+      if (toastIt) {
+        const message = extractErrorMessage(error, errorMessage);
+        toast.error(message, { id: toastId("error", message) });
+      }
     },
     onSettled: (data, error, vars, context, mutationContext) =>
       mutation?.onSettled?.(
