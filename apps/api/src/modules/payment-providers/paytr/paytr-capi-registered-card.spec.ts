@@ -185,33 +185,121 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
   });
 
   describe("getInstallmentRates", () => {
+    const answer = (body: Record<string, unknown>) =>
+      fetchSpy.mockResolvedValue({ text: async () => JSON.stringify(body) });
+
     it("hits /odeme/taksit-oranlari with hash = merchant_id + request_id + merchant_salt", async () => {
-      fetchSpy.mockResolvedValue({
-        text: async () =>
-          JSON.stringify({
-            status: "success",
-            request_id: "req-1",
-            max_inst_non_bus: "9",
-            rates: { axess: [] },
-          }),
+      answer({
+        status: "success",
+        request_id: "req1",
+        max_inst_non_bus: "9",
+        oranlar: { axess: { taksit_2: "2.83" } },
       });
 
-      const r = await service.getInstallmentRates("req-1");
+      const r = await service.getInstallmentRates("req1", {
+        singleRatio: true,
+      });
 
       expect(fetchSpy).toHaveBeenCalledWith(
         "https://www.paytr.com/odeme/taksit-oranlari",
         expect.objectContaining({ method: "POST" }),
       );
       const body = bodyOf();
-      expect(body.get("request_id")).toBe("req-1");
+      expect(body.get("request_id")).toBe("req1");
+      expect(body.get("single_ratio")).toBe("1");
+      expect(body.has("abroad_ratio")).toBe(false);
       const expected = crypto
         .createHmac("sha256", KEY)
-        .update(MID + "req-1" + SALT)
+        .update(MID + "req1" + SALT)
         .digest("base64");
       expect(body.get("paytr_token")).toBe(expected);
 
       expect(r.ok).toBe(true);
-      expect(r.maxInstallment).toBe(9);
+      if (!r.ok) return;
+      expect(r.maxInstallmentNonBusiness).toBe(9);
     });
+
+    // Regression: the parser read `data.rates`, which PayTR never sends, so
+    // the table was always undefined. The documented field is `oranlar`.
+    it("reads the rates from oranlar, keeps the raw answer and ignores rates", async () => {
+      const raw = {
+        status: "success",
+        request_id: "req2",
+        max_inst_non_bus: 12,
+        oranlar: {
+          axess: { taksit_2: "2.83", taksit_3: "3,95" },
+          world: { "2": "2.90" },
+        },
+        rates: { bonus: { taksit_2: "9.99" } },
+      };
+      answer(raw);
+
+      const r = await service.getInstallmentRates("req2");
+
+      expect(r).toEqual({
+        ok: true,
+        requestId: "req2",
+        maxInstallmentNonBusiness: 12,
+        rates: {
+          axess: { "2": "2.83", "3": "3.95" },
+          world: { "2": "2.90" },
+        },
+        ignored: [],
+        raw,
+      });
+    });
+
+    it("never throws on unknown keys inside oranlar", async () => {
+      answer({
+        status: "success",
+        request_id: "req3",
+        oranlar: { axess: { taksit_2: "2.8", foo: { bar: 1 } }, troy: [] },
+      });
+
+      const r = await service.getInstallmentRates("req3");
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.rates).toEqual({ axess: { "2": "2.8" } });
+      expect(r.ignored).toEqual(["oranlar.axess.foo", "oranlar.troy"]);
+      expect(r.maxInstallmentNonBusiness).toBeUndefined();
+    });
+
+    it("fails closed when the echoed request_id differs", async () => {
+      answer({
+        status: "success",
+        request_id: "someone-else",
+        oranlar: { axess: { taksit_2: "2.8" } },
+      });
+      const r = await service.getInstallmentRates("req4");
+      expect(r).toEqual({ ok: false, errMsg: "request_id mismatch" });
+    });
+
+    it("returns err_msg on a failed answer", async () => {
+      answer({
+        status: "failed",
+        err_msg: "Zorunlu alan degeri gecersiz veya gonderilmedi:",
+      });
+      const r = await service.getInstallmentRates("req5");
+      expect(r).toEqual({
+        ok: false,
+        errMsg: "Zorunlu alan degeri gecersiz veya gonderilmedi:",
+      });
+    });
+
+    it("returns ok false on a network error", async () => {
+      fetchSpy.mockRejectedValue(new Error("socket hang up"));
+      const r = await service.getInstallmentRates("req6");
+      expect(r).toEqual({ ok: false, errMsg: "socket hang up" });
+    });
+
+    it.each([[""], ["x".repeat(33)]])(
+      "refuses a request_id that is empty or longer than 32 (%p) without calling PayTR",
+      async (id) => {
+        const r = await service.getInstallmentRates(id);
+        expect(r.ok).toBe(false);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      },
+    );
   });
 });

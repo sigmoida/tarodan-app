@@ -183,6 +183,13 @@ import {
   networkErrorReason,
 } from "./paytr-fetch-retry.util";
 import { isNothingLeftToRefund } from "./paytr-refund-rejection";
+import {
+  parsePaytrInstallmentRates,
+  parsePaytrMaxInstallment,
+  type PaytrInstallmentRatesResult,
+} from "./paytr-installments";
+import { isPaytrSuccess, isPlainRecord, textOf } from "./paytr-response.util";
+import { errorMessage } from "../../../common/helpers/error-message";
 
 // =============================================================================
 // PAYTR SERVICE
@@ -730,26 +737,30 @@ export class PayTRService implements IPaymentProvider {
   }
 
   /**
-   * Taksit oranları: mağazanın kart-tipi bazlı taksit oran tablosunu döndürür.
-   * Dokümana göre endpoint /odeme/taksit-oranlari (bin-detail DEĞİL); hash_str =
-   * merchant_id + request_id + merchant_salt (HMAC key = merchant_key). request_id
-   * ≤ 32 karakter; çağıran benzersiz bir değer üretmeli.
+   * The store's installment rate table (`POST /odeme/taksit-oranlari`, not
+   * bin-detail). Doc: https://dev.paytr.com/direkt-api/taksit-sorgulama.
+   * Token: base64(HMAC-SHA256(merchant_id + request_id + merchant_salt,
+   * merchant_key)). `request_id` is at most 32 characters and is echoed in
+   * the answer; the caller makes it unique (the snapshot id).
+   *
+   * The answer's rates are in `oranlar` (per card family, per count), parsed
+   * by `parsePaytrInstallmentRates`; `max_inst_non_bus` is the store's
+   * maximum count for non-business cards. "Oranlar gunluk olarak
+   * degisebilir": the caller stores a snapshot with `raw` and prices from it.
+   * Never throws: a failure is `{ ok: false }`.
    */
   async getInstallmentRates(
     requestId: string,
     options?: { singleRatio?: boolean; abroadRatio?: boolean },
-  ): Promise<{
-    ok: boolean;
-    requestId?: string;
-    maxInstallment?: number;
-    rates?: Record<string, unknown>;
-    errMsg?: string;
-  }> {
+  ): Promise<PaytrInstallmentRatesResult> {
     if (!this.isConfigured) {
       return { ok: false, errMsg: "PayTR not configured" };
     }
-    const reqId = (requestId || "").slice(0, 32);
-    // Doküman: hash_str = merchant_id + request_id + merchant_salt
+    const reqId = (requestId ?? "").trim();
+    // Never truncate: a cut id would not match the snapshot that asked for it.
+    if (reqId.length === 0 || reqId.length > 32) {
+      return { ok: false, errMsg: "request_id must be 1-32 characters" };
+    }
     const paytrToken = this.creds.signWithSalt(this.merchantId + reqId);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -768,24 +779,44 @@ export class PayTRService implements IPaymentProvider {
           signal: AbortSignal.timeout(this.httpTimeoutMs),
         },
       );
-      const data = this.parsePaytrJson<any>(await response.text());
-      if (!data || data.status !== "success") {
+      const data = this.parsePaytrJson<Record<string, unknown>>(
+        await response.text(),
+      );
+      if (!isPlainRecord(data) || !isPaytrSuccess(data.status)) {
         return {
           ok: false,
-          errMsg: data?.err_msg || "Installment rates unavailable",
+          errMsg: textOf(data?.err_msg) ?? "Installment rates unavailable",
         };
+      }
+      const echoedId = textOf(data.request_id);
+      if (echoedId !== undefined && echoedId !== reqId) {
+        this.logger.warn(
+          `PayTR taksit-oranlari request_id mismatch: sent=${reqId} got=${echoedId}`,
+        );
+        return { ok: false, errMsg: "request_id mismatch" };
+      }
+      const { rates, ignored } = parsePaytrInstallmentRates(data.oranlar);
+      if (ignored.length > 0) {
+        this.logger.warn(
+          `PayTR taksit-oranlari request_id=${reqId}: ${ignored.length} entries not understood: ${ignored.slice(0, 20).join(", ")}`,
+        );
       }
       return {
         ok: true,
-        requestId: data.request_id != null ? String(data.request_id) : reqId,
-        maxInstallment: Number.isFinite(Number(data.max_inst_non_bus))
-          ? Number(data.max_inst_non_bus)
-          : undefined,
-        rates: (data.rates as Record<string, unknown>) ?? undefined,
+        requestId: reqId,
+        maxInstallmentNonBusiness: parsePaytrMaxInstallment(
+          data.max_inst_non_bus,
+        ),
+        rates,
+        ignored,
+        raw: data,
       };
-    } catch (error: any) {
-      this.logger.error(`PayTR taksit-oranları hata: ${error?.message}`);
-      return { ok: false, errMsg: error?.message || "Installment rates error" };
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      this.logger.error(
+        `PayTR taksit-oranlari request_id=${reqId} failed: ${message}`,
+      );
+      return { ok: false, errMsg: message || "Installment rates error" };
     }
   }
 
