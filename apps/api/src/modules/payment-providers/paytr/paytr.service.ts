@@ -356,8 +356,9 @@ export class PayTRService implements IPaymentProvider {
       try {
         data = JSON.parse(rawText) as Record<string, unknown>;
       } catch {
+        // Digit runs masked: a garbled answer may still hold `masked_pan`.
         this.logger.error(
-          `PayTR durum-sorgu JSON değil: ${rawText.slice(0, 200)}`,
+          `PayTR durum-sorgu oid=${merchantOid}: answer is not JSON: ${rawText.slice(0, 200).replace(/\d{4,}/g, "#")}`,
         );
         return { ok: false, errMsg: "Invalid JSON from PayTR" };
       }
@@ -381,8 +382,9 @@ export class PayTRService implements IPaymentProvider {
       );
 
       if (paymentTotalTl === null) {
+        // Field names only: the answer carries card data (`masked_pan`).
         this.logger.warn(
-          `PayTR durum-sorgu payment_total parse edilemedi: ${JSON.stringify(data)}`,
+          `PayTR durum-sorgu oid=${merchantOid}: payment_total not parseable (fields: ${Object.keys(data).join(", ")})`,
         );
         return { ok: false, errMsg: "Could not parse payment_total" };
       }

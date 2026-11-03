@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
@@ -182,4 +183,46 @@ describe("PayTRService.queryPaymentStatus — returns + kesinti alanları", () =
       expect(r.maskedPan).toBeUndefined();
     },
   );
+  // The answer carries card data (`masked_pan`): a parse warning must not
+  // log the answer itself.
+  it("does not log the answer when payment_total cannot be parsed", async () => {
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "n/a",
+          masked_pan: "455359******6747",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(false);
+    const logged = warn.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(logged).toContain("ORDER123");
+    expect(logged).not.toContain("455359");
+    warn.mockRestore();
+  });
+
+  it("masks digit runs when the answer is not JSON", async () => {
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    fetchSpy.mockResolvedValue({
+      status: 200,
+      text: async () => '{"status":"success","masked_pan":"455359******6747"',
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(false);
+    const logged = error.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(logged).toContain("ORDER123");
+    expect(logged).not.toContain("455359");
+    expect(logged).not.toContain("6747");
+    error.mockRestore();
+  });
 });
