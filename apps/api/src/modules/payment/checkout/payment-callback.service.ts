@@ -12,7 +12,10 @@ import {
 } from "@prisma/client";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "../payment-common.service";
-import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
+import {
+  PaymentFulfillmentService,
+  providerPaymentDataOf,
+} from "../fulfillment/payment-fulfillment.service";
 import { PaymentReconciliationService } from "../reconciliation/payment-reconciliation.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { CacheService } from "../../cache/cache.service";
@@ -323,12 +326,8 @@ export class PaymentCallbackService {
       payment,
       txnRef,
       oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
-      {
-        // durum-sorgu artık ödeme yöntemi/taksit de döndürüyor (gözlemlenebilirlik).
-        paymentType: inquiry.paymentType,
-        installmentCount: inquiry.installmentCount,
-        currency: inquiry.currency,
-      },
+      // The inquiry's payment method and installment count (`taksit`).
+      providerPaymentDataOf(inquiry),
     );
     if (did) {
       this.logger.log(

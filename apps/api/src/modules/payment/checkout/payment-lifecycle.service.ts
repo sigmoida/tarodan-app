@@ -19,7 +19,10 @@ import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/pa
 import { EventService } from "../../events";
 import { Request } from "express";
 import { PaymentCommonService } from "../payment-common.service";
-import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
+import {
+  PaymentFulfillmentService,
+  providerPaymentDataOf,
+} from "../fulfillment/payment-fulfillment.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { i18nMessage } from "../../i18n";
 import {
@@ -520,6 +523,8 @@ export class PaymentLifecycleService {
       payment,
       txnRef,
       capturedOid, // FLOW-M5: çekilen oid'e senkronla
+      // Same payment-method columns as the callback (installment count).
+      providerPaymentDataOf(capturedInquiry),
     );
     // Gözlemlenebilirlik: istemci-tetikli doğrulama, callback kaçırılmış bir ödemeyi
     // durum-sorgu ile buldu (çift-çekim guard'ı). Yalnız BULUNAN sorgu kaydedilir.

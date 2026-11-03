@@ -73,7 +73,14 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
     const { service, queryPaymentStatus, processSuccessfulPayment } =
       makeService((oid) =>
         oid === "oid1"
-          ? { ok: true, paymentTotalTl: 100, paymentDate: "2026-01-01" }
+          ? {
+              ok: true,
+              paymentTotalTl: 100,
+              paymentDate: "2026-01-01",
+              paymentType: "card",
+              installmentCount: 0,
+              currency: "TL",
+            }
           : { ok: false },
       );
 
@@ -85,11 +92,13 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
     // Her iki oid de sorgulandı; capture oid1'de bulundu.
     expect(queryPaymentStatus).toHaveBeenCalledWith("oid2");
     expect(queryPaymentStatus).toHaveBeenCalledWith("oid1");
-    // processSuccessfulPayment çekilen oid (oid1) ile senkron çağrıldı.
+    // processSuccessfulPayment is called with the captured oid (oid1) and
+    // the inquiry's payment method, like the callback path.
     expect(processSuccessfulPayment).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringContaining("oid1"),
       "oid1",
+      { paymentType: "card", installmentCount: 0, currency: "TL" },
     );
   });
 

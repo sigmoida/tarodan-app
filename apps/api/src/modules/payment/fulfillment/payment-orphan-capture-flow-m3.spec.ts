@@ -60,7 +60,14 @@ describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M
   it("çekilmiş + sipariş ödenebilir: CAS reset + tamamla (telafi)", async () => {
     const { service, prisma, processSuccessfulPayment } = makeService({
       candidate,
-      query: () => ({ ok: true, paymentTotalTl: 100, paymentDate: "x" }),
+      query: () => ({
+        ok: true,
+        paymentTotalTl: 100,
+        paymentDate: "x",
+        paymentType: "card",
+        installmentCount: 0,
+        currency: "TL",
+      }),
       full: {
         orderId: "o1",
         order: {
@@ -80,10 +87,13 @@ describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M
       where: { id: "pay-1", status: PaymentStatus.failed },
       data: { status: PaymentStatus.pending },
     });
+    // The inquiry's payment method reaches fulfillment like a callback's
+    // (single payment: taksit 0).
     expect(processSuccessfulPayment).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringContaining("oid1"),
       "oid1",
+      { paymentType: "card", installmentCount: 0, currency: "TL" },
     );
     expect(res).toEqual({ checked: 1, recovered: 1, alarms: 0 });
   });

@@ -7,7 +7,10 @@ import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "../payment-common.service";
-import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
+import {
+  PaymentFulfillmentService,
+  providerPaymentDataOf,
+} from "../fulfillment/payment-fulfillment.service";
 
 /**
  * PSP (PayTR) durum-sorgu tabanlı mutabakat süpürmeleri (cron). Callback kaçırılmış
@@ -155,6 +158,8 @@ export class PspReconciliationService {
           full,
           txnRef,
           capturedOid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
+          // Same payment-method columns as the callback (installment count).
+          providerPaymentDataOf(capturedInquiry),
         );
         if (did) {
           completed++;
@@ -334,6 +339,8 @@ export class PspReconciliationService {
             fresh,
             txnRef,
             capturedOid,
+            // Same payment-method columns as the callback (installment count).
+            providerPaymentDataOf(capturedInquiry),
           );
           if (did) {
             recovered++;
