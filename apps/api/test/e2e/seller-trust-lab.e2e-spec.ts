@@ -1,6 +1,6 @@
 import * as request from "supertest";
 import { getQueueToken } from "@nestjs/bull";
-import { AdminRole } from "@prisma/client";
+import { AdminRole, Prisma } from "@prisma/client";
 import {
   pickSellerTrustFormulaParams,
   SELLER_TRUST_LAB_POPULATION_MAX_ROWS,
@@ -23,11 +23,14 @@ import {
 } from "../factories/user.factory";
 import { sellerTrustFixtures } from "../factories/seller-trust.factory";
 import { SellerTrustSchedulerService } from "../../src/modules/seller-trust/jobs/seller-trust-scheduler.service";
+import { SellerTrustService } from "../../src/modules/seller-trust/seller-trust.service";
+import { UserSellerTrustStatsService } from "../../src/modules/user/stats/user-seller-trust-stats.service";
 import { TRUST_FORMULA_V1 } from "../../src/modules/seller-trust/helpers/trust-formula.constants";
 import { SELLER_TRUST_GOLDEN_V1 } from "../../src/modules/seller-trust/helpers/trust-golden-v1";
 import { RolesGuard } from "../../src/modules/auth/guards/roles.guard";
 import { SYSTEM_GUEST_EMAIL } from "../../src/modules/invoicing/invoice/guest-recipient";
 import { QUEUE_NAMES } from "../../src/workers/constants";
+import { SELLER_TRUST_LAB_THROTTLES } from "../../src/modules/admin/users/seller-trust-lab/admin-seller-trust-lab.controller";
 
 /**
  * The admin seller trust lab against a real app and Postgres (tarodan-ops
@@ -553,5 +556,119 @@ describe("seller trust lab (E2E)", () => {
     expect(narrowed.status).toBe(200);
     expect(narrowed.body.summary.rowsRead).toBe(0);
     expect((await prisma.auditLog.count()) - auditBefore).toBe(1);
+  });
+
+  /**
+   * Mutation guard for proof 1 (plan 4.3): a write slipped into the lab's
+   * read path, on the very transaction the lab hands its readers, is refused
+   * by Postgres (25006, READ ONLY), so the call fails, nothing changes and no
+   * audit row is written. This fails if the lab ever reads on a client that
+   * is not a READ ONLY snapshot, whatever the helper is called.
+   */
+  it("has Postgres refuse a write slipped into the lab's read path", async () => {
+    const s = await seedAndRun();
+    const prisma = getPrisma();
+    const superAdmin = await createAdminUser(ctx.module);
+    const scoresBefore = await scoresChecksum();
+    const usersBefore = await prisma.user.findMany({
+      orderBy: { id: "asc" },
+      select: { id: true, username: true, updatedAt: true },
+    });
+    const auditBefore = await prisma.auditLog.count();
+
+    const refusals: string[] = [];
+    const writeOn = async (tx: Prisma.TransactionClient, sql: Prisma.Sql) => {
+      try {
+        await tx.$executeRaw(sql);
+      } catch (e) {
+        const err = e as { message?: string; meta?: unknown };
+        refusals.push(JSON.stringify({ m: err.message, meta: err.meta }));
+        throw e;
+      }
+    };
+
+    const stored = ctx.module.get(SellerTrustService);
+    const readPage = stored.readStoredPage.bind(stored);
+    const pageSpy = jest
+      .spyOn(stored, "readStoredPage")
+      .mockImplementation(async (tx, ...rest) => {
+        await writeOn(
+          tx,
+          Prisma.sql`UPDATE "seller_trust_scores" SET "score_x100" = NULL`,
+        );
+        return readPage(tx, ...rest);
+      });
+    const users = ctx.module.get(UserSellerTrustStatsService);
+    const subjectOf = users.trustLabSubject.bind(users);
+    const subjectSpy = jest
+      .spyOn(users, "trustLabSubject")
+      .mockImplementation(async (tx, id) => {
+        await writeOn(
+          tx,
+          Prisma.sql`UPDATE "users" SET "username" = 'lab-wrote' WHERE "id" = ${id}`,
+        );
+        return subjectOf(tx, id);
+      });
+
+    try {
+      const population = await request(server())
+        .post(`${BASE}/population`)
+        .set(authHeader(superAdmin))
+        .send({ params: v1() });
+      expect(population.status).toBe(500);
+
+      const seller = await request(server())
+        .post(`${BASE}/sellers/${s.scored}`)
+        .set(authHeader(superAdmin))
+        .send({ asOf: "stored" });
+      expect(seller.status).toBe(500);
+    } finally {
+      pageSpy.mockRestore();
+      subjectSpy.mockRestore();
+    }
+
+    expect(refusals).toHaveLength(2);
+    for (const r of refusals) expect(r).toMatch(/25006|read-only transaction/);
+    expect(await scoresChecksum()).toBe(scoresBefore);
+    expect(
+      await prisma.user.findMany({
+        orderBy: { id: "asc" },
+        select: { id: true, username: true, updatedAt: true },
+      }),
+    ).toEqual(usersBefore);
+    expect(await prisma.auditLog.count()).toBe(auditBefore);
+  });
+
+  /**
+   * AC-A15 through the real global guard chain: the throttler runs before
+   * the admin guards and the handler, so the call past the limit is a 429
+   * that does no work (no audit row). The e2e app skips throttling unless
+   * `TEST_THROTTLING_ENABLED` is set (app.module `skipIf`, read per request);
+   * skipped requests are not counted, so the bucket starts empty here.
+   */
+  it("answers 429 past the population limit and does no work", async () => {
+    const superAdmin = await createAdminUser(ctx.module);
+    const prisma = getPrisma();
+    const auditBefore = await prisma.auditLog.count();
+    const previous = process.env.TEST_THROTTLING_ENABLED;
+    process.env.TEST_THROTTLING_ENABLED = "true";
+    try {
+      const call = () =>
+        request(server())
+          .post(`${BASE}/population`)
+          .set(authHeader(superAdmin))
+          .send({ params: v1() });
+      for (let i = 0; i < SELLER_TRUST_LAB_THROTTLES.population; i++) {
+        expect((await call()).status).toBe(200);
+      }
+      const over = await call();
+      expect(over.status).toBe(429);
+    } finally {
+      if (previous === undefined) delete process.env.TEST_THROTTLING_ENABLED;
+      else process.env.TEST_THROTTLING_ENABLED = previous;
+    }
+    expect((await prisma.auditLog.count()) - auditBefore).toBe(
+      SELLER_TRUST_LAB_THROTTLES.population,
+    );
   });
 });
