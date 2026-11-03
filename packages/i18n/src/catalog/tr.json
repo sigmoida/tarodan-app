@@ -5754,6 +5754,7 @@
         "desktopImage": "Masaüstü görseli",
         "mobileImage": "Mobil görsel (isteğe bağlı)",
         "mobileImageHint": "Boşsa her cihazda masaüstü görseli kullanılır.",
+        "imageSpecHint": "Önerilen: {ratio} oran, {width} x {height} px.",
         "imageSideLabel": "Görsel tarafı",
         "imageSide": {
           "left": "Sol",
@@ -5775,7 +5776,11 @@
         "preview": {
           "title": "Önizleme",
           "titlePlaceholder": "Başlık",
-          "noImage": "Görsel yok"
+          "noImage": "Görsel yok",
+          "phone": "Telefon",
+          "desktop": "Masaüstü ve tablet",
+          "cropWarning": "Görselin her kenarından yaklaşık %{percent} bu çerçevede kesilir.",
+          "cropFixMobile": "Önlemek için bir mobil görsel ({ratio}, {width} x {height} px) yükleyin."
         },
         "moveUp": "Yukarı taşı",
         "moveDown": "Aşağı taşı",

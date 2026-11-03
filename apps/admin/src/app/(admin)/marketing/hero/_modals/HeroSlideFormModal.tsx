@@ -18,6 +18,11 @@ import { LocaleTabs } from "@/components/form/LocaleTabs";
 import { localizedKey, type LocaleLang } from "@/lib/localized-form";
 import { HeroPreview } from "../_components/HeroPreview";
 import {
+  DESKTOP_IMAGE_SPEC,
+  MOBILE_IMAGE_SPEC,
+  imageHint,
+} from "../_lib/image-spec";
+import {
   HERO_LOCALIZED_FIELDS,
   emptyHeroForm,
   heroFormToPayload,
@@ -181,12 +186,13 @@ export function HeroSlideFormModal({
       <ImageUploadField
         name="imageUrl"
         label={t("admin.marketing.hero.desktopImage")}
+        helperText={imageHint(t, DESKTOP_IMAGE_SPEC)}
         upload={uploadHeroImage}
       />
       <ImageUploadField
         name="mobileImageUrl"
         label={t("admin.marketing.hero.mobileImage")}
-        helperText={t("admin.marketing.hero.mobileImageHint")}
+        helperText={`${imageHint(t, MOBILE_IMAGE_SPEC)} ${t("admin.marketing.hero.mobileImageHint")}`}
         upload={uploadHeroImage}
       />
       <ImageSideField />

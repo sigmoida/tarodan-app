@@ -5754,6 +5754,7 @@
         "desktopImage": "Desktop image",
         "mobileImage": "Mobile image (optional)",
         "mobileImageHint": "When empty, the desktop image is used on every device.",
+        "imageSpecHint": "Recommended: {ratio} ratio, {width} x {height} px.",
         "imageSideLabel": "Image side",
         "imageSide": {
           "left": "Left",
@@ -5775,7 +5776,11 @@
         "preview": {
           "title": "Preview",
           "titlePlaceholder": "Title",
-          "noImage": "No image"
+          "noImage": "No image",
+          "phone": "Phone",
+          "desktop": "Desktop and tablet",
+          "cropWarning": "About {percent}% of the image is cut off on each side in this frame.",
+          "cropFixMobile": "Upload a mobile image ({ratio}, {width} x {height} px) to avoid it."
         },
         "moveUp": "Move up",
         "moveDown": "Move down",
