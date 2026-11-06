@@ -349,11 +349,17 @@ describe("processRefund of an installment payment (the vade farkı share, D7)", 
     expect(w.state.attempts[0].installmentFeeAmount.toFixed(2)).toBe("62.40");
   });
 
-  it("tells the buyer the cash back to the card against the charged total", async () => {
+  it("tells the buyer the cash back against the charged total, the seller the goods amount", async () => {
     const w = world();
     await w.refund(1000, "full-1");
     expect(w.events.emitPaymentRefunded).toHaveBeenCalledWith(
-      expect.objectContaining({ refundAmount: 1066.38, totalAmount: 1066.38 }),
+      expect.objectContaining({
+        // The seller's figures stay on the goods scale.
+        refundAmount: 1000,
+        totalAmount: 1000,
+        buyerRefundAmount: 1066.38,
+        buyerTotalAmount: 1066.38,
+      }),
     );
     expect(w.providerEvents.record).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 1066.38, totalAmount: 1066.38 }),

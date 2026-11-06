@@ -450,7 +450,12 @@ export class PaymentRefundService {
 
   private async notifyRefundOutcome(
     orderId: string,
-    amountToRefund: number,
+    amounts: {
+      /** Goods scale: what the seller sees. */
+      goods: number;
+      /** PSP scale: the cash back to the buyer's card (goods + fee share). */
+      cash: number;
+    },
     payment: Pick<Payment, "id" | "amount" | "chargedAmount" | "provider">,
     providerRefundId: string | undefined,
     skipRefundEvent: boolean | undefined,
@@ -464,7 +469,7 @@ export class PaymentRefundService {
         .notifyOrderCancelledByPlatform({
           orderId,
           reasonCode: adminReasonCode,
-          refundAmount: amountToRefund,
+          refundAmount: amounts.cash,
         })
         .catch((error: unknown) =>
           this.logger.error(
@@ -489,7 +494,7 @@ export class PaymentRefundService {
           // denmeli. Alıcı + satıcıya iptal bildirimi + order-cancelled maili; refunded ATLA.
           await this.notificationService.notifyOrderCancelledParties(
             order,
-            amountToRefund,
+            amounts.cash,
           );
           this.logger.log(
             `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
@@ -505,9 +510,12 @@ export class PaymentRefundService {
             sellerId: order.sellerId,
             sellerEmail: order.seller.email,
             sellerName: publicName(order.seller),
-            refundAmount: amountToRefund,
-            // PSP scale, like `refundAmount` (the cash back to the card).
-            totalAmount: Number(chargedAmountOf(payment)),
+            // The seller's e-mail stays on the goods scale; the buyer's
+            // e-mail and push show the cash back against the charged total.
+            refundAmount: amounts.goods,
+            totalAmount: Number(payment.amount),
+            buyerRefundAmount: amounts.cash,
+            buyerTotalAmount: Number(chargedAmountOf(payment)),
             provider: payment.provider,
             providerRefundId,
           });
@@ -1485,10 +1493,10 @@ export class PaymentRefundService {
           if (!response) return response;
           // 11.2d: iade bildirimleri POST-COMMIT (tx dışında, best-effort — para geri döndü).
           // The buyer is told the cash that goes back to the card (with
-          // the installment fee share), against what the card was charged.
+          // the installment fee share); the seller the goods amount.
           await this.notifyRefundOutcome(
             orderId,
-            cashToRefund,
+            { goods: amountToRefund, cash: cashToRefund },
             payment,
             response.providerRefundId,
             opts?.skipRefundEvent || boostRefund,

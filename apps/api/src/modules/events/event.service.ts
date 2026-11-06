@@ -240,8 +240,17 @@ export interface PaymentRefundedPayload {
   sellerId: string;
   sellerEmail: string;
   sellerName: string;
+  /** Goods scale: the order's refunded amount (what the seller sees). */
   refundAmount: number;
+  /** Goods scale: the payment's goods total. */
   totalAmount: number;
+  /**
+   * PSP scale, for the buyer: the cash back to the card, the installment fee
+   * share included (ADR 0019). Absent = `refundAmount` (paid in one).
+   */
+  buyerRefundAmount?: number;
+  /** PSP scale, for the buyer: what the card was charged. Absent = `totalAmount`. */
+  buyerTotalAmount?: number;
   provider: string;
   // The provider's own id is not always known yet: a refund is recorded
   // locally first and reconciled with the provider afterwards.
@@ -889,8 +898,8 @@ export class EventService {
         templateData: {
           orderNumber: payload.orderNumber,
           buyerName: payload.buyerName,
-          refundAmount: payload.refundAmount,
-          totalAmount: payload.totalAmount,
+          refundAmount: payload.buyerRefundAmount ?? payload.refundAmount,
+          totalAmount: payload.buyerTotalAmount ?? payload.totalAmount,
           provider: payload.provider,
           orderId: payload.orderId,
         },
@@ -931,7 +940,9 @@ export class EventService {
         userId: payload.buyerId,
         ...notificationEventCopy("paymentRefundedBuyer", {
           orderNumber: payload.orderNumber,
-          amount: payload.refundAmount.toFixed(2),
+          amount: (payload.buyerRefundAmount ?? payload.refundAmount).toFixed(
+            2,
+          ),
         }),
         data: {
           type: "payment_refunded",
