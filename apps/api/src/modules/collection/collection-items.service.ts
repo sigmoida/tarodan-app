@@ -222,21 +222,31 @@ export class CollectionItemsService {
     await this.assertCanEditItems(collectionId, userId);
 
     // Every update is scoped to this collection. One id that is not an item of
-    // it (another collection's item, a deleted one) fails the whole request
-    // with 404 and the transaction rolls back, so nothing is reordered.
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of dto.items) {
-        const { count } = await tx.collectionItem.updateMany({
+    // it (another collection's item, an unknown id) is a 404 and nothing is
+    // reordered. The check is one query and the writes one batch transaction,
+    // so a long list cannot run into the interactive-transaction timeout. The
+    // collectionId in each where keeps the writes scoped even if an item is
+    // deleted between the two steps (it is then simply not updated).
+    const ids = [...new Set(dto.items.map((item) => item.itemId))];
+    if (ids.length === 0) return;
+    const owned = await this.prisma.collectionItem.findMany({
+      where: { id: { in: ids }, collectionId },
+      select: { id: true },
+    });
+    if (owned.length !== ids.length) {
+      throw new NotFoundException(
+        i18nMessage("server.collection.itemNotFound"),
+      );
+    }
+
+    await this.prisma.$transaction(
+      dto.items.map((item) =>
+        this.prisma.collectionItem.updateMany({
           where: { id: item.itemId, collectionId },
           data: { sortOrder: item.sortOrder },
-        });
-        if (count === 0) {
-          throw new NotFoundException(
-            i18nMessage("server.collection.itemNotFound"),
-          );
-        }
-      }
-    });
+        }),
+      ),
+    );
   }
 
   /**

@@ -34,12 +34,22 @@ function makeStorage(publicBase = S3_ROOT): StorageService {
   return new StorageService(config as never, {} as never);
 }
 
-/** Prisma double whose interactive transaction commits only on success. */
+/**
+ * Prisma double. `updateMany` only describes a write (like a PrismaPromise in
+ * a batch); writes take effect when `$transaction` runs the batch, and only
+ * rows of the collection named in the where clause match.
+ */
 function makePrisma(itemsByCollection: Record<string, string[]>) {
   const sortOrders = new Map<string, number>();
+  type UpdateArgs = {
+    where: { id: string; collectionId: string };
+    data: { sortOrder: number };
+  };
+  const owns = (collectionId: string, id: string) =>
+    (itemsByCollection[collectionId] ?? []).includes(id);
   const prisma = {
     collection: {
-      findUnique: jest.fn(async () => ({ id: COLLECTION, userId: OWNER })),
+      findUnique: jest.fn(async () => ({ userId: OWNER })),
     },
     collectionItem: {
       aggregate: jest.fn(async () => ({ _max: { sortOrder: 2 } })),
@@ -47,35 +57,24 @@ function makePrisma(itemsByCollection: Record<string, string[]>) {
         id: ITEM_A,
         ...data,
       })),
-      updateMany: jest.fn(),
+      findMany: jest.fn(
+        async ({
+          where,
+        }: {
+          where: { id: { in: string[] }; collectionId: string };
+        }) =>
+          where.id.in
+            .filter((id) => owns(where.collectionId, id))
+            .map((id) => ({ id })),
+      ),
+      updateMany: jest.fn((args: UpdateArgs) => args),
     },
-    $transaction: jest.fn(
-      async (fn: (tx: unknown) => Promise<unknown>): Promise<unknown> => {
-        const staged = new Map<string, number>();
-        const tx = {
-          collectionItem: {
-            updateMany: jest.fn(
-              async ({
-                where,
-                data,
-              }: {
-                where: { id: string; collectionId: string };
-                data: { sortOrder: number };
-              }) => {
-                prisma.collectionItem.updateMany({ where, data });
-                const owned = (
-                  itemsByCollection[where.collectionId] ?? []
-                ).includes(where.id);
-                if (owned) staged.set(where.id, data.sortOrder);
-                return { count: owned ? 1 : 0 };
-              },
-            ),
-          },
-        };
-        const result = await fn(tx);
-        staged.forEach((value, id) => sortOrders.set(id, value));
-        return result;
-      },
+    $transaction: jest.fn(async (batch: UpdateArgs[]) =>
+      batch.map(({ where, data }) => {
+        const matched = owns(where.collectionId, where.id);
+        if (matched) sortOrders.set(where.id, data.sortOrder);
+        return { count: matched ? 1 : 0 };
+      }),
     ),
   };
   return { prisma, sortOrders };
@@ -272,15 +271,17 @@ describe("CollectionItemsService.reorderItems", () => {
     });
     expect(sortOrders.get(ITEM_A)).toBe(2);
     expect(sortOrders.get(ITEM_B)).toBe(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     for (const [call] of prisma.collectionItem.updateMany.mock.calls) {
-      expect(call.where).toEqual(
-        expect.objectContaining({ collectionId: COLLECTION }),
-      );
+      expect(call.where).toEqual({
+        id: call.where.id,
+        collectionId: COLLECTION,
+      });
     }
   });
 
   it("404s on an item of another collection and changes nothing", async () => {
-    const { service, sortOrders } = makeService();
+    const { service, prisma, sortOrders } = makeService();
     const error = await caught(
       service.reorderItems(COLLECTION, OWNER, {
         items: [
@@ -293,7 +294,46 @@ describe("CollectionItemsService.reorderItems", () => {
     expect(error.getResponse()).toEqual({
       i18nKey: "server.collection.itemNotFound",
     });
+    expect(prisma.collectionItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: [ITEM_A, FOREIGN_ITEM] }, collectionId: COLLECTION },
+      }),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(sortOrders.size).toBe(0);
+  });
+
+  it("404s on an unknown item id and changes nothing", async () => {
+    const { service, prisma, sortOrders } = makeService();
+    const error = await caught(
+      service.reorderItems(COLLECTION, OWNER, {
+        items: [
+          { itemId: ITEM_B, sortOrder: 0 },
+          { itemId: "88888888-8888-4888-8888-888888888888", sortOrder: 1 },
+        ],
+      }),
+    );
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(sortOrders.size).toBe(0);
+  });
+
+  it("accepts a repeated id of its own item", async () => {
+    const { service, sortOrders } = makeService();
+    await service.reorderItems(COLLECTION, OWNER, {
+      items: [
+        { itemId: ITEM_A, sortOrder: 1 },
+        { itemId: ITEM_A, sortOrder: 3 },
+      ],
+    });
+    expect(sortOrders.get(ITEM_A)).toBe(3);
+  });
+
+  it("writes nothing for an empty list", async () => {
+    const { service, prisma } = makeService();
+    await service.reorderItems(COLLECTION, OWNER, { items: [] });
+    expect(prisma.collectionItem.findMany).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("refuses a non-owner before any write", async () => {
