@@ -75,9 +75,9 @@ send path writes the amounts from the line snapshot).
   room. The target comes from the cut's own reader
   (`resolvePlatformSaleDocument`, `resolvePackageFeeBasis`,
   `resolveFeeLedgerTotals`) at the rate(s) the document was cut with, read
-  strictly, with the attempt's own refund request counted as refunded (its
-  `refundedAt` is stamped after the money commits). A new document type cut
-  from refund-dependent amounts must get a target in
+  strictly, with every refund request whose attempt is finalized counted as
+  refunded (`refundedAt` is stamped after the money commits). A new
+  document type cut from refund-dependent amounts must get a target in
   `InvoiceReversalService.invoiceDocumentNow`, or it can be reversed twice.
 - **Decide inside the transaction**: the return amount is computed again in
   the Serializable transaction that cuts it, from the returns read there.
