@@ -13,10 +13,18 @@
  * - Taksit Oranlari Sorgulama, https://dev.paytr.com/direkt-api/taksit-sorgulama:
  *   `oranlar` holds the rates per installment count, grouped by card family
  *   (axess, world, maximum, cardfinans, paraf, advantage, combo, bonus). Its
- *   inner shape is NOT documented, so the parser below accepts only shapes
- *   whose meaning is unambiguous and reports everything else in `ignored`.
+ *   inner shape is not documented.
+ * - Staging capture with `single_ratio=1` (2026-11-06, hub plan S0; fixture
+ *   `test/fixtures/paytr-taksit-oranlari-staging.ts`): `oranlar` is
+ *   `{ <family>: { taksit_2..taksit_12: <number> }, tumu: { tek_cekim: <number> } }`
+ *   for all nine families above, rates as JSON numbers in percent with binary
+ *   float noise (7.4299999999999997), and `max_inst_non_bus` a number.
+ *   `tumu` ("all cards") is not a card family: it carries the single-payment
+ *   rate. The parser keeps accepting only shapes whose meaning is
+ *   unambiguous and reports everything else in `ignored`.
  */
 
+import { Prisma } from "@prisma/client";
 import { isPlainRecord } from "./paytr-response.util";
 
 /** Card program families PayTR accepts as `card_type` (and returns as BIN `brand`). */
@@ -56,12 +64,19 @@ export function isPaytrInstallmentCount(value: unknown): value is number {
 }
 
 /**
+ * The `oranlar` key that holds rates for all cards rather than one family
+ * ("tumu" = all), and its single-payment rate key. Together the one source
+ * of the store's single-payment rate r1 (staging capture, S0).
+ */
+export const PAYTR_ALL_CARDS_KEY = "tumu";
+export const PAYTR_SINGLE_RATE_KEY = "tek_cekim";
+
+/**
  * Rates by family, then by installment count ("2".."12"; "1" is kept when
- * PayTR lists it for a family). The value is the rate exactly as PayTR
- * published it, as a dot-decimal string ("2.83"), so no float rounding
- * happens here: callers convert it with `new Prisma.Decimal(value)`.
- * Whether the number is a percent or a ratio is not documented (hub plan
- * 2026-11-03, question [PayTR] Q1); this parser does not reinterpret it.
+ * PayTR lists it for a family). The value is the rate as PayTR published
+ * it, as a dot-decimal string ("2.83") normalized by `parsePaytrRate`:
+ * callers convert it with `new Prisma.Decimal(value)`. The number is a
+ * percent (AS-P1, `paytrRateToRatio`); this parser does not reinterpret it.
  */
 export type PaytrInstallmentRateTable = Partial<
   Record<PaytrCardFamily, Record<string, string>>
@@ -69,6 +84,12 @@ export type PaytrInstallmentRateTable = Partial<
 
 export interface ParsedPaytrInstallmentRates {
   rates: PaytrInstallmentRateTable;
+  /**
+   * The single-payment rate r1 from `oranlar.tumu.tek_cekim`, as a
+   * dot-decimal string; undefined when absent, not a rate, or given twice
+   * with different values (fail closed).
+   */
+  singleRatePct?: string;
   /**
    * Paths of entries that were not understood and left out of `rates`
    * (unknown family, unknown key, ambiguous or conflicting value). Key paths
@@ -85,7 +106,8 @@ export type PaytrInstallmentRatesResult =
       maxInstallmentNonBusiness?: number;
       /**
        * The store's single-payment rate (r1) as a dot-decimal string, from
-       * `parsePaytrSingleRate`; undefined until its field is known (S0).
+       * `oranlar.tumu.tek_cekim` (`parsePaytrInstallmentRates`); undefined
+       * when PayTR sent no usable one (then no snapshot is stored).
        */
       singleRatePct?: string;
       rates: PaytrInstallmentRateTable;
@@ -136,9 +158,24 @@ function countOf(key: string): number | null {
 }
 
 /**
+ * Decimals a PayTR rate is kept to: the scale of
+ * `installment_rate_snapshots.single_rate_pct` (`Decimal(6,3)`), so the single
+ * rate and the family rates of one snapshot have the same precision. PayTR
+ * publishes two decimals; anything finer is float noise.
+ */
+export const PAYTR_RATE_SCALE = 3;
+
+/**
  * A PayTR rate as a dot-decimal string in [0, 100), else null: a number or a
  * text with a dot or a Turkish comma. The one reading of a rate value, for
  * the PayTR answer and for the stored snapshot alike.
+ *
+ * Deterministic normalization: a JSON number becomes its shortest round-trip
+ * text (ECMAScript `String(number)`), so the literal 7.4299999999999997
+ * reads as "7.43"; a value with more than `PAYTR_RATE_SCALE` decimals (a text
+ * carrying the noise, or a computed float like 0.30000000000000004) is
+ * rounded half up to that scale. A value with fewer decimals is kept as
+ * published ("2.90" stays "2.90"; compare rates as numbers, not text).
  */
 export function parsePaytrRate(value: unknown): string | null {
   let text: string;
@@ -151,20 +188,33 @@ export function parsePaytrRate(value: unknown): string | null {
     return null;
   }
   if (!RATE_TEXT.test(text)) return null;
-  const normalized = text.replace(",", ".");
+  let normalized = text.replace(",", ".");
+  const decimals = normalized.split(".")[1]?.length ?? 0;
+  if (decimals > PAYTR_RATE_SCALE) {
+    normalized = new Prisma.Decimal(normalized)
+      .toDecimalPlaces(PAYTR_RATE_SCALE, Prisma.Decimal.ROUND_HALF_UP)
+      .toFixed();
+  }
+  // Checked after rounding: 99.9996 rounds to 100, which is not a rate.
   return Number(normalized) < 100 ? normalized : null;
 }
 
 /**
  * Parses `oranlar` defensively. Accepted shapes:
- * - `{ <family>: { <countKey>: <rate>, ... }, ... }` (the expected one);
+ * - `{ <family>: { <countKey>: <rate>, ... }, ..., tumu: { tek_cekim: <rate> } }`
+ *   (the staging capture);
  * - a family value that is an array of such count-keyed objects (merged);
  * - `oranlar` itself an array of family-keyed objects (merged).
  *
+ * `tumu` is read for the single-payment rate only, and only as the plain
+ * object the capture shows (an array or a scalar is ignored as `oranlar.tumu`
+ * and the answer has no single rate: fail closed, visible in the warn log).
+ * Any other key in it is ignored (an all-cards installment row would have no
+ * family to price).
  * A plain list of numbers is ambiguous (does index 0 mean 1 or 2
  * installments?) and is ignored, as are unknown families and keys, values
- * that are not a decimal in [0, 100), and a count that two entries give
- * different rates for (dropped, fail closed). Never throws.
+ * that are not a decimal in [0, 100), and a count or a single rate that two
+ * entries give different rates for (dropped, fail closed). Never throws.
  */
 export function parsePaytrInstallmentRates(
   oranlar: unknown,
@@ -172,6 +222,34 @@ export function parsePaytrInstallmentRates(
   const rates: PaytrInstallmentRateTable = {};
   const ignored: string[] = [];
   const conflicted = new Set<string>();
+  let singleRatePct: string | undefined;
+  let singleConflicted = false;
+
+  const addSingle = (rate: string, path: string) => {
+    if (singleConflicted) return;
+    if (singleRatePct === undefined) {
+      singleRatePct = rate;
+    } else if (Number(singleRatePct) !== Number(rate)) {
+      singleRatePct = undefined;
+      singleConflicted = true;
+      ignored.push(`${path} (conflicting rate)`);
+    }
+  };
+
+  const readAllCards = (value: unknown, path: string) => {
+    if (!isPlainRecord(value)) {
+      ignored.push(path);
+      return;
+    }
+    for (const [key, raw] of Object.entries(value)) {
+      const rate =
+        key.trim().toLowerCase() === PAYTR_SINGLE_RATE_KEY
+          ? parsePaytrRate(raw)
+          : null;
+      if (rate === null) ignored.push(`${path}.${key}`);
+      else addSingle(rate, `${path}.${key}`);
+    }
+  };
 
   const addCount = (
     family: PaytrCardFamily,
@@ -223,6 +301,10 @@ export function parsePaytrInstallmentRates(
   const readFamilies = (value: Record<string, unknown>, path: string) => {
     for (const [key, raw] of Object.entries(value)) {
       const family = key.trim().toLowerCase();
+      if (family === PAYTR_ALL_CARDS_KEY) {
+        readAllCards(raw, `${path}.${key}`);
+        continue;
+      }
       if (!isPaytrCardFamily(family)) {
         ignored.push(`${path}.${key}`);
         continue;
@@ -245,37 +327,7 @@ export function parsePaytrInstallmentRates(
   for (const family of Object.keys(rates) as PaytrCardFamily[]) {
     if (Object.keys(rates[family] ?? {}).length === 0) delete rates[family];
   }
-  return { rates, ignored };
-}
-
-/**
- * Top-level fields of a `taksit-oranlari` answer that hold the store's
- * single-payment rate (requested with `single_ratio=1`). EMPTY on purpose:
- * the doc does not say where the rate is returned, and an echoed "1" flag
- * must not be read as a 1% rate. The staging capture (hub plan S0) names the
- * field; adding it here is the one change. Until then every answer has no
- * single rate, so no rate snapshot is stored and installments stay
- * unavailable (fail closed to a single payment).
- */
-export const PAYTR_SINGLE_RATE_FIELDS: readonly string[] = [];
-
-/**
- * The store's single-payment rate r1 from a `taksit-oranlari` answer, as a
- * dot-decimal string in [0, 100), read only from `fields`. Undefined when no
- * field holds a rate, or when two fields disagree (fail closed).
- */
-export function parsePaytrSingleRate(
-  answer: Record<string, unknown>,
-  fields: readonly string[] = PAYTR_SINGLE_RATE_FIELDS,
-): string | undefined {
-  let found: string | undefined;
-  for (const field of fields) {
-    const rate = parsePaytrRate(answer[field]);
-    if (rate === null) continue;
-    if (found !== undefined && Number(found) !== Number(rate)) return undefined;
-    found ??= rate;
-  }
-  return found;
+  return { rates, singleRatePct, ignored };
 }
 
 /**

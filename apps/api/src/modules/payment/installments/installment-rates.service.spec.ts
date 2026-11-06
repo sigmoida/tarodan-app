@@ -134,7 +134,7 @@ describe("InstallmentRatesService", () => {
     expect(provider.getInstallmentRates).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the lock after an incomplete answer too (no single rate before S0)", async () => {
+  it("keeps the lock after an incomplete answer too (no single rate)", async () => {
     const { service, cache } = setup({
       latest: null,
       rates: {
@@ -203,7 +203,7 @@ describe("InstallmentRatesService", () => {
       );
     });
 
-    it("only warns about stale rates while installments are off (no daily noise before S0)", async () => {
+    it("only warns about stale rates while installments are off (no daily noise)", async () => {
       const { service } = setup({
         latest: null,
         rates: { ok: true, requestId: "x", rates: {}, ignored: [], raw: {} },

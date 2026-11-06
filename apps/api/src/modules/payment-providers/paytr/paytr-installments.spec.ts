@@ -3,17 +3,19 @@ import {
   isPaytrInstallmentCount,
   parsePaytrInstallmentRates,
   parsePaytrInstallmentCount,
-  parsePaytrSingleRate,
+  parsePaytrRate,
   PAYTR_CARD_FAMILIES,
-  PAYTR_SINGLE_RATE_FIELDS,
 } from "./paytr-installments";
+import {
+  paytrTaksitOranlariStagingBody,
+  PAYTR_STAGING_FAMILIES,
+  PAYTR_STAGING_FAMILY_RATES,
+} from "../../../../test/fixtures/paytr-taksit-oranlari-staging";
 
 /**
- * `taksit-oranlari` documents `oranlar` only as "rates per installment
- * count, grouped by card family" (https://dev.paytr.com/direkt-api/taksit-sorgulama).
- * FIXTURE: the shape below is the doc shape (family -> count -> rate), not a
- * captured answer. Swap it for the redacted staging capture (hub plan task
- * S0) once it exists; the parser must keep failing closed on anything else.
+ * The doc shape (family -> count -> rate) with mixed notations; the real
+ * answer is the staging capture below. The parser must keep failing closed on
+ * anything else.
  */
 const DOC_SHAPE_ORANLAR = {
   axess: { taksit_2: "2.83", taksit_3: "3,95", taksit_6: 7.1 },
@@ -49,6 +51,247 @@ describe("PayTR card families", () => {
     for (const n of [2, 6, 12]) expect(isPaytrInstallmentCount(n)).toBe(true);
     for (const n of [0, 1, 13, 2.5, Number.NaN, "3"]) {
       expect(isPaytrInstallmentCount(n)).toBe(false);
+    }
+  });
+});
+
+describe("parsePaytrInstallmentRates: staging capture (single_ratio=1, S0)", () => {
+  const oranlar = (
+    JSON.parse(paytrTaksitOranlariStagingBody()) as { oranlar: unknown }
+  ).oranlar;
+
+  it("reads the single-payment rate 3.46 from oranlar.tumu.tek_cekim (a JSON number)", () => {
+    expect((oranlar as { tumu: unknown }).tumu).toEqual({ tek_cekim: 3.46 });
+    expect(parsePaytrInstallmentRates(oranlar).singleRatePct).toBe("3.46");
+  });
+
+  it("parses all nine families, 2-12 each, float noise normalized", () => {
+    const { rates } = parsePaytrInstallmentRates(oranlar);
+    expect(Object.keys(rates).sort()).toEqual([...PAYTR_CARD_FAMILIES].sort());
+    expect([...PAYTR_STAGING_FAMILIES].sort()).toEqual(
+      [...PAYTR_CARD_FAMILIES].sort(),
+    );
+    for (const family of PAYTR_CARD_FAMILIES) {
+      expect(rates[family]).toEqual(PAYTR_STAGING_FAMILY_RATES);
+    }
+    expect(rates.world?.["2"]).toBe("7.43");
+    expect(rates.world?.["12"]).toBe("27.8");
+  });
+
+  it("ignores nothing and does not read tumu as a card family", () => {
+    const { rates, ignored } = parsePaytrInstallmentRates(oranlar);
+    expect(ignored).toEqual([]);
+    expect(rates).not.toHaveProperty("tumu");
+  });
+});
+
+describe("parsePaytrInstallmentRates: tumu (all cards)", () => {
+  it("reads tek_cekim as a number or a text, case-insensitive keys", () => {
+    expect(
+      parsePaytrInstallmentRates({ TUMU: { Tek_Cekim: "3,46" } }).singleRatePct,
+    ).toBe("3.46");
+    expect(
+      parsePaytrInstallmentRates({ tumu: { tek_cekim: 0 } }).singleRatePct,
+    ).toBe("0");
+  });
+
+  it("ignores other keys in tumu: an all-cards row has no family to price", () => {
+    const { rates, singleRatePct, ignored } = parsePaytrInstallmentRates({
+      tumu: { tek_cekim: 3.46, taksit_2: 7.43 },
+    });
+    expect(singleRatePct).toBe("3.46");
+    expect(rates).toEqual({});
+    expect(ignored).toEqual(["oranlar.tumu.taksit_2"]);
+  });
+
+  it.each([
+    [{ tumu: { tek_cekim: "abc" } }, ["oranlar.tumu.tek_cekim"]],
+    [{ tumu: { tek_cekim: 100 } }, ["oranlar.tumu.tek_cekim"]],
+    [{ tumu: { tek_cekim: null } }, ["oranlar.tumu.tek_cekim"]],
+    [{ tumu: 3.46 }, ["oranlar.tumu"]],
+    [{ tumu: [{ tek_cekim: 3.46 }] }, ["oranlar.tumu"]],
+    [{ world: { taksit_2: 7.43 } }, []],
+  ])("has no single rate for %p (fail closed)", (input, expectedIgnored) => {
+    const { singleRatePct, ignored } = parsePaytrInstallmentRates(input);
+    expect(singleRatePct).toBeUndefined();
+    expect(ignored).toEqual(expectedIgnored);
+  });
+
+  it("drops a single rate two entries disagree on, and keeps one given twice alike", () => {
+    const conflicted = parsePaytrInstallmentRates([
+      { tumu: { tek_cekim: 3.46 } },
+      { tumu: { tek_cekim: "3.50" } },
+      { tumu: { tek_cekim: 3.46 } },
+    ]);
+    expect(conflicted.singleRatePct).toBeUndefined();
+    expect(conflicted.ignored).toEqual([
+      "oranlar[1].tumu.tek_cekim (conflicting rate)",
+    ]);
+
+    const same = parsePaytrInstallmentRates([
+      { tumu: { tek_cekim: 3.46 } },
+      { tumu: { tek_cekim: "3.460" } },
+    ]);
+    expect(same.singleRatePct).toBe("3.46");
+    expect(same.ignored).toEqual([]);
+  });
+
+  it("reads tumu next to the families in the array shape", () => {
+    const { rates, singleRatePct, ignored } = parsePaytrInstallmentRates([
+      { world: { taksit_2: 7.43 } },
+      { tumu: { tek_cekim: 3.46 } },
+    ]);
+    expect(singleRatePct).toBe("3.46");
+    expect(rates).toEqual({ world: { "2": "7.43" } });
+    expect(ignored).toEqual([]);
+  });
+
+  it("has no single rate for an empty tumu (the rate service then logs it missing)", () => {
+    const { singleRatePct, ignored } = parsePaytrInstallmentRates({
+      tumu: {},
+    });
+    expect(singleRatePct).toBeUndefined();
+    expect(ignored).toEqual([]);
+  });
+
+  it("drops a single rate that two case variants of the key disagree on", () => {
+    const { singleRatePct, ignored } = parsePaytrInstallmentRates({
+      tumu: { tek_cekim: 3.46, TEK_CEKIM: "3.5" },
+    });
+    expect(singleRatePct).toBeUndefined();
+    expect(ignored).toEqual(["oranlar.tumu.TEK_CEKIM (conflicting rate)"]);
+  });
+
+  it("compares two single rates after normalization", () => {
+    // Float noise of the same published rate is one rate, not a conflict.
+    const noise = parsePaytrInstallmentRates([
+      { tumu: { tek_cekim: 3.46 } },
+      { tumu: { tek_cekim: "3.4600000000000001" } },
+    ]);
+    expect(noise.singleRatePct).toBe("3.46");
+    expect(noise.ignored).toEqual([]);
+    // A difference that survives rounding to 3 decimals is a conflict.
+    const differs = parsePaytrInstallmentRates([
+      { tumu: { tek_cekim: 3.46 } },
+      { tumu: { tek_cekim: "3.4605" } },
+    ]);
+    expect(differs.singleRatePct).toBeUndefined();
+    expect(differs.ignored).toEqual([
+      "oranlar[1].tumu.tek_cekim (conflicting rate)",
+    ]);
+  });
+
+  it.each([
+    ["3.4600000000000001", "3.46"],
+    ["3.4599999999999999", "3.46"],
+    ["3.4595", "3.46"],
+    ["3.4594", "3.459"],
+  ])(
+    "reads the tek_cekim JSON number %s as %p (half up to 3 decimals)",
+    (literal, expected) => {
+      const oranlar = JSON.parse(
+        `{"tumu":{"tek_cekim":${literal}}}`,
+      ) as unknown;
+      expect(parsePaytrInstallmentRates(oranlar).singleRatePct).toBe(expected);
+    },
+  );
+
+  it.each([["99.9995"], [99.9996], ["99,9999"]])(
+    "has no single rate for %p: it rounds to 100 (range checked after rounding)",
+    (raw) => {
+      const { singleRatePct, ignored } = parsePaytrInstallmentRates({
+        tumu: { tek_cekim: raw },
+      });
+      expect(singleRatePct).toBeUndefined();
+      expect(ignored).toEqual(["oranlar.tumu.tek_cekim"]);
+    },
+  );
+
+  it.each([["-3.46"], [-3.46], ["1e-3"], [1e-7], [Number.NaN], [true], [{}]])(
+    "has no single rate for tek_cekim %p (not a decimal in [0, 100))",
+    (raw) => {
+      const { singleRatePct, ignored } = parsePaytrInstallmentRates({
+        tumu: { tek_cekim: raw },
+      });
+      expect(singleRatePct).toBeUndefined();
+      expect(ignored).toEqual(["oranlar.tumu.tek_cekim"]);
+    },
+  );
+
+  it("does not read a single rate from a card family row", () => {
+    const { singleRatePct, ignored } = parsePaytrInstallmentRates({
+      world: { tek_cekim: 3.46 },
+    });
+    expect(singleRatePct).toBeUndefined();
+    expect(ignored).toEqual(["oranlar.world.tek_cekim"]);
+  });
+});
+
+describe("parsePaytrRate normalization", () => {
+  it.each([
+    // JSON number literals as PayTR sends them, parsed like the wire.
+    ["7.4299999999999997", "7.43"],
+    ["9.4700000000000006", "9.47"],
+    ["13.550000000000001", "13.55"],
+    ["27.800000000000001", "27.8"],
+    ["3.46", "3.46"],
+  ])("reads the JSON number %s as %p", (literal, expected) => {
+    expect(parsePaytrRate(JSON.parse(literal))).toBe(expected);
+  });
+
+  it.each([
+    ["7.4299999999999997", "7.43"],
+    ["7,4299999999999997", "7.43"],
+    ["2.0005", "2.001"],
+    ["2.0004", "2"],
+    ["12.345", "12.345"],
+    ["2.90", "2.90"],
+  ])(
+    "rounds a text finer than 3 decimals half up: %p -> %p",
+    (raw, expected) => {
+      expect(parsePaytrRate(raw)).toBe(expected);
+    },
+  );
+
+  it("rounds a computed float to 3 decimals", () => {
+    expect(parsePaytrRate(0.1 + 0.2)).toBe("0.3");
+  });
+
+  it("rejects a value that rounds to 100", () => {
+    expect(parsePaytrRate("99.9996")).toBeNull();
+    expect(parsePaytrRate("99.9994")).toBe("99.999");
+  });
+
+  it("rejects the exact half below 100 (half up, not half even)", () => {
+    expect(parsePaytrRate("99.9995")).toBeNull();
+    expect(parsePaytrRate(99.9995)).toBeNull();
+  });
+
+  it("drops a family rate that rounds to 100 from the table", () => {
+    const { rates, ignored } = parsePaytrInstallmentRates({
+      world: { taksit_2: 7.43, taksit_12: "99.9995" },
+    });
+    expect(rates).toEqual({ world: { "2": "7.43" } });
+    expect(ignored).toEqual(["oranlar.world.taksit_12"]);
+  });
+
+  it("reads a stored (already normalized) rate back unchanged", () => {
+    // Pricing re-reads the snapshot's rates with parsePaytrRate
+    // (installment-eligibility `rateOf`): the second reading must not move
+    // a rate the first one stored.
+    const stored = parsePaytrInstallmentRates(
+      (JSON.parse(paytrTaksitOranlariStagingBody()) as { oranlar: unknown })
+        .oranlar,
+    );
+    const values = [
+      stored.singleRatePct,
+      ...Object.values(stored.rates).flatMap((row) => Object.values(row)),
+    ];
+    expect(values.length).toBeGreaterThan(1);
+    for (const value of values) {
+      expect(parsePaytrRate(value)).toBe(value);
+      // Also as the JSON number a JSONB column could hand back.
+      expect(Number(parsePaytrRate(Number(value)))).toBe(Number(value));
     }
   });
 });
@@ -219,37 +462,6 @@ describe("parsePaytrInstallmentRates", () => {
       expect(ignored).toEqual(["oranlar"]);
     },
   );
-});
-
-describe("parsePaytrSingleRate", () => {
-  it("reads nothing while no field is configured (S0 names it)", () => {
-    expect(PAYTR_SINGLE_RATE_FIELDS).toEqual([]);
-    expect(
-      parsePaytrSingleRate({ single_ratio: "1", tek_cekim: "2.99" }),
-    ).toBeUndefined();
-  });
-
-  it("reads a rate from the configured fields, as a dot-decimal string", () => {
-    expect(parsePaytrSingleRate({ tek_cekim: "2,99" }, ["tek_cekim"])).toBe(
-      "2.99",
-    );
-    expect(parsePaytrSingleRate({ tek_cekim: 3 }, ["tek_cekim"])).toBe("3");
-  });
-
-  it("fails closed on a value that is not a rate or on two fields that disagree", () => {
-    expect(
-      parsePaytrSingleRate({ tek_cekim: "abc" }, ["tek_cekim"]),
-    ).toBeUndefined();
-    expect(
-      parsePaytrSingleRate({ tek_cekim: "100" }, ["tek_cekim"]),
-    ).toBeUndefined();
-    expect(
-      parsePaytrSingleRate({ a: "2.9", b: "3.1" }, ["a", "b"]),
-    ).toBeUndefined();
-    expect(parsePaytrSingleRate({ a: "2.9", b: "2.90" }, ["a", "b"])).toBe(
-      "2.9",
-    );
-  });
 });
 
 describe("parsePaytrInstallmentCount", () => {
