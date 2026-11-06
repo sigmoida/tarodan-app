@@ -326,6 +326,101 @@ describe("LedgerService", () => {
       expect(debit).toBe(50);
     });
 
+    /** The group as account -> [direction, amount], and its signed net. */
+    function refundGroup(tx: { ledgerEntry: { createMany: jest.Mock } }) {
+      const rows: Array<{
+        account: LedgerAccount;
+        direction: LedgerDirection;
+        amount: unknown;
+      }> = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      return {
+        byAccount: Object.fromEntries(
+          rows.map((r) => [r.account, [r.direction, Number(r.amount)]]),
+        ),
+        net: Math.round(
+          rows.reduce(
+            (sum, r) =>
+              sum +
+              (r.direction === LedgerDirection.debit
+                ? Number(r.amount)
+                : -Number(r.amount)),
+            0,
+          ) * 100,
+        ),
+      };
+    }
+
+    it("a full installment refund reverses installment_fee and pays out C (ADR 0019)", async () => {
+      const svc = new LedgerService({} as never);
+      const tx = makeTx();
+      // Plan 4.4: T_o 1,000.00 (commission 100, stopaj 20), F_o 66.38;
+      // PayTR return_amount 1,066.38.
+      await svc.recordRefund(tx, {
+        orderId: "o1",
+        orderTotal: 1000,
+        commission: 100,
+        withholdingTax: 20,
+        refundAmount: 1000,
+        installmentFeeRefund: 66.38,
+      });
+      const { byAccount, net } = refundGroup(tx);
+      expect(byAccount[LedgerAccount.refund]).toEqual([
+        LedgerDirection.debit,
+        1066.38,
+      ]);
+      expect(byAccount[LedgerAccount.installment_fee]).toEqual([
+        LedgerDirection.credit,
+        66.38,
+      ]);
+      // The seller side stays on the goods scale, as for a single payment.
+      expect(byAccount[LedgerAccount.seller_escrow]).toEqual([
+        LedgerDirection.credit,
+        880,
+      ]);
+      expect(byAccount[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.credit,
+        100,
+      ]);
+      expect(net).toBe(0);
+    });
+
+    it("a partial installment refund reverses only its fee share; the seller side is the single-payment split", async () => {
+      const svc = new LedgerService({} as never);
+      const single = makeTx();
+      const installment = makeTx();
+      const goods = {
+        orderId: "o1",
+        orderTotal: 1000,
+        commission: 100,
+        withholdingTax: 20,
+        refundAmount: 400,
+      };
+      await svc.recordRefund(single, goods);
+      await svc.recordRefund(installment, {
+        ...goods,
+        installmentFeeRefund: 26.55,
+      });
+      const a = refundGroup(single);
+      const b = refundGroup(installment);
+      expect(b.byAccount[LedgerAccount.refund]).toEqual([
+        LedgerDirection.debit,
+        426.55,
+      ]);
+      expect(b.byAccount[LedgerAccount.installment_fee]).toEqual([
+        LedgerDirection.credit,
+        26.55,
+      ]);
+      for (const account of [
+        LedgerAccount.seller_escrow,
+        LedgerAccount.platform_commission,
+        LedgerAccount.withholding_tax,
+      ]) {
+        expect(b.byAccount[account]).toEqual(a.byAccount[account]);
+      }
+      expect(a.byAccount[LedgerAccount.installment_fee]).toBeUndefined();
+      expect(b.net).toBe(0);
+    });
+
     it("tutar 0 / dejenere split → null (kayıt yok)", async () => {
       const svc = new LedgerService({} as any);
       const tx = makeTx();

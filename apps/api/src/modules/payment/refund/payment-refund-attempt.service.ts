@@ -3,6 +3,10 @@ import { PrismaService } from "../../../prisma";
 import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { asPaymentMetadata } from "../helpers/payment-metadata.types";
+import {
+  refundFeeShareFor,
+  refundGoodsPartOf,
+} from "../helpers/charged-amount";
 import { i18nMessage } from "../../i18n";
 // Two refusals, both before this call sends anything: a different attempt of
 // the order is unresolved (`RefundAttemptInFlight`, this call's intent has no
@@ -15,15 +19,32 @@ import {
 } from "../../payment-providers/refund-errors";
 
 /**
- * Dayanıklı iade denemesi defteri — PaymentRefundService'ten birebir taşındı.
- * Sağlayıcıya (PayTR) bir iade isteği GİTMEDEN önce niyet veritabanına yazılır;
- * böylece istek ile yanıt arasında çökülse bile ortada hangi tutarın yolda
- * olduğunu bilen bir kayıt kalır ve tekrar deneme parayı ikilemez.
+ * The durable refund attempt log (moved from PaymentRefundService as is).
+ * The intent is written to the database BEFORE a refund request goes to the
+ * provider (PayTR), so a crash between the request and its answer leaves a
+ * row that knows which amount is on its way, and a retry never pays twice.
  *
- * Sipariş iadesi ve takas nakit iadesi bu defteri PAYLAŞIR: ikisi de aynı
- * prepared → submitting geçişini kullanır. Ayrı kopyalar tutmak, iki para
- * yolunun idempotency kuralının sessizce ayrışması demekti.
+ * Order refunds and trade cash refunds SHARE this log: both use the same
+ * prepared -> submitting transition. Separate copies would let the
+ * idempotency rule of the two money paths drift apart.
+ *
+ * Two scales (ADR 0019): an order refund attempt's `amount` is the PayTR
+ * `return_amount`, its goods part plus the installment fee share
+ * (`installmentFeeAmount`) priced here, under the payment lock, by
+ * `refundFeeShareFor`. The caller passes and compares the goods part.
  */
+/** What a claim hands back of the attempt it found or wrote. */
+export interface ClaimedRefundAttempt {
+  id: string;
+  status: RefundAttemptStatus;
+  /** PSP scale: the `return_amount` (goods part + fee share). */
+  amount: Prisma.Decimal;
+  /** The installment fee share inside `amount` (0 = none). */
+  installmentFeeAmount: Prisma.Decimal;
+  providerRefundId: string | null;
+  providerResponse: Prisma.JsonValue | null;
+}
+
 @Injectable()
 export class PaymentRefundAttemptService {
   constructor(private readonly prisma: PrismaService) {}
@@ -45,15 +66,21 @@ export class PaymentRefundAttemptService {
     guard?: (tx: Prisma.TransactionClient) => Promise<void>,
   ): Promise<{
     action: "submit" | "finalize" | "done";
-    attempt: {
-      id: string;
-      status: RefundAttemptStatus;
-      providerRefundId: string | null;
-      providerResponse: Prisma.JsonValue | null;
-    };
+    attempt: ClaimedRefundAttempt;
   }> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+      // The fee share given back with this goods refund (0 without an
+      // installment fee), priced under the payment lock so two refunds of the
+      // payment never hand out the same fee.
+      const feeShareFor = (excludeAttemptId?: string) =>
+        refundFeeShareFor(tx, {
+          paymentId,
+          orderId,
+          orderGoodsTotal: refundCap,
+          goodsRefund: amountToRefund,
+          excludeAttemptId,
+        });
       const fresh = await tx.payment.findUnique({
         where: { id: paymentId },
         select: { metadata: true },
@@ -85,10 +112,13 @@ export class PaymentRefundAttemptService {
         where: { idempotencyKey },
       });
       if (attempt) {
+        // The caller's amount is the goods part; the attempt holds the PSP
+        // amount (goods + fee share).
         if (
           attempt.paymentId !== paymentId ||
           attempt.orderId !== orderId ||
-          Math.abs(Number(attempt.amount) - amountToRefund) > MONEY_EPSILON
+          Math.abs(Number(refundGoodsPartOf(attempt)) - amountToRefund) >
+            MONEY_EPSILON
         ) {
           throw new BadRequestException(
             i18nMessage("server.payment.refundInitiationFailed"),
@@ -110,12 +140,17 @@ export class PaymentRefundAttemptService {
         }
         await guard?.(tx);
         if (attempt.status === RefundAttemptStatus.failed) {
+          // A failed attempt moved no money: its fee share is priced again,
+          // since other refunds of the payment may have finished meanwhile.
+          const fee = await feeShareFor(attempt.id);
           attempt = await tx.refundAttempt.update({
             where: { id: attempt.id },
             data: {
               status: RefundAttemptStatus.prepared,
               failureReason: null,
               requestStartedAt: null,
+              amount: fee.plus(amountToRefund),
+              installmentFeeAmount: fee,
             },
           });
         }
@@ -143,12 +178,14 @@ export class PaymentRefundAttemptService {
       }
       await guard?.(tx);
 
+      const fee = await feeShareFor();
       attempt = await tx.refundAttempt.create({
         data: {
           paymentId,
           orderId,
           idempotencyKey,
-          amount: amountToRefund,
+          amount: fee.plus(amountToRefund),
+          installmentFeeAmount: fee,
           provider,
           providerReference,
         },
@@ -182,12 +219,7 @@ export class PaymentRefundAttemptService {
     providerReference: string,
   ): Promise<{
     action: "submit" | "finalize" | "done";
-    attempt: {
-      id: string;
-      status: RefundAttemptStatus;
-      providerRefundId: string | null;
-      providerResponse: Prisma.JsonValue | null;
-    };
+    attempt: ClaimedRefundAttempt;
   }> {
     const idempotencyKey = `trade-cash-refund:${paymentId}`;
     return this.prisma.$transaction(async (tx) => {

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { ModuleRef } from "@nestjs/core";
-import { PaymentStatus, RefundAttemptStatus } from "@prisma/client";
+import { PaymentStatus, Prisma, RefundAttemptStatus } from "@prisma/client";
 import { PaymentService } from "../payment.service";
 import { PaymentQueryService } from "../payment-query.service";
 import { PaymentCommonService } from "../payment-common.service";
@@ -115,6 +115,8 @@ describe("PaymentService trade cash refund idempotency", () => {
     status: PaymentStatus.completed,
     providerConversationId: "ORDER123",
     tradeCashPaymentId: "tcp-1",
+    // Trades never take installments (D6): no fee.
+    installmentFeeAmount: new Prisma.Decimal(0),
     metadata: { checkoutGroupId: "group-1" },
     tradeCashPayment: { id: "tcp-1", tradeId: TRADE_ID, totalAmount: 99.5 },
   });

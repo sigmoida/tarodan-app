@@ -373,10 +373,15 @@ export class LedgerService {
   }
 
   /**
-   * İade (tam/kısmi): dış çıkış (refund) = capture'daki escrow + komisyon + stopajın
-   * ORANSAL ters kaydı. ratio = refundAmount / orderTotal. Komisyon/stopaj oranları
-   * yuvarlanır; seller_escrow kalanı EMER (grup tam olarak dengelensin, epsilon aşımı yok).
-   * @returns entryGroupId, veya kayıt anlamsızsa (tutar<=0 / dejenere split) null.
+   * A refund (full or partial): the money out (`refund` debit) is the cash
+   * PayTR gave back, the goods part plus the installment fee share. The goods
+   * part reverses the capture's escrow, commission and stopaj PRO RATA,
+   * `ratio = refundAmount / orderTotal` on the goods scale; the commission and
+   * stopaj portions are rounded and `seller_escrow` absorbs the rest, so the
+   * group balances exactly. The fee share reverses `installment_fee` (credit)
+   * one to one (ADR 0019, D7); it never touches the seller's escrow.
+   * @returns entryGroupId, or null when there is nothing meaningful to book
+   *   (goods amount <= 0, or a degenerate split).
    */
   async recordRefund(
     tx: Prisma.TransactionClient,
@@ -387,31 +392,38 @@ export class LedgerService {
       sellerId?: string | null;
       /** İade denemesi kimliği — idempotency anahtarının kaynağı (deneme başına TEK ters kayıt). */
       refundAttemptId?: string | null;
+      /** The order's goods total T_o. */
       orderTotal: number;
       commission: number;
       withholdingTax: number;
+      /** The refund's goods part (PayTR got this plus `installmentFeeRefund`). */
       refundAmount: number;
+      /** The installment fee share given back with it; 0 or absent = none. */
+      installmentFeeRefund?: number;
       currency?: string;
     },
   ): Promise<string | null> {
     const total = Number(input.orderTotal);
     const refund = Number(input.refundAmount);
+    const feeRefund = round2(Number(input.installmentFeeRefund ?? 0));
     if (!(total > 0) || !(refund > 0)) return null;
     const ratio = Math.min(refund / total, 1);
 
     const commissionPortion = round2(input.commission * ratio);
     const withholdingPortion = round2(input.withholdingTax * ratio);
-    // seller_escrow kalanı emer → krediler toplamı TAM olarak refund'a eşit (yuvarlama drift'i yok).
+    // seller_escrow absorbs the rest: the goods credits sum EXACTLY to the
+    // goods refund (no rounding drift).
     const sellerPortion = round2(
       refund - commissionPortion - withholdingPortion,
     );
-    if (sellerPortion <= 0) return null; // dejenere (neredeyse tümü komisyon/stopaj) → atla
+    // Degenerate (almost all commission/stopaj): skip.
+    if (sellerPortion <= 0) return null;
 
     const entries: LedgerEntryInput[] = [
       {
         account: LedgerAccount.refund,
         direction: LedgerDirection.debit,
-        amount: refund,
+        amount: round2(refund + feeRefund),
       },
       {
         account: LedgerAccount.seller_escrow,
@@ -431,6 +443,13 @@ export class LedgerService {
         account: LedgerAccount.withholding_tax,
         direction: LedgerDirection.credit,
         amount: withholdingPortion,
+      });
+    }
+    if (feeRefund > 0) {
+      entries.push({
+        account: LedgerAccount.installment_fee,
+        direction: LedgerDirection.credit,
+        amount: feeRefund,
       });
     }
     return this.record(tx, {

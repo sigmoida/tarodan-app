@@ -3,6 +3,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import {
   PaymentStatus,
+  Prisma,
   RefundAttemptStatus,
   PaymentHoldStatus,
   ProductStatus,
@@ -39,7 +40,8 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
       id: "attempt-1",
       paymentId: "pay-1",
       orderId: ORDER_ID,
-      amount: 0,
+      amount: new Prisma.Decimal(0),
+      installmentFeeAmount: new Prisma.Decimal(0),
       idempotencyKey: "quarantine-refund-1",
       status: RefundAttemptStatus.prepared,
       providerRefundId: null,
@@ -76,7 +78,11 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
         }),
       },
       payment: {
-        findUnique: jest.fn().mockResolvedValue({ metadata: {} }),
+        findUnique: jest.fn().mockResolvedValue({
+          metadata: {},
+          amount: new Prisma.Decimal(opts.paymentAmount),
+          installmentFeeAmount: new Prisma.Decimal(0),
+        }),
         update: jest.fn().mockResolvedValue({}),
       },
       paymentHold: {

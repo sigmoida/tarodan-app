@@ -15,7 +15,10 @@ import {
   refundRequestAdminReasonCode,
 } from "../helpers/refund-attempt-actor";
 import { REFUND_FAILURE_PROVIDER_NOTHING_LEFT } from "../helpers/refund-provider-failure";
-import { paytrAmountMatches } from "../helpers/charged-amount";
+import {
+  paytrAmountMatches,
+  refundGoodsPartOf,
+} from "../helpers/charged-amount";
 import {
   claimRefundAlarm,
   sweepablePaymentWhere,
@@ -337,7 +340,9 @@ export class RefundReconciliationService {
           : null;
         const result = await this.paymentRefund.processRefund(
           attempt.orderId,
-          Number(attempt.amount),
+          // processRefund takes the goods part; the attempt keeps its PSP
+          // amount (goods + installment fee share) and is finished with it.
+          Number(refundGoodsPartOf(attempt)),
           {
             idempotencyKey: attempt.idempotencyKey,
             cancelledBy: refundAttemptCancelActor(
