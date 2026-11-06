@@ -4,11 +4,52 @@ import {
   CONSENT_DOCUMENTS,
   DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
 } from "@tarodan/types";
+import { InstallmentSettingsService } from "../payment/installments/installment-settings.service";
 import { ConsentService } from "./consent.service";
 import { DistanceSalesConsentService } from "./distance-sales-consent.service";
 import { TRADE_CONSENT_UNIQUE_INDEX } from "./helpers/distance-sales-trade";
 
-function makeService(opts: { existing?: boolean; setting?: string | null }) {
+/**
+ * The installment switch as `platform_settings` holds it: a value of
+ * `installments_enabled`, no row (undefined: off) or an unreadable table
+ * ("fail").
+ */
+type InstallmentSwitch = string | undefined | "fail";
+
+function installmentSettingRows(installments: InstallmentSwitch) {
+  return jest.fn(() =>
+    installments === "fail"
+      ? Promise.reject(new Error("connection lost"))
+      : Promise.resolve(
+          installments === undefined
+            ? []
+            : [
+                {
+                  settingKey: "installments_enabled",
+                  settingValue: installments,
+                },
+              ],
+        ),
+  );
+}
+
+function consentServiceOn(prisma: object, sentry?: object): ConsentService {
+  return new ConsentService(
+    prisma as never,
+    new InstallmentSettingsService(prisma as never),
+    sentry as never,
+  );
+}
+
+const BASE_VERSION = CONSENT_DOCUMENTS.distance_sales.version;
+const INSTALLMENT_VERSION = CONSENT_DOCUMENTS.distance_sales
+  .installmentVersion as string;
+
+function makeService(opts: {
+  existing?: boolean;
+  setting?: string | null;
+  installments?: InstallmentSwitch;
+}) {
   const prisma = {
     consentRecord: {
       findFirst: jest
@@ -28,12 +69,15 @@ function makeService(opts: { existing?: boolean; setting?: string | null }) {
             ? null
             : { settingValue: opts.setting },
         ),
+      findMany: installmentSettingRows(opts.installments),
     },
   };
-  const consents = new ConsentService(prisma as never);
+  const sentry = { addBreadcrumb: jest.fn(), captureException: jest.fn() };
+  const consents = consentServiceOn(prisma, sentry);
   return {
     service: new DistanceSalesConsentService(prisma as never, consents),
     prisma,
+    sentry,
   };
 }
 
@@ -50,7 +94,7 @@ describe("DistanceSalesConsentService.ensureForPayment", () => {
     const [row] = prisma.consentRecord.createMany.mock.calls[0][0].data;
     expect(row).toMatchObject({
       document: "distance_sales",
-      version: CONSENT_DOCUMENTS.distance_sales.version,
+      version: BASE_VERSION,
       source: ConsentSource.payment,
       orderId: "order-1",
       userId: "buyer-1",
@@ -202,7 +246,7 @@ describe("DistanceSalesConsentService.ensureForPayment: trade cash payment", () 
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({
       document: "distance_sales",
-      version: CONSENT_DOCUMENTS.distance_sales.version,
+      version: BASE_VERSION,
       action: "granted",
       source: ConsentSource.payment,
       userId: "payer-1",
@@ -312,12 +356,15 @@ function makeStoreService(rows: StoredRow[] = []) {
         return { count: data.length };
       }),
     },
-    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    platformSetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: installmentSettingRows(undefined),
+    },
   };
   const sentry = { addBreadcrumb: jest.fn() };
   const service = new DistanceSalesConsentService(
     prisma as never,
-    new ConsentService(prisma as never),
+    consentServiceOn(prisma),
     sentry as never,
   );
   return { service, prisma, rows, sentry };
@@ -508,6 +555,7 @@ describe("DistanceSalesConsentService.recordAtCheckout", () => {
     const { service } = makeService({});
     const tx = {
       consentRecord: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      platformSetting: { findMany: jest.fn().mockResolvedValue([]) },
     };
 
     await service.recordAtCheckout(tx as never, {
@@ -518,9 +566,97 @@ describe("DistanceSalesConsentService.recordAtCheckout", () => {
 
     expect(tx.consentRecord.createMany.mock.calls[0][0].data[0]).toMatchObject({
       document: "distance_sales",
+      version: BASE_VERSION,
       source: ConsentSource.checkout,
       checkoutGroupId: "group-1",
       userId: "buyer-1",
     });
+  });
+});
+
+/**
+ * User decision 2026-11-06: the installment clause, and its version, are in
+ * force only while installments are on. With the switch off (or unreadable)
+ * every consent is recorded against the text before the clause.
+ */
+describe("DistanceSalesConsentService: the version follows the installment switch", () => {
+  const checkoutSubject = {
+    checkoutGroupId: "group-1",
+    userId: "buyer-1",
+    guestEmail: null,
+  };
+
+  /** A checkout transaction: the consent table and the settings it reads. */
+  const checkoutTx = (installments: InstallmentSwitch) => ({
+    consentRecord: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    platformSetting: { findMany: installmentSettingRows(installments) },
+  });
+
+  it.each<[string, InstallmentSwitch, string]>([
+    ["no setting row (default off)", undefined, BASE_VERSION],
+    ["the switch off", "false", BASE_VERSION],
+    ["the switch on", "true", INSTALLMENT_VERSION],
+  ])(
+    "records the checkout consent with %s",
+    async (_label, installments, version) => {
+      const { service, prisma } = makeService({});
+      const tx = checkoutTx(installments);
+
+      await service.recordAtCheckout(tx as never, checkoutSubject);
+
+      expect(tx.consentRecord.createMany.mock.calls[0][0].data[0].version).toBe(
+        version,
+      );
+      // The switch is read in the checkout transaction (no second
+      // connection while it holds one).
+      expect(tx.platformSetting.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.platformSetting.findMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each<[string, InstallmentSwitch, string]>([
+    ["the switch off", "false", BASE_VERSION],
+    ["the switch on", "true", INSTALLMENT_VERSION],
+  ])(
+    "records the payment-form consent with %s",
+    async (_label, installments, version) => {
+      const { service, prisma } = makeService({ installments });
+
+      await expect(service.ensureForPayment(offerOrder, true)).resolves.toBe(
+        "record",
+      );
+
+      expect(
+        prisma.consentRecord.createMany.mock.calls[0][0].data[0].version,
+      ).toBe(version);
+    },
+  );
+
+  it("reads an unreadable switch on the payment form as off and reports it", async () => {
+    const { service, prisma, sentry } = makeService({ installments: "fail" });
+
+    await expect(service.ensureForPayment(offerOrder, true)).resolves.toBe(
+      "record",
+    );
+
+    expect(
+      prisma.consentRecord.createMany.mock.calls[0][0].data[0].version,
+    ).toBe(BASE_VERSION);
+    expect(sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ flow: "consent.version_context" }),
+    );
+  });
+
+  it("does not read the switch when no consent is written", async () => {
+    const { service, prisma } = makeService({
+      existing: true,
+      installments: "true",
+    });
+
+    await expect(service.ensureForPayment(offerOrder, true)).resolves.toBe(
+      "proceed",
+    );
+    expect(prisma.platformSetting.findMany).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,10 @@ import {
 import { requestIdMiddleware } from "../../common/context/request-context";
 import { ConsentService } from "./consent.service";
 
-function makeService(history: Record<string, unknown>[] = []) {
+function makeService(
+  history: Record<string, unknown>[] = [],
+  installmentsEnabled = false,
+) {
   const prisma = {
     consentRecord: {
       createMany: jest
@@ -37,7 +40,17 @@ function makeService(history: Record<string, unknown>[] = []) {
       return Promise.resolve([...latest.values()]);
     }),
   };
-  return { service: new ConsentService(withQuery as never), prisma: withQuery };
+  const installmentSettings = {
+    read: jest.fn().mockResolvedValue({ enabled: installmentsEnabled }),
+  };
+  return {
+    service: new ConsentService(
+      withQuery as never,
+      installmentSettings as never,
+    ),
+    prisma: withQuery,
+    installmentSettings,
+  };
 }
 
 /** Servisi gerçek bir HTTP isteğinin bağlamında çalıştırır (kanıt alanları). */
@@ -94,6 +107,71 @@ describe("ConsentService.record", () => {
         userAgent: "Mozilla/5.0 test",
       }),
     ]);
+  });
+
+  it("does not read the installment switch for a document that does not follow it", async () => {
+    const { service, installmentSettings } = makeService([], true);
+
+    await service.record([
+      {
+        document: "terms",
+        source: ConsentSource.registration,
+        subject: { userId: "u1" },
+      },
+    ]);
+
+    expect(installmentSettings.read).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [false, CONSENT_DOCUMENTS.distance_sales.version],
+    [true, CONSENT_DOCUMENTS.distance_sales.installmentVersion],
+  ])(
+    "stamps the distance sales version in force with installments %p (one read per call)",
+    async (installmentsEnabled, version) => {
+      const { service, prisma, installmentSettings } = makeService(
+        [],
+        installmentsEnabled,
+      );
+
+      await service.record([
+        {
+          document: "distance_sales",
+          source: ConsentSource.checkout,
+          subject: { userId: "u1" },
+          checkoutGroupId: "g1",
+        },
+        {
+          document: "marketing",
+          source: ConsentSource.registration,
+          subject: { userId: "u1" },
+        },
+      ]);
+
+      expect(rowsOf(prisma).map((row) => row.version)).toEqual([
+        version,
+        CONSENT_DOCUMENTS.marketing.version,
+      ]);
+      expect(installmentSettings.read).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("reads an unreadable installment switch as off", async () => {
+    const { service, prisma, installmentSettings } = makeService([], true);
+    installmentSettings.read.mockRejectedValueOnce(new Error("timeout"));
+
+    await service.record([
+      {
+        document: "distance_sales",
+        source: ConsentSource.payment,
+        subject: { userId: "u1" },
+        orderId: "o1",
+      },
+    ]);
+
+    expect(rowsOf(prisma)[0].version).toBe(
+      CONSENT_DOCUMENTS.distance_sales.version,
+    );
   });
 
   it("verilen transaction istemcisine yazar (ör. kayıt transaction'ı)", async () => {
@@ -350,6 +428,25 @@ describe("ConsentService.getStatus", () => {
     // Zorunlu olmayan belge hiçbir zaman "bekliyor" sayılmaz.
     expect(byDoc.get("marketing")).toMatchObject({ pending: false });
   });
+
+  it.each([
+    [false, CONSENT_DOCUMENTS.distance_sales.version],
+    [true, CONSENT_DOCUMENTS.distance_sales.installmentVersion],
+  ])(
+    "shows the distance sales version in force with installments %p",
+    async (installmentsEnabled, version) => {
+      const { service } = makeService([], installmentsEnabled);
+
+      const status = await service.getStatus("u1");
+
+      expect(
+        status.find((s) => s.document === "distance_sales")?.currentVersion,
+      ).toBe(version);
+      expect(status.find((s) => s.document === "terms")?.currentVersion).toBe(
+        CONSENT_DOCUMENTS.terms.version,
+      );
+    },
+  );
 
   it("reads the latest row of each document, however many per-order rows follow it", async () => {
     // A seller with many boost purchases: hundreds of newer per-order rows

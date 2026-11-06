@@ -2,7 +2,8 @@
 
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
-import PaymentOptionsClient from "./_components/PaymentOptionsClient";
+import { getInstallmentsConfig } from "@/lib/server/payments-config";
+import PaymentOptionsContent from "./_components/PaymentOptionsContent";
 import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
@@ -21,6 +22,7 @@ export async function generateMetadata({
   };
 }
 
-export default function PaymentOptionsPage() {
-  return <PaymentOptionsClient />;
+export default async function PaymentOptionsPage() {
+  const { enabled } = await getInstallmentsConfig();
+  return <PaymentOptionsContent installmentsEnabled={enabled} />;
 }

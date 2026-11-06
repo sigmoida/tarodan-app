@@ -8,6 +8,7 @@ import {
   SubscriptionStatus,
 } from "@prisma/client";
 import {
+  binCacheKey,
   InstallmentOptionsService,
   normalizedBin,
 } from "./installment-options.service";
@@ -708,6 +709,17 @@ describe("InstallmentOptionsService.lookupCard (BIN cache)", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
+  // Redis keys reach Sentry spans (ioredis), the slowlog and MONITOR; card
+  // digits are never logged (docs/PCI_PAYMENT_PAGE.md).
+  it("keys the cache by a hash of the BIN, never by its digits", () => {
+    const key = binCacheKey("45467112");
+    expect(key).toMatch(/^paytr:bin:[0-9a-f]{64}$/);
+    expect(key).not.toContain("45467112");
+    expect(binCacheKey("454671")).not.toContain("454671");
+    expect(binCacheKey("45467112")).toBe(key);
+    expect(binCacheKey("45467113")).not.toBe(key);
+  });
+
   it("answers from the cache without calling PayTR", async () => {
     const cached = {
       outcome: "success",
@@ -717,7 +729,7 @@ describe("InstallmentOptionsService.lookupCard (BIN cache)", () => {
     };
     const { service, provider, cache } = setup({ cached });
     expect(await service.lookupCard("45467112")).toEqual(cached);
-    expect(cache.get).toHaveBeenCalledWith("paytr:bin:45467112");
+    expect(cache.get).toHaveBeenCalledWith(binCacheKey("45467112"));
     expect(provider.lookupBin).not.toHaveBeenCalled();
   });
 
@@ -734,7 +746,7 @@ describe("InstallmentOptionsService.lookupCard (BIN cache)", () => {
     expect(provider.lookupBin).toHaveBeenCalledWith("45467112", {
       timeoutMs: 3000,
     });
-    expect(cache.set).toHaveBeenCalledWith("paytr:bin:45467112", facts, {
+    expect(cache.set).toHaveBeenCalledWith(binCacheKey("45467112"), facts, {
       ttl: 7 * 24 * 60 * 60,
     });
   });
@@ -745,7 +757,7 @@ describe("InstallmentOptionsService.lookupCard (BIN cache)", () => {
     });
     expect(await service.lookupCard("454671")).toEqual({ outcome: "failed" });
     expect(cache.set).toHaveBeenCalledWith(
-      "paytr:bin:454671",
+      binCacheKey("454671"),
       { outcome: "failed" },
       {
         ttl: 24 * 60 * 60,

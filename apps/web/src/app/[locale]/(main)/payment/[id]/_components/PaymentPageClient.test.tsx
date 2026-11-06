@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, createElement, Fragment, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -133,7 +134,14 @@ async function open(query: string, status: Record<string, unknown>) {
   h.getStatusLight.mockResolvedValue({
     data: { id: "pay-1", status: "pending", amount: 100, ...status },
   });
-  act(() => root.render(<PaymentPageClient />));
+  // The card form holds the installment query.
+  act(() =>
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PaymentPageClient />
+      </QueryClientProvider>,
+    ),
+  );
   await flush();
 }
 

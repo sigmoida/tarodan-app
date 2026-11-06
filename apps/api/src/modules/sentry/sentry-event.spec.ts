@@ -199,6 +199,21 @@ describe("applySentryEventPolicy", () => {
     expect(event?.request?.headers?.accept).toBe("application/json");
   });
 
+  it("redacts the card BIN of an installment request body", () => {
+    for (const data of [
+      { bin: "45467112", paymentId: "p1" },
+      JSON.stringify({ bin: "45467112", paymentId: "p1" }),
+      { installment: { count: 3, bin: "45467112" } },
+      JSON.stringify({ installment: { count: 3, bin: "45467112" } }),
+    ]) {
+      const event = applySentryEventPolicy({
+        request: { url: "https://api/payments/installment-options", data },
+      } satisfies Event);
+
+      expect(JSON.stringify(event)).not.toContain("45467112");
+    }
+  });
+
   it("redacts the body before a card-number pass could break its JSON", () => {
     const event = applySentryEventPolicy({
       request: {

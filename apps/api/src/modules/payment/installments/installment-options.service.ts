@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { PaytrMerchant, Prisma, SavedCardStatus } from "@prisma/client";
 import * as Sentry from "@sentry/node";
+import { createHash } from "crypto";
 import { INSTALLMENT_SETTINGS } from "@tarodan/types";
 import type {
   InstallmentBuyerSegment,
@@ -223,6 +224,15 @@ export function normalizedBin(bin: string): string {
 }
 
 /**
+ * The Redis key of a BIN answer. The digits are hashed: a Redis command and
+ * its key reach Sentry spans (ioredis instrumentation), the slowlog and
+ * MONITOR, and card digits are never logged (docs/PCI_PAYMENT_PAGE.md).
+ */
+export function binCacheKey(digits: string): string {
+  return `paytr:bin:${createHash("sha256").update(digits).digest("hex")}`;
+}
+
+/**
  * `POST /payments/installment-options` (ADR 0019, plan 5.1-5.3). Read-only:
  * prices the counts a card may be charged for a payment (`paymentId`) or, on
  * the web single-page checkout before the order exists, for a displayed
@@ -388,13 +398,13 @@ export class InstallmentOptionsService {
   }
 
   /**
-   * BIN facts through the Redis cache (`paytr:bin:<bin>`): `success` 7 days,
+   * BIN facts through the Redis cache (`binCacheKey`): `success` 7 days,
    * `failed` 1 day; an `error` or a timeout is not cached. A cache miss or a
    * Redis error falls through to PayTR, bounded by the 3 s timeout.
    */
   async lookupCard(bin: string): Promise<BinFacts> {
     const digits = normalizedBin(bin);
-    const key = `paytr:bin:${digits}`;
+    const key = binCacheKey(digits);
     const cached = await this.cache.get<CachedBinFacts>(key);
     if (cached?.outcome === "success" || cached?.outcome === "failed") {
       return cached;

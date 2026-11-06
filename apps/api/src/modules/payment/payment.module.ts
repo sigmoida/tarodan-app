@@ -38,7 +38,7 @@ import { OrderFulfillmentListener } from "./fulfillment/order-fulfillment.listen
 import { EscrowHoldService } from "./fulfillment/escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment/fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./fulfillment/virtual-order-fulfillment.service";
-import { InstallmentSettingsService } from "./installments/installment-settings.service";
+import { InstallmentSettingsModule } from "./installments/installment-settings.module";
 import { InstallmentRatesService } from "./installments/installment-rates.service";
 import { InstallmentRulesService } from "./installments/installment-rules.service";
 import { InstallmentOptionsService } from "./installments/installment-options.service";
@@ -83,6 +83,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     DiscountModule,
     // Ödeme formu kapısı: mesafeli satış onayı (consent_records).
     ConsentModule,
+    // The installment switch and minimum (also read by consent).
+    InstallmentSettingsModule,
     // Staging: refund sweeps leave rows copied from production alone.
     UatProductionCopyModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
@@ -134,7 +136,6 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,
     RawBodyMiddleware,
-    InstallmentSettingsService,
     InstallmentRatesService,
     InstallmentRulesService,
     InstallmentOptionsService,
@@ -150,7 +151,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaytrReportMatchingService,
     PaytrSyncStateService,
     // Admin Finance > Installments: settings, rule versions, preview.
-    InstallmentSettingsService,
+    InstallmentSettingsModule,
     InstallmentRatesService,
     InstallmentRulesService,
   ],

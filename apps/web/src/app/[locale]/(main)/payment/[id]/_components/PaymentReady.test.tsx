@@ -2,6 +2,7 @@
 
 import { act, createElement, Fragment, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaymentKind } from "@/lib/paymentKind";
 
@@ -71,17 +72,20 @@ let root: Root;
 function render(kind: PaymentKind) {
   act(() =>
     root.render(
-      <PaymentReady
-        target={{ orderId: "order-1" }}
-        paymentId="pay-1"
-        kind={kind}
-        amount={100}
-        cardStorageEnabled
-        hasTarget
-        onCancel={vi.fn()}
-        cancelling={false}
-        retry={vi.fn()}
-      />,
+      // The card form holds the installment query (off here: no config).
+      <QueryClientProvider client={new QueryClient()}>
+        <PaymentReady
+          target={{ orderId: "order-1" }}
+          paymentId="pay-1"
+          kind={kind}
+          amount={100}
+          cardStorageEnabled
+          hasTarget
+          onCancel={vi.fn()}
+          cancelling={false}
+          retry={vi.fn()}
+        />
+      </QueryClientProvider>,
     ),
   );
 }

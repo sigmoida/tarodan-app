@@ -19,6 +19,11 @@ vi.mock("@/i18n/navigation", () => ({ Link: () => null }));
 vi.mock("@/components/legal/cookies/CookiePreferencesPanel", () => ({
   default: () => "cookie-preferences-panel",
 }));
+// The distance sales text reads the installment switch on the server
+// (`server-only`); its two variants are pinned in `documents.test.tsx`.
+vi.mock("@/lib/server/payments-config", () => ({
+  getInstallmentsConfig: async () => ({ enabled: false, minAmount: 0 }),
+}));
 
 import EmbedDocPage, {
   dynamicParams,

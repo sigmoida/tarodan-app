@@ -40,8 +40,10 @@ export default function PaymentPageClient() {
     phase,
     payment,
     cardStorageEnabled,
+    installmentsConfig,
     cancelling,
     handleCancel,
+    handlePaymentOutdated,
     retry,
     directTarget,
     hasTarget,
@@ -87,6 +89,8 @@ export default function PaymentPageClient() {
         // has its own summary on the cart screen).
         pricing={payment.tradeId ? payment.pricing : null}
         cardStorageEnabled={cardStorageEnabled}
+        installmentsConfig={installmentsConfig}
+        onPaymentOutdated={handlePaymentOutdated}
         hasTarget={hasTarget}
         onCancel={handleCancel}
         cancelling={cancelling}

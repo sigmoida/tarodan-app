@@ -1,6 +1,7 @@
 import { ConsentSource, Prisma } from "@prisma/client";
 import {
   ACCOUNT_REQUIRED_CONSENTS,
+  BASE_CONSENT_VERSION_CONTEXT,
   type ConsentDocumentKey,
   type PendingConsent,
 } from "@tarodan/types";
@@ -117,6 +118,8 @@ export async function grantPendingAccountConsents(
         { document: p.document, source, subject: { userId } },
         null,
         null,
+        // Account documents do not depend on the installment switch.
+        BASE_CONSENT_VERSION_CONTEXT,
       ),
     ),
   });

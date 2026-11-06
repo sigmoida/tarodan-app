@@ -1,5 +1,7 @@
 /** @format */
 
+import type { PaymentInstallmentFields } from "@tarodan/types";
+
 /** One line-item of a checkout-group (cart) payment — expanded in the card. */
 export interface GroupOrder {
   id: string;
@@ -11,7 +13,8 @@ export interface GroupOrder {
   status: string;
 }
 
-export interface Payment {
+/** One row of `GET /payments/me`; the installment fields come only on the payer's own rows. */
+export interface Payment extends PaymentInstallmentFields {
   id: string;
   type?: "order" | "checkout_group" | "trade_cash";
   description?: string;

@@ -130,6 +130,23 @@ describe("scrubSentryEvent", () => {
     });
   });
 
+  it("masks the card BIN in the request body, top level and nested", () => {
+    const out = scrubSentryEvent({
+      request: {
+        data: JSON.stringify({
+          paymentId: "pay-1",
+          installment: { count: 2, bin: "45467112" },
+        }),
+      },
+      extra: { body: { bin: "45467112" } },
+    });
+    expect(JSON.stringify(out)).not.toContain("45467112");
+    expect(JSON.parse(out.request?.data as string)).toEqual({
+      paymentId: "pay-1",
+      installment: { count: 2, bin: REDACTED },
+    });
+  });
+
   it("masks credentials in the request URL and query string", () => {
     const out = scrubSentryEvent({
       request: {
