@@ -56,6 +56,8 @@ import { CommissionLedgerService } from "../../commission/commission-ledger.serv
 import { StorageService } from "../../storage/storage.service";
 import { I18nService } from "../../i18n";
 import { OutboxService } from "../../outbox/outbox.service";
+import { InstallmentChargeService } from "../installments/installment-charge.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 describe("PaymentService trade cash refund idempotency", () => {
   let service: PaymentService;
@@ -168,6 +170,10 @@ describe("PaymentService trade cash refund idempotency", () => {
         },
         MiscReconciliationService,
         PaymentInitiationService,
+        {
+          provide: InstallmentChargeService,
+          useValue: singlePaymentChargeStub(),
+        },
         PaymentCallbackService,
         PaymentFulfillmentService,
         PaymentLifecycleService,

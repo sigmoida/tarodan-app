@@ -47,6 +47,40 @@ import {
 import { PlatformServiceConsentService } from "../../consent/platform-service-consent.service";
 import { virtualOrderKind } from "../helpers/virtual-order-kind";
 import { paymentReturnQuery } from "../helpers/payment-return-query";
+import type { PaytrCardFamily } from "../../payment-providers/paytr/paytr-installments";
+import {
+  InstallmentChargeService,
+  chargeAttemptCreateData,
+  type ChargeQuote,
+} from "../installments/installment-charge.service";
+import { INSTALLMENT_FEE_BASKET_ITEM } from "../installments/installment-config";
+
+/** One PayTR `user_basket` line. */
+interface DirectBasketItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  quantity: number;
+}
+
+/**
+ * The installment a form is signed with: PayTR `installment_count` and
+ * `card_type`. Absent = single payment (`installment_count = 0`).
+ */
+interface DirectFormInstallment {
+  count: number;
+  cardFamily: PaytrCardFamily | null;
+}
+
+/** What one quote signs: the installment of a count above 1, else none. */
+function directFormInstallmentOf(
+  charge: ChargeQuote,
+): DirectFormInstallment | undefined {
+  return charge.installmentCount > 1
+    ? { count: charge.installmentCount, cardFamily: charge.card.family }
+    : undefined;
+}
 
 /** Misafir siparişinin alıcı e-postası — `shippingAddress` JSON'ında saklanır. */
 function guestEmailOf(shippingAddress: Prisma.JsonValue | null): string | null {
@@ -76,6 +110,7 @@ export class PaymentInitiationService {
     private readonly providerEvents: PaymentProviderEventService,
     private readonly distanceSalesConsent: DistanceSalesConsentService,
     private readonly platformServiceConsent: PlatformServiceConsentService,
+    private readonly installmentCharge: InstallmentChargeService,
   ) {}
 
   /**
@@ -281,19 +316,26 @@ export class PaymentInitiationService {
 
     let payment;
     if (existingPayment) {
-      if (existingPayment.status === PaymentStatus.completed) {
+      // A row captured through a charge attempt (also one refunded since)
+      // was paid: resetting it would rewrite `amount` under the captured
+      // charged amount (DB CHECK `payments_charged_amount_check`).
+      if (
+        existingPayment.status === PaymentStatus.completed ||
+        existingPayment.chargeAttemptId
+      ) {
         throw new BadRequestException(
           i18nMessage("server.payment.orderGroupAlreadyPaid"),
         );
       }
-      // FLOW-M1: CAS reset. findUnique ile bu güncelleme arasında bir başarı
-      // callback'i ödemeyi `completed` yapmış olabilir; KOŞULSUZ update bunu
-      // `pending`'e EZER (ödenmiş grup bozulur, çekilen para sipariş'e bağlı kalmaz).
-      // Yalnız completed OLMAYAN satırı resetle; count===0 → arada tamamlandı.
+      // FLOW-M1: CAS reset. A success callback may complete the payment
+      // between the read and this write; an unconditional update would turn
+      // a paid cart back to `pending`. Only a row neither completed nor
+      // captured is reset; count === 0 -> it was paid in between.
       const reset = await this.prisma.payment.updateMany({
         where: {
           id: existingPayment.id,
           status: { not: PaymentStatus.completed },
+          chargeAttemptId: null,
         },
         data: {
           status: PaymentStatus.pending,
@@ -414,6 +456,7 @@ export class PaymentInitiationService {
       basketItems,
       merchantOid,
       amount,
+      installment,
       returnQueryParams,
       ownerId,
     } = await this.resolveDirectPaymentContext(
@@ -432,6 +475,7 @@ export class PaymentInitiationService {
           basketItems,
           merchantOid,
           amount,
+          installment,
           returnQueryParams,
           ownerId,
         },
@@ -459,15 +503,12 @@ export class PaymentInitiationService {
     ctx: {
       payment: any;
       buyer: PayTRBuyer;
-      basketItems: Array<{
-        id: string;
-        name: string;
-        category: string;
-        price: number;
-        quantity: number;
-      }>;
+      basketItems: DirectBasketItem[];
       merchantOid: string;
+      /** The signed `payment_amount`: the charge attempt's C. */
       amount: number;
+      /** Absent = single payment. */
+      installment?: DirectFormInstallment;
       returnQueryParams: string;
       /** Kartın senkronlanacağı hesap (callback'teki sahip); bkz. resolveStoreCard. */
       ownerId: string | null;
@@ -480,9 +521,18 @@ export class PaymentInitiationService {
       basketItems,
       merchantOid,
       amount,
+      installment,
       returnQueryParams,
       ownerId,
     } = ctx;
+    const installmentOptions = installment
+      ? {
+          installmentCount: installment.count,
+          ...(installment.cardFamily
+            ? { cardType: installment.cardFamily }
+            : {}),
+        }
+      : {};
     // Ödemenin mağazası claim'de yazıldı (resolvePaytrMerchant). Form, kart
     // kasası ve yetenekler o mağazanındır: üyelik kartları üyelik mağazasında,
     // sepet kartları pazaryeri mağazasında durur ve birbirinin yerine geçmez.
@@ -529,6 +579,7 @@ export class PaymentInitiationService {
             ctoken: saved.ctoken,
             requireCvv: saved.requireCvv,
           },
+          ...installmentOptions,
         },
       );
       await this.providerEvents.record({
@@ -538,6 +589,7 @@ export class PaymentInitiationService {
         paytrMerchant: merchant,
         status: "pending",
         paymentType: "card",
+        installmentCount: installment?.count ?? 1,
         amount,
         totalAmount: amount,
         raw: { savedCard: true, formPrepared: true },
@@ -588,18 +640,20 @@ export class PaymentInitiationService {
         storeCard,
         utoken: existingCard?.utoken,
         returnQueryParams,
-        // Test şeridi: DB trigger'ının damgaladığı Payment.isTest → test_mode=1.
+        // Test lane: the DB trigger's Payment.isTest stamp -> test_mode=1.
         testMode: payment.isTest === true,
+        ...installmentOptions,
       },
     );
 
-    // Yalnız form hazırlama olayını kaydet; kart alanları bu servise ulaşmaz.
+    // Only the form preparation is recorded; card fields never reach this service.
     await this.providerEvents.record({
       eventType: "direct_payment",
       merchantOid,
       paymentId: payment.id,
       status: "pending",
       paymentType: "card",
+      installmentCount: installment?.count ?? 1,
       amount,
       totalAmount: amount,
       paytrMerchant: merchant,
@@ -634,15 +688,12 @@ export class PaymentInitiationService {
   ): Promise<{
     payment: any;
     buyer: PayTRBuyer;
-    basketItems: Array<{
-      id: string;
-      name: string;
-      category: string;
-      price: number;
-      quantity: number;
-    }>;
+    basketItems: DirectBasketItem[];
     merchantOid: string;
+    /** The signed `payment_amount`: the charge attempt's C. */
     amount: number;
+    /** Absent = single payment. */
+    installment?: DirectFormInstallment;
     returnQueryParams: string;
     /**
      * Ödemenin sahibi: sipariş/grup alıcısı ya da takas satırının ödeyeni.
@@ -727,13 +778,7 @@ export class PaymentInitiationService {
     // Pazaryeri varsayılan; yalnız üyelik siparişi üyelik mağazasına gider.
     let paytrMerchant: PaytrMerchant = PaytrMerchant.marketplace;
     let buyer: PayTRBuyer;
-    let basketItems: Array<{
-      id: string;
-      name: string;
-      category: string;
-      price: number;
-      quantity: number;
-    }>;
+    let basketItems: DirectBasketItem[];
     let baseOid: string;
     let amount: number;
     let returnQueryParams: string;
@@ -1127,6 +1172,27 @@ export class PaymentInitiationService {
       }
     }
 
+    // PRICE THE CHARGE, before the claim (ADR 0019): T from the payment row,
+    // the chosen installment priced again from the same rates, rules and
+    // settings the options call used. A refusal (400 not offered, 409 drift
+    // or unavailable) leaves the row untouched and writes no attempt. No
+    // installment chosen (old clients) = a single payment of T.
+    const charge = await this.installmentCharge.quoteCharge({
+      paymentId: payment.id,
+      targetTotal: new Prisma.Decimal(amount),
+      paytrMerchant,
+      selection: dto.installment,
+      savedCardId: dto.savedCardId,
+      userId,
+    });
+    if (charge.feeAmount.gt(0)) {
+      // PayTR's basket sums to the signed amount: the fee is its own line.
+      basketItems = [
+        ...basketItems,
+        { ...INSTALLMENT_FEE_BASKET_ITEM, price: charge.feeAmount.toNumber() },
+      ];
+    }
+
     // merchant_oid + Y8 deseni: eski oid'li callback de eşleşsin diye geçmişini koru.
     const merchantOid = buildPaytrMerchantOid(baseOid);
     const prevMeta = (payment.metadata as any) || {};
@@ -1159,7 +1225,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.orderNotAwaitingPayment"),
         );
       }
-      return tx.payment.updateMany({
+      const claim = await tx.payment.updateMany({
         where: {
           id: payment.id,
           status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
@@ -1185,6 +1251,21 @@ export class PaymentInitiationService {
           },
         },
       });
+      // One priced snapshot per signed form, keyed by its oid, in the claim
+      // transaction: the callback of this oid (also once superseded) is
+      // checked against its own amount, and the capture copies it. After the
+      // claim update, which wrote the store the attempt must match (DB
+      // trigger `payment_charge_attempts_guard`).
+      if (claim.count > 0) {
+        await tx.paymentChargeAttempt.create({
+          data: chargeAttemptCreateData(charge, {
+            paymentId: payment.id,
+            merchantOid,
+            paytrMerchant,
+          }),
+        });
+      }
+      return claim;
     });
     if (claimed.count === 0) {
       throw new BadRequestException(
@@ -1200,7 +1281,8 @@ export class PaymentInitiationService {
       buyer,
       basketItems,
       merchantOid,
-      amount,
+      amount: charge.chargedAmount.toNumber(),
+      installment: directFormInstallmentOf(charge),
       returnQueryParams,
       ownerId,
     };
@@ -1314,12 +1396,15 @@ export class PaymentInitiationService {
     // because PayTR iframe tokens are single-use. Returning the old providerPaymentId
     // leads to "Bu ödeme sayfası artık geçersiz" on the PayTR iframe.
     if (existingPayment) {
-      // FLOW-M1: CAS reset (bkz. grup/tekil yolu) — koşulsuz update, arada tamamlanan
-      // bir trade-cash ödemesini `pending`'e ezmesin. count===0 → zaten ödendi.
+      // FLOW-M1: CAS reset (see the cart and order paths): an unconditional
+      // update would turn a trade cash payment completed in between, or one
+      // captured through a charge attempt, back to `pending`. count === 0 ->
+      // already paid.
       const reset = await this.prisma.payment.updateMany({
         where: {
           id: existingPayment.id,
           status: { not: PaymentStatus.completed },
+          chargeAttemptId: null,
         },
         data: {
           status: PaymentStatus.pending,
@@ -1430,6 +1515,8 @@ export class PaymentInitiationService {
         where: {
           id: existingPayment.id,
           status: { not: PaymentStatus.completed },
+          // Never a row captured through a charge attempt (see below).
+          chargeAttemptId: null,
         },
         data: {
           status: PaymentStatus.pending,
@@ -1569,13 +1656,25 @@ export class PaymentInitiationService {
     });
     let payment;
     if (existingOrderPayment) {
-      if (existingOrderPayment.status === PaymentStatus.completed) {
+      // A row captured through a charge attempt (also one refunded since)
+      // was paid: resetting `amount` under its captured charged amount would
+      // break the DB CHECK `payments_charged_amount_check`.
+      if (
+        existingOrderPayment.status === PaymentStatus.completed ||
+        existingOrderPayment.chargeAttemptId
+      ) {
         throw new BadRequestException(
           i18nMessage("server.payment.orderAlreadyPaid"),
         );
       }
-      payment = await this.prisma.payment.update({
-        where: { id: existingOrderPayment.id },
+      // CAS reset, as in the cart path: a capture between the read and this
+      // write wins and the retry is refused.
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingOrderPayment.id,
+          status: { not: PaymentStatus.completed },
+          chargeAttemptId: null,
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
@@ -1583,6 +1682,14 @@ export class PaymentInitiationService {
           amount: order.totalAmount,
           provider: PaymentProvider.paytr,
         },
+      });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderAlreadyPaid"),
+        );
+      }
+      payment = await this.prisma.payment.findUniqueOrThrow({
+        where: { id: existingOrderPayment.id },
       });
     } else {
       payment = await this.prisma.payment.create({

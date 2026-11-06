@@ -1,4 +1,5 @@
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * Grup üyesi siparişte TEKİL ödeme başlatılamaz: sepet tek çekimle ödenir.
@@ -22,6 +23,7 @@ describe("PaymentInitiationService — group redirect guard", () => {
       {} as any,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     const groupSpy = jest
       .spyOn(svc as any, "initiateGroupPayment")

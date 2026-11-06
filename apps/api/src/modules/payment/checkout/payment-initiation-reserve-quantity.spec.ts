@@ -1,4 +1,5 @@
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * #6 (OVERSELL): Ödeme başlatılırken 30-dk cron rezervasyonu bıraktıysa, stok
@@ -39,6 +40,7 @@ describe("PaymentInitiationService — reserve uses order.quantity (#6)", () => 
       {} as any, // providerEvents
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     return { service, reserveCalls };
   };
