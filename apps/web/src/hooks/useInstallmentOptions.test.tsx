@@ -169,6 +169,47 @@ describe("useInstallmentOptions", () => {
     expect(h.installmentOptions).toHaveBeenCalledTimes(2);
     expect(result.state.status).toBe("done");
     expect(result.sourceKey).toBe("bin:55555555");
+    // The aborted request's key holds the old BIN: never reported either.
+    expect(queryErrors).toEqual([]);
+  });
+
+  it("leaving the page mid-request aborts it without a reported query error", async () => {
+    let signal: AbortSignal | undefined;
+    h.installmentOptions.mockImplementationOnce(
+      (_body: unknown, opts: { signal: AbortSignal }) => {
+        signal = opts.signal;
+        return new Promise((_resolve, reject) =>
+          opts.signal.addEventListener("abort", () =>
+            reject(new Error("canceled")),
+          ),
+        );
+      },
+    );
+    render({ ...base, source: bin("45467112") });
+    await settle();
+    act(() => root.unmount());
+    await settle(10);
+    expect(signal?.aborted).toBe(true);
+    expect(queryErrors).toEqual([]);
+    // afterEach unmounts again: give it a fresh root.
+    root = createRoot(container);
+  });
+
+  it("while the typed card differs from the priced one, its options are neither shown nor payable", async () => {
+    render({ ...base, source: bin("45467112") });
+    await settle();
+    expect(result.state.status).toBe("done");
+
+    // Another BIN inside the debounce: the first card's prices must not be
+    // offered for the second card.
+    render({ ...base, source: bin("55555555") });
+    expect(result.state.status).toBe("loading");
+    act(() => result.select(6));
+    expect(result.chosen).toBeNull();
+    expect(result.selectedCount).toBe(1);
+    await settle(100);
+    expect(result.state.status).toBe("loading");
+    expect(result.chosen).toBeNull();
   });
 
   it("checkout before the order: prices the goods total (amount, two decimals)", async () => {
