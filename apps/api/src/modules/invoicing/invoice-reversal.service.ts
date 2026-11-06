@@ -33,6 +33,7 @@ import {
   isStaleInvoiceCancelClaim,
   parseInvoiceCancelClaim,
 } from "./helpers/invoice-cancel-claim";
+import { errorMessage } from "../../common/helpers/error-message";
 import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
 import { tradeHandedToCargo } from "../trade/helpers/trade-handed-to-cargo";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
@@ -71,9 +72,11 @@ interface CreatedReturn {
   capped: boolean;
 }
 
+const CANCEL_IN_PROGRESS = "INVOICE_CANCEL_IN_PROGRESS";
+
 const cancelInProgress = (inv: { id: string; invoiceNumber: string | null }) =>
   new Error(
-    `INVOICE_CANCEL_IN_PROGRESS invoice=${inv.invoiceNumber ?? inv.id}: another run is cancelling it`,
+    `${CANCEL_IN_PROGRESS} invoice=${inv.invoiceNumber ?? inv.id}: another run is cancelling it`,
   );
 
 /**
@@ -288,9 +291,15 @@ export class InvoiceReversalService {
           await this.reverseInvoice(inv, adjustment);
         }
       } catch (error: unknown) {
-        const message = `${inv.invoiceNumber ?? inv.id}: ${(error as Error)?.message ?? error}`;
+        const message = `${inv.invoiceNumber ?? inv.id}: ${errorMessage(error)}`;
         failures.push(message);
-        this.logger.error(`eLogo refund/cancel failed (${message})`);
+        // Backing off from another run's cancel claim is expected and
+        // retried by the outbox: "watch this", not an alarm.
+        if (message.includes(CANCEL_IN_PROGRESS)) {
+          this.logger.warn(`eLogo refund/cancel deferred (${message})`);
+        } else {
+          this.logger.error(`eLogo refund/cancel failed (${message})`);
+        }
       }
     }
     if (failures.length > 0) {
