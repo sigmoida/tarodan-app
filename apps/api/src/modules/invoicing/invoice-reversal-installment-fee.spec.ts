@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { InvoiceReversalService } from "./invoice-reversal.service";
 import type {
@@ -120,6 +121,34 @@ function makeService(
         return row;
       },
     ),
+    count: jest.fn(
+      async ({ where }: { where: Where }) =>
+        store.invoices.filter((i) => matches(i, where)).length,
+    ),
+    // The cancel claim: `{ id, status: { in }, OR: [{ cancelReason }] }`.
+    updateMany: jest.fn(
+      async ({
+        where,
+        data,
+      }: {
+        where: {
+          id: string;
+          status: { in: string[] };
+          OR: Array<{ cancelReason: string | null }>;
+        };
+        data: Partial<Row>;
+      }) => {
+        const row = store.invoices.find(
+          (i) =>
+            i.id === where.id &&
+            where.status.in.includes(String(i.status)) &&
+            where.OR.some((c) => (i.cancelReason ?? null) === c.cancelReason),
+        );
+        if (!row) return { count: 0 };
+        Object.assign(row, data);
+        return { count: 1 };
+      },
+    ),
     create: jest.fn(async ({ data }: { data: Partial<Row> }) => {
       const row = { id: `ret-${++ids}`, ...data };
       store.invoices.push(row);
@@ -165,20 +194,23 @@ function makeService(
           buyerId: "b1",
           packageNumber: "PKG-K7X9M2QF3N",
           shippingAddress: null,
-          orders: [
-            {
-              id: `${packageId}-o`,
-              fee,
-              refundedFee: store.refundedFee[packageId] ?? 0,
-            },
-          ],
+          // The package's fee and refunds sit on its first order.
+          orders: Object.entries(orderPackage)
+            .filter(([, pkg]) => pkg === packageId)
+            .map(([orderId], i) => ({
+              id: orderId,
+              fee: i === 0 ? fee : 0,
+              refundedFee: i === 0 ? (store.refundedFee[packageId] ?? 0) : 0,
+            })),
           paymentFeeFullyRefunded: store.paymentFeeFullyRefunded,
           vatRatePct: 20,
-          paymentPackageIds: store.paymentFeeFullyRefunded
-            ? store.paymentPackageIds
-            : [],
         };
       },
+    ),
+    installmentFeeSweepPackageIds: jest.fn(async (orderId: string) =>
+      store.paymentFeeFullyRefunded
+        ? store.paymentPackageIds.filter((p) => p !== orderPackage[orderId])
+        : [],
     ),
   };
   const provider = {
@@ -233,7 +265,7 @@ function makeService(
         lineItems: i.lineItems,
       }));
 
-  return { service, store, refund, returns, provider, sendRecord };
+  return { service, store, refund, returns, provider, sendRecord, db };
 }
 
 describe("InvoiceReversalService: installment fee document", () => {
@@ -463,5 +495,174 @@ describe("InvoiceReversalService: installment fee document", () => {
       // pkg1's remainder: 39.83 - 36.00 = 3.83, net 33.19 - 30.00.
       ["TRD2026000000001", 3.83, 3.19, 0.64],
     ]);
+  });
+
+  it("lets the closing sweep take only another package's shortfall, never a share its own refund still has to reverse", async () => {
+    // pkg1 (fee 60) was fully refunded by ra1, whose event has not run yet;
+    // ra2 on pkg2 (fee 40) closes the payment and its event runs first.
+    const { service, refund, returns, store } = makeService({
+      orderPackage: { o1: "pkg1", o2: "pkg2" },
+      feeOf: { pkg1: 60, pkg2: 40 },
+      paymentPackageIds: ["pkg1", "pkg2"],
+      invoices: [
+        sentFeeInvoice({
+          id: "fee-1",
+          sourceId: "pkg1",
+          invoiceNumber: "TRD2026000000001",
+          netAmount: D("50.00"),
+          taxAmount: D("10.00"),
+          total: D("60.00"),
+        }),
+        sentFeeInvoice({
+          id: "fee-2",
+          sourceId: "pkg2",
+          invoiceNumber: "TRD2026000000002",
+          netAmount: D("33.33"),
+          taxAmount: D("6.67"),
+          total: D("40.00"),
+        }),
+      ],
+    });
+    const first = refund("ra1", "o1", 60, 1);
+    const closing = refund("ra2", "o2", 40, 1);
+    store.paymentFeeFullyRefunded = true;
+
+    await service.handleOrderRefund("o2", closing);
+    await service.handleOrderRefund("o1", first);
+
+    expect(returns().map((r) => [r.sourceId, r.total])).toEqual([
+      // Strategy RETURN_INVOICE: no cancel, one return per attempt and document.
+      ["fee-2:ra2", 40],
+      ["fee-1:ra1", 60],
+    ]);
+  });
+
+  it("sweeps the other packages even when the closing order's own package carried no fee", async () => {
+    // o3's package has no fee (no document), but its refund closed the
+    // payment and gave back pkg1's 3.83 shortfall.
+    const { service, refund, returns, store } = makeService({
+      orderPackage: { o1: "pkg1", o3: "pkg3" },
+      feeOf: { pkg1: 39.83 },
+      refundedFee: { pkg1: 36.0 },
+      paymentPackageIds: ["pkg1", "pkg3"],
+      invoices: [
+        sentFeeInvoice({
+          id: "fee-1",
+          sourceId: "pkg1",
+          netAmount: D("33.19"),
+          taxAmount: D("6.64"),
+          total: D("39.83"),
+        }),
+        {
+          id: "ret-0",
+          type: "return_invoice",
+          sourceId: "fee-1:ra0",
+          status: "sent",
+          billingReference: "TRD2026000000001",
+          total: D("36.00"),
+          netAmount: D("30.00"),
+        },
+      ],
+    });
+    store.paymentFeeFullyRefunded = true;
+
+    await service.handleOrderRefund("o3", refund("ra9", "o3", 3.83, 1));
+
+    expect(
+      returns()
+        .filter((r) => r.sourceId.endsWith(":ra9"))
+        .map((r) => [r.sourceId, r.total]),
+    ).toEqual([["fee-1:ra9", 3.83]]);
+  });
+
+  it("decides the amount inside the transaction: a return committed meanwhile is not reversed twice", async () => {
+    const { service, refund, returns, store, db } = makeService();
+    const adjustment = refund("ra2", "o1", 26.55);
+    // Another handler (ra1, same share) commits its return between this
+    // handler's first read and its transaction.
+    const transaction = db.$transaction.getMockImplementation();
+    db.$transaction.mockImplementationOnce(async (fn) => {
+      store.invoices.push({
+        id: "ret-x",
+        type: "return_invoice",
+        sourceId: "fee-1:ra1",
+        status: "pending",
+        billingReference: "TRD2026000000001",
+        total: D("66.38"),
+        netAmount: D("55.32"),
+      });
+      return transaction ? transaction(fn) : fn(db);
+    });
+
+    await service.handleOrderRefund("o1", adjustment);
+
+    expect(returns().map((r) => r.sourceId)).toEqual(["fee-1:ra1"]);
+  });
+
+  it("logs a refund whose whole share was capped away", async () => {
+    const { service, refund } = makeService({
+      invoices: [
+        sentFeeInvoice({
+          netAmount: D("33.19"),
+          taxAmount: D("6.64"),
+          total: D("39.83"),
+          originalTotal: D("39.83"),
+        }),
+      ],
+    });
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+
+    await service.handleOrderRefund("o1", refund("ra1", "o1", 26.55));
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^INSTALLMENT_FEE_RETURN_CAPPED invoice=TRD2026000000001 attempt=ra1 share=26.55 due=0$/,
+      ),
+    );
+    warn.mockRestore();
+  });
+
+  it("does not cancel when another attempt's return lands before the cancel claim", async () => {
+    const { service, refund, store, provider, db } = makeService({
+      strategy: "CANCEL",
+    });
+    const adjustment = refund("ra2", "o1", 66.38, 1);
+    const transaction = db.$transaction.getMockImplementation();
+    // The first transaction is the cancel claim: a return commits just before.
+    db.$transaction.mockImplementationOnce(async (fn) => {
+      store.invoices.push({
+        id: "ret-x",
+        type: "return_invoice",
+        sourceId: "fee-1:ra1",
+        status: "pending",
+        billingReference: "TRD2026000000001",
+        total: D("26.55"),
+        netAmount: D("22.13"),
+      });
+      return transaction ? transaction(fn) : fn(db);
+    });
+
+    await service.handleOrderRefund("o1", adjustment);
+
+    expect(provider.cancelEArchive).not.toHaveBeenCalled();
+    // The return path decides from what is left: 66.38 - 26.55.
+    expect(
+      store.invoices
+        .filter((i) => i.sourceId === "fee-1:ra2")
+        .map((i) => Number(i.total)),
+    ).toEqual([39.83]);
+  });
+
+  it("cuts no return while another handler holds the cancel claim", async () => {
+    const { service, refund, returns } = makeService({
+      strategy: "CANCEL",
+      invoices: [sentFeeInvoice({ cancelReason: "refund_cancelling" })],
+    });
+
+    await service.handleOrderRefund("o1", refund("ra1", "o1", 26.55));
+
+    expect(returns()).toEqual([]);
   });
 });

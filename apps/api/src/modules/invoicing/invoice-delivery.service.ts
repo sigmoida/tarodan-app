@@ -20,6 +20,7 @@ import {
 } from "./invoice/invoice-line-description";
 import { resolveInvoiceParties } from "./invoice/invoice-parties";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
+import { assertCutVatRateInput } from "./invoice/invoice-vat-rate";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import {
   adminUrl,
@@ -105,6 +106,9 @@ export class InvoiceDeliveryService {
       sourceReference,
       snapshotVatRate,
     } = opts;
+    // Outside the catch-all below: a wrong VAT input is a programming error
+    // that must fail the issuer (no stamp, retried), not a logged no-op.
+    assertCutVatRateInput(type, snapshotVatRate);
     try {
       const providerEnabled = this.provider.isEnabled();
       if (!providerEnabled) {

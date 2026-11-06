@@ -24,7 +24,10 @@ import {
   type PackageFeeOrderRow,
 } from "./invoice/package-fee-basis";
 import { invoiceIssueDate, invoiceIssueTime } from "./invoice/invoice-datetime";
-import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
+import {
+  assertCutVatRateInput,
+  VAT_SOURCE_BY_TYPE,
+} from "./invoice/invoice-vat-rate";
 import { formatInvoiceNumber } from "./invoice/document-number";
 import { DEFAULT_ELOGO_INVOICE_PREFIX } from "../../config/elogo";
 import {
@@ -47,13 +50,16 @@ export interface InstallmentFeeBasis {
    * carries the fee, which the issuer refuses (fail closed).
    */
   vatRatePct: number | null;
-  /**
-   * Every package of the payment, filled only once the payment's whole fee
-   * went back: the refund that closes the payment can carry another
-   * package's shortfall, so the reversal visits them all.
-   */
-  paymentPackageIds: string[];
 }
+
+/** What the fee lookups read of the payment that captured a fee. */
+const FEE_PAYMENT_SELECT = {
+  id: true,
+  orderId: true,
+  checkoutGroupId: true,
+  installmentFeeAmount: true,
+  chargeAttempt: { select: { feeVatRatePct: true } },
+} satisfies Prisma.PaymentSelect;
 
 /**
  * Faturanın GÖVDESİNİ kuran katman — InvoicingService'ten birebir taşındı.
@@ -144,23 +150,9 @@ export class InvoiceDocumentService {
     type: FiscalInvoiceType,
     opts: { categoryId?: string | null; snapshotVatRate?: number } = {},
   ): Promise<number> {
-    const { snapshotVatRate } = opts;
+    assertCutVatRateInput(type, opts.snapshotVatRate);
     if (VAT_SOURCE_BY_TYPE[type] === "charge_snapshot") {
-      if (
-        snapshotVatRate === undefined ||
-        !Number.isFinite(snapshotVatRate) ||
-        snapshotVatRate < 0
-      ) {
-        throw new Error(
-          `VAT rate of ${type} is snapshotted on the charge and was not passed`,
-        );
-      }
-      return snapshotVatRate;
-    }
-    if (snapshotVatRate !== undefined) {
-      throw new Error(
-        `${type} resolves its own VAT rate; a charge snapshot rate is not accepted`,
-      );
+      return opts.snapshotVatRate as number;
     }
     return this.resolveVatRate(type, opts.categoryId);
   }
@@ -560,34 +552,10 @@ export class InvoiceDocumentService {
     if (feeOrders.length === 0) return null;
 
     const orderIds = pkg.orders.map((order) => order.id);
-    const groupIds = [
-      ...new Set(
-        pkg.orders
-          .map((order) => order.checkoutGroupId)
-          .filter((id): id is string => !!id),
-      ),
-    ];
-    // The payment that captured the fee: one per package (a package never
-    // spans two checkouts). The DB guard ties a fee to a captured attempt.
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        installmentFeeAmount: { gt: 0 },
-        chargeAttemptId: { not: null },
-        OR: [
-          { orderId: { in: orderIds } },
-          ...(groupIds.length ? [{ checkoutGroupId: { in: groupIds } }] : []),
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        orderId: true,
-        checkoutGroupId: true,
-        installmentFeeAmount: true,
-        chargeAttempt: { select: { feeVatRatePct: true } },
-      },
-    });
-
+    const payment = await this.feePaymentOf(
+      orderIds,
+      pkg.orders.map((order) => order.checkoutGroupId),
+    );
     const refunds = await this.prisma.refundAttempt.findMany({
       where: {
         status: RefundAttemptStatus.finalized,
@@ -598,45 +566,18 @@ export class InvoiceDocumentService {
       },
       select: { orderId: true, paymentId: true, installmentFeeAmount: true },
     });
-    const refundedOf = (orderId: string) =>
+    const refundedOf = (keep: (r: (typeof refunds)[number]) => boolean) =>
       refunds
-        .filter((r) => r.orderId === orderId)
+        .filter(keep)
         .reduce(
           (sum, r) => sum.plus(refundInstallmentFeeOf(r)),
           new Prisma.Decimal(0),
         );
-    const paymentRefunded = payment
-      ? refunds
-          .filter((r) => r.paymentId === payment.id)
-          .reduce(
-            (sum, r) => sum.plus(refundInstallmentFeeOf(r)),
-            new Prisma.Decimal(0),
-          )
-      : new Prisma.Decimal(0);
     const paymentFeeFullyRefunded =
-      !!payment && paymentRefunded.gte(payment.installmentFeeAmount);
-
-    const paymentOrders: Prisma.OrderWhereInput | null =
-      payment?.checkoutGroupId
-        ? { checkoutGroupId: payment.checkoutGroupId }
-        : payment?.orderId
-          ? { id: payment.orderId }
-          : null;
-    const paymentPackageIds =
-      paymentFeeFullyRefunded && paymentOrders
-        ? [
-            ...new Set(
-              (
-                await this.prisma.order.findMany({
-                  where: paymentOrders,
-                  select: { packageId: true },
-                })
-              )
-                .map((order) => order.packageId)
-                .filter((id): id is string => !!id),
-            ),
-          ]
-        : [];
+      !!payment &&
+      refundedOf((r) => r.paymentId === payment.id).gte(
+        payment.installmentFeeAmount,
+      );
 
     const rate = payment?.chargeAttempt?.feeVatRatePct;
     return {
@@ -647,12 +588,79 @@ export class InvoiceDocumentService {
       orders: pkg.orders.map((order) => ({
         id: order.id,
         fee: orderInstallmentFeeOf(order).toNumber(),
-        refundedFee: refundedOf(order.id).toNumber(),
+        refundedFee: refundedOf((r) => r.orderId === order.id).toNumber(),
       })),
       paymentFeeFullyRefunded,
       vatRatePct: rate ? rate.toNumber() : null,
-      paymentPackageIds,
     };
+  }
+
+  /**
+   * The OTHER packages of an order's payment whose fee documents a refund of
+   * the order must also reconcile: every package of the payment once the
+   * payment's whole fee went back (the refund that closes the payment takes
+   * the rest of the fee, which can be another package's shortfall, even
+   * when the refunded order's own package carried no fee). Empty otherwise.
+   */
+  async installmentFeeSweepPackageIds(orderId: string): Promise<string[]> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { packageId: true, checkoutGroupId: true },
+    });
+    if (!order) return [];
+    const payment = await this.feePaymentOf([orderId], [order.checkoutGroupId]);
+    if (!payment) return [];
+    const refunds = await this.prisma.refundAttempt.findMany({
+      where: {
+        paymentId: payment.id,
+        status: RefundAttemptStatus.finalized,
+      },
+      select: { installmentFeeAmount: true },
+    });
+    const refunded = refunds.reduce(
+      (sum, r) => sum.plus(refundInstallmentFeeOf(r)),
+      new Prisma.Decimal(0),
+    );
+    if (refunded.lt(payment.installmentFeeAmount)) return [];
+    const orders = await this.prisma.order.findMany({
+      where: payment.checkoutGroupId
+        ? { checkoutGroupId: payment.checkoutGroupId }
+        : { id: payment.orderId ?? orderId },
+      select: { packageId: true },
+    });
+    return [
+      ...new Set(
+        orders
+          .map((o) => o.packageId)
+          .filter((id): id is string => !!id && id !== order.packageId),
+      ),
+    ];
+  }
+
+  /**
+   * The payment that captured the fee of these orders: one per package (a
+   * package never spans two checkouts); the DB guard ties a fee to its
+   * captured attempt.
+   */
+  private feePaymentOf(
+    orderIds: string[],
+    checkoutGroupIds: Array<string | null>,
+  ) {
+    const groupIds = [
+      ...new Set(checkoutGroupIds.filter((id): id is string => !!id)),
+    ];
+    return this.prisma.payment.findFirst({
+      where: {
+        installmentFeeAmount: { gt: 0 },
+        chargeAttemptId: { not: null },
+        OR: [
+          { orderId: { in: orderIds } },
+          ...(groupIds.length ? [{ checkoutGroupId: { in: groupIds } }] : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      select: FEE_PAYMENT_SELECT,
+    });
   }
 
   /**

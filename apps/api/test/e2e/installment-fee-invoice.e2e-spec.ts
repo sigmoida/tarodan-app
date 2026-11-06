@@ -388,7 +388,12 @@ describe("installment fee document on a real database (E2E)", () => {
   }
 
   /** Refunds goods and runs the outbox handler of its invoice event. */
-  async function refund(orderId: string, goods: number, key: string) {
+  async function refund(
+    orderId: string,
+    goods: number,
+    key: string,
+    opts: { handle?: boolean } = {},
+  ) {
     const before = outboxEvents.length;
     await refunds.processRefund(orderId, goods, {
       idempotencyKey: key,
@@ -399,7 +404,9 @@ describe("installment fee document on a real database (E2E)", () => {
       .find((e) => e.type === OUTBOX_INVOICE_REFUND_REVERSE);
     if (!event) throw new Error(`no invoice event for ${key}`);
     const payload = event.payload as InvoiceRefundReversePayload;
-    await reversals.handleOrderRefund(payload.orderId, payload);
+    if (opts.handle !== false) {
+      await reversals.handleOrderRefund(payload.orderId, payload);
+    }
     return payload;
   }
 
@@ -606,6 +613,57 @@ describe("installment fee document on a real database (E2E)", () => {
     );
     expect(cancelled).toContain(big.ettn);
     expect(await returnsOf(big)).toEqual([]);
+  });
+
+  it("never reverses more than the document when two refund events run at once", async () => {
+    const target = await singleOrder();
+    await capture(target, target.paymentId);
+    // R1 before delivery: the document is cut net of its 26.55 (39.83).
+    const r1 = await refund(
+      target.orderId,
+      400,
+      `e2e-a6-race-1:${target.paymentId}`,
+      { handle: false },
+    );
+    await deliver(target.orderId);
+    const r2 = await refund(
+      target.orderId,
+      600,
+      `e2e-a6-race-2:${target.paymentId}`,
+      { handle: false },
+    );
+    const doc = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+    expect(amounts(doc)).toEqual(["39.83", "33.19", "6.64"]);
+
+    // Both events at once (outbox and fast path, or two workers): each one
+    // decides its amount inside its Serializable transaction.
+    await Promise.all([
+      reversals.handleOrderRefund(r1.orderId, r1),
+      reversals.handleOrderRefund(r2.orderId, r2),
+    ]);
+    await reversals.handleOrderRefund(r1.orderId, r1);
+    await reversals.handleOrderRefund(r2.orderId, r2);
+
+    // Whichever handler won, the document is reversed exactly once: either
+    // the fresh e-Arşiv is cancelled and no return exists, or it stands and
+    // its returns sum to it.
+    const after = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+    const returns = (await returnsOf(doc)).filter(
+      (r) => r.status !== "cancelled",
+    );
+    const sum = (pick: (r: FiscalInvoice) => Prisma.Decimal) =>
+      returns.reduce((acc, r) => acc.plus(pick(r)), D(0)).toFixed(2);
+    if (after.status === "cancelled") {
+      expect(returns).toEqual([]);
+      expect(cancelled).toContain(doc.ettn);
+    } else {
+      expect([
+        sum((r) => r.total),
+        sum((r) => r.netAmount),
+        sum((r) => r.taxAmount),
+      ]).toEqual(["39.83", "33.19", "6.64"]);
+    }
+    expect(after.cancelReason).not.toBe("refund_cancelling");
   });
 
   it("issues no fee document for a single payment", async () => {

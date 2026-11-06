@@ -196,7 +196,6 @@ describe("InvoiceDocumentService.resolveInstallmentFeeBasis", () => {
     orders?: Array<Record<string, unknown>>;
     payment?: Record<string, unknown> | null;
     refunds?: Array<Record<string, unknown>>;
-    paymentOrders?: Array<{ packageId: string | null }>;
   }) {
     const prisma = {
       orderPackage: {
@@ -227,9 +226,6 @@ describe("InvoiceDocumentService.resolveInstallmentFeeBasis", () => {
         ),
       },
       refundAttempt: { findMany: jest.fn(async () => over.refunds ?? []) },
-      order: {
-        findMany: jest.fn(async () => over.paymentOrders ?? []),
-      },
     };
     const service = new InvoiceDocumentService(
       prisma as unknown as PrismaService,
@@ -257,7 +253,6 @@ describe("InvoiceDocumentService.resolveInstallmentFeeBasis", () => {
       orders: [{ id: "o1", fee: 39.83, refundedFee: 10.62 }],
       paymentFeeFullyRefunded: false,
       vatRatePct: 20,
-      paymentPackageIds: [],
     });
     expect(prisma.payment.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -279,23 +274,17 @@ describe("InvoiceDocumentService.resolveInstallmentFeeBasis", () => {
     );
   });
 
-  it("names every package of the payment once its whole fee went back", async () => {
+  it("marks the payment's fee fully refunded once all of it went back", async () => {
     const { service } = buildBasis({
       refunds: [
         { orderId: "o1", paymentId: "p1", installmentFeeAmount: D("36.00") },
         { orderId: "o9", paymentId: "p1", installmentFeeAmount: D("30.38") },
-      ],
-      paymentOrders: [
-        { packageId: "pkg1" },
-        { packageId: "pkg2" },
-        { packageId: "pkg2" },
       ],
     });
 
     const basis = await service.resolveInstallmentFeeBasis("pkg1");
 
     expect(basis?.paymentFeeFullyRefunded).toBe(true);
-    expect(basis?.paymentPackageIds).toEqual(["pkg1", "pkg2"]);
   });
 
   it("returns null without a fee in the package, before any payment read", async () => {
@@ -322,5 +311,70 @@ describe("InvoiceDocumentService.resolveInstallmentFeeBasis", () => {
     const basis = await service.resolveInstallmentFeeBasis("pkg1");
 
     expect(basis?.vatRatePct).toBeNull();
+  });
+});
+
+/**
+ * The other packages a refund must reconcile: every package of the payment
+ * once its whole fee went back, whatever the refunded order's own package
+ * carried; none before.
+ */
+describe("InvoiceDocumentService.installmentFeeSweepPackageIds", () => {
+  const D = (v: string) => new Prisma.Decimal(v);
+
+  function buildSweep(refunded: string) {
+    const prisma = {
+      order: {
+        findUnique: jest.fn(async () => ({
+          packageId: "pkg3",
+          checkoutGroupId: "g1",
+        })),
+        findMany: jest.fn(async () => [
+          { packageId: "pkg1" },
+          { packageId: "pkg3" },
+          { packageId: "pkg1" },
+          { packageId: null },
+        ]),
+      },
+      payment: {
+        findFirst: jest.fn(async () => ({
+          id: "p1",
+          orderId: null,
+          checkoutGroupId: "g1",
+          installmentFeeAmount: D("66.38"),
+          chargeAttempt: { feeVatRatePct: D("20.00") },
+        })),
+      },
+      refundAttempt: {
+        findMany: jest.fn(async () => [{ installmentFeeAmount: D(refunded) }]),
+      },
+    };
+    const service = new InvoiceDocumentService(
+      prisma as unknown as PrismaService,
+      fakeProvider("local") as unknown as EInvoiceProvider,
+      fakeConfig(),
+    );
+    return { service, prisma };
+  }
+
+  it("names the payment's other packages once its whole fee went back", async () => {
+    const { service, prisma } = buildSweep("66.38");
+
+    await expect(service.installmentFeeSweepPackageIds("o3")).resolves.toEqual([
+      "pkg1",
+    ]);
+    expect(prisma.order.findMany).toHaveBeenCalledWith({
+      where: { checkoutGroupId: "g1" },
+      select: { packageId: true },
+    });
+  });
+
+  it("names none while part of the fee is still with the platform", async () => {
+    const { service, prisma } = buildSweep("40.00");
+
+    await expect(service.installmentFeeSweepPackageIds("o3")).resolves.toEqual(
+      [],
+    );
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
   });
 });

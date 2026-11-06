@@ -35,7 +35,6 @@ const basisOf = (
   orders: [{ id: "o1", fee: 66.38, refundedFee: 0 }],
   paymentFeeFullyRefunded: false,
   vatRatePct: 20,
-  paymentPackageIds: [],
   ...over,
 });
 
@@ -239,5 +238,38 @@ describe("InvoiceIssuingService.issueOrderRevenueInvoices with an installment fe
     await service.issueOrderRevenueInvoices("o1");
 
     expect(fee).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The fee document's VAT input is checked before `cut`'s swallow-everything
+ * guard: a fee document without its charge's rate fails the issuer (the
+ * order is not stamped, the backfill retries) instead of being logged and
+ * lost.
+ */
+describe("InvoiceDeliveryService.cut and the snapshotted VAT rate", () => {
+  it("throws to the issuer when the installment fee document has no rate", async () => {
+    const { InvoiceDeliveryService: Delivery } =
+      await import("./invoice-delivery.service");
+    const { InvoiceDocumentService: Documents } =
+      await import("./invoice-document.service");
+    const prisma = { fiscalInvoice: { findUnique: jest.fn() } };
+    const provider = { isEnabled: () => true, numbering: "local" };
+    const config = { get: (_k: string, d?: string) => d };
+    const documents = new Documents(
+      prisma as never,
+      provider as never,
+      config as never,
+    );
+    const delivery = new Delivery(
+      prisma as never,
+      provider as never,
+      documents,
+    );
+
+    await expect(
+      delivery.cut("buyer_installment_fee", "pkg1", "b1", 66.38, {}),
+    ).rejects.toThrow(/snapshotted on the charge/);
+    expect(prisma.fiscalInvoice.findUnique).not.toHaveBeenCalled();
   });
 });
