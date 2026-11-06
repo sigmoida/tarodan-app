@@ -195,6 +195,16 @@ export const queryKeys = {
     all: () => ["profile-payments"] as const,
     list: <TFilters>(page: number, filters: TFilters) =>
       ["profile-payments", page, filters] as const,
+    /** Public `GET /payments/config` (bypass, card storage, installments). */
+    config: () => ["payments-config"] as const,
+    /**
+     * `POST /payments/installment-options` for one payment (or the
+     * checkout's goods total before the order exists) and one card source
+     * (`installmentSourceKey`). The source holds at most the first 8 card
+     * digits; the cache lives in memory only (nothing is persisted).
+     */
+    installmentOptions: (paymentId: string, amount: string, card: string) =>
+      ["installment-options", paymentId, amount, card] as const,
   },
   collection: {
     /** A single collection (edit route), keyed by id-or-slug. `['collection']`

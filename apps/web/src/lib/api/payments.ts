@@ -1,3 +1,10 @@
+import type { AxiosResponse } from "axios";
+import type {
+  DirectFormInstallmentSelection,
+  InstallmentOptionsRequest,
+  InstallmentOptionsResponse,
+  PaymentsInstallmentsConfig,
+} from "@tarodan/types";
 import { api } from "./client";
 
 const paymentCapabilityKey = (paymentId: string) =>
@@ -62,6 +69,11 @@ export type PaymentConfig = {
   recurringEnabled: boolean;
   /** Eski API bu alanı döndürmeyebilir. */
   purposes?: Record<PaymentPurpose, PaymentPurposeCapabilities>;
+  /**
+   * Installment switch and minimum goods total (ADR 0019). Absent on an
+   * older API: off. Read it through `installmentsConfigOf` (fail closed).
+   */
+  installments?: Partial<PaymentsInstallmentsConfig>;
 };
 
 /** Amaca göre yetenekler — `purposes` yoksa (eski API) üst düzey alanlara düşer. */
@@ -160,6 +172,11 @@ export const paymentsApi = {
      * onay kaydı yoksa (teklif siparişi) burada kaydeder.
      */
     distanceSalesAccepted?: boolean;
+    /**
+     * The installment the buyer chose (count above 1 only; absent = single
+     * payment). Carries at most the first 8 card digits, never the number.
+     */
+    installment?: DirectFormInstallmentSelection;
   }) =>
     api.post<{
       paymentId: string;
@@ -174,4 +191,59 @@ export const paymentsApi = {
         ? paymentCapabilityHeaders(body.paymentId)
         : undefined,
     }),
+  /**
+   * The installment options of a card for a payment (`paymentId`) or, on the
+   * single-page checkout before the order exists, for the goods total
+   * (`amount`, display only). PCI: `bin` is at most the first 8 digits. A
+   * guest's payment carries its capability header, as for `direct-form`.
+   */
+  installmentOptions: (
+    body: InstallmentOptionsRequest,
+    options?: { signal?: AbortSignal },
+  ) =>
+    api.post<InstallmentOptionsResponse>(
+      "/payments/installment-options",
+      body,
+      {
+        signal: options?.signal,
+        headers: body.paymentId
+          ? paymentCapabilityHeaders(body.paymentId)
+          : undefined,
+      },
+    ),
 };
+
+/** What an initiate call answers (only the id is read; some envelopes nest it). */
+type InitiateResponse = AxiosResponse<{
+  paymentId?: unknown;
+  data?: { paymentId?: unknown };
+}>;
+
+/**
+ * Starts the payment of a target anew: the server resets a pending row to the
+ * current order, cart or trade total (CAS-guarded; nothing is charged) and
+ * answers its id, which may be a new one. Used once after `direct-form`
+ * answers 409 `server.payment.paymentAmountOutOfDate`. `null` when the target
+ * holds nothing to initiate.
+ */
+export async function reinitiatePayment(
+  target: { orderId?: string; checkoutGroupId?: string; tradeId?: string },
+  guest: boolean,
+): Promise<string | null> {
+  let request: Promise<InitiateResponse> | null = null;
+  if (target.tradeId) {
+    request = paymentsApi.initiateTradeCash(target.tradeId);
+  } else if (target.checkoutGroupId) {
+    request = guest
+      ? paymentsApi.initiateGroupGuest(target.checkoutGroupId, "paytr")
+      : paymentsApi.initiateGroup(target.checkoutGroupId, "paytr");
+  } else if (target.orderId) {
+    request = guest
+      ? paymentsApi.initiateGuest(target.orderId, "paytr")
+      : paymentsApi.initiate(target.orderId, "paytr");
+  }
+  if (!request) return null;
+  const response = await request;
+  const id = response.data?.data?.paymentId ?? response.data?.paymentId;
+  return typeof id === "string" && id ? id : null;
+}
