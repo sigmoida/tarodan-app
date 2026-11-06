@@ -1,5 +1,5 @@
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
-import { LedgerEventType, OrderStatus } from "@prisma/client";
+import { LedgerEventType, OrderStatus, Prisma } from "@prisma/client";
 
 /**
  * #8: finalize iki kez koşabilir (anlık yol + outbox backstop / drainer retry).
@@ -31,9 +31,10 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
           .mockResolvedValue(existingCapture ? { id: "le-1" } : null),
       },
       order: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ status: OrderStatus.preparing }),
+        findUnique: jest.fn().mockResolvedValue({
+          status: OrderStatus.preparing,
+          installmentFeeAmount: new Prisma.Decimal(0),
+        }),
       },
     } as any;
     const eventService = {
@@ -72,6 +73,28 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
       commission: 10,
       withholdingTax: 2,
       sellerNet: 88, // 100 - 10 - 2
+      installmentFee: 0,
+    });
+  });
+
+  it("passes the order's installment fee share from the row the capture wrote", async () => {
+    const { svc, prisma, ledger } = make(false);
+    prisma.order.findUnique.mockResolvedValue({
+      status: OrderStatus.preparing,
+      installmentFeeAmount: new Prisma.Decimal("39.83"),
+    });
+
+    // The order object passed in may predate the capture's fee write.
+    await svc.finalizePaidOrder({ ...order }, payment, {});
+
+    expect(prisma.order.findUnique).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      select: { installmentFeeAmount: true },
+    });
+    expect(ledger.recordCapture.mock.calls[0][1]).toMatchObject({
+      gross: 100,
+      sellerNet: 88,
+      installmentFee: 39.83,
     });
   });
 

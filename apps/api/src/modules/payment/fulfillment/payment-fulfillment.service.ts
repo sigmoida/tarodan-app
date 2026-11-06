@@ -53,6 +53,28 @@ import {
   boostPurchasedNotice,
   orderPaidNotice,
 } from "../../mail-routing/helpers/mail-internal-notices";
+import * as Sentry from "@sentry/node";
+import {
+  chargeAttemptByOid,
+  type ChargeAttemptAmounts,
+} from "../helpers/charged-amount";
+import {
+  INSTALLMENT_FEE_SPLIT_ORDER_BY,
+  allocateInstallmentFee,
+} from "../installments/installment-pricing";
+
+/**
+ * The outcome of a capture claim (`claimPaymentCompleted`): the charge
+ * attempt it captured and the installment fee F to allocate to the orders.
+ */
+interface CapturedCharge {
+  /** null = captured without an attempt (a form signed before attempts). */
+  attemptId: string | null;
+  /** F of the captured attempt; 0 for a single payment or without one. */
+  feeAmount: Prisma.Decimal;
+}
+
+const NO_FEE = new Prisma.Decimal(0);
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -144,11 +166,24 @@ export class PaymentFulfillmentService {
   }
 
   /**
-   * Faz 8.3: Ödemeyi CAS ile `{pending|processing} → completed` claim eder — tekil /
-   * grup / takas ortak boilerplate'i (audit trail + provider verisi + FLOW-M5 oid
-   * senkronu). CAS guard'ı (`status in [pending, processing]`) mükerrer başarı
-   * callback'ini idempotent kılar (tek-claim) ve hızlı-callback yarışını (#4) kapsar.
-   * @returns bu çağrı ödemeyi tamamladı mı (count > 0; false → zaten completed).
+   * Claims the payment `{pending|processing} -> completed` with a CAS (the
+   * single, cart and trade cash paths share it: audit trail, provider data,
+   * FLOW-M5 oid sync). The CAS (`status in [pending, processing]`) makes a
+   * duplicate success callback a no-op and covers the fast-callback race
+   * (#4).
+   *
+   * Capture of a charge attempt (ADR 0019): the attempt THIS payment signed
+   * under the captured oid is the evidence of what PayTR charged (the caller
+   * already checked PayTR's amount against it). The same update writes
+   * `chargeAttemptId`, `chargedAmount`, `installmentFeeAmount` and
+   * `installmentCount` from it (the DB trigger
+   * `payments_charge_attempt_guard` checks they match), and the attempt is
+   * stamped `capturedAt` once. A callback count other than the signed one is
+   * logged (`INSTALLMENT_COUNT_MISMATCH`): the amount matched, so the
+   * payment completes with the attempt's count.
+   *
+   * @returns the captured charge, or null when this call did not complete
+   * the payment (already completed).
    */
   private async claimPaymentCompleted(
     tx: Prisma.TransactionClient,
@@ -158,7 +193,7 @@ export class PaymentFulfillmentService {
       capturedMerchantOid?: string;
       providerData?: ProviderPaymentData;
     },
-  ): Promise<boolean> {
+  ): Promise<CapturedCharge | null> {
     const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat(
       {
         action: "payment.completed",
@@ -171,14 +206,26 @@ export class PaymentFulfillmentService {
     const { columns: providerColumns, metaPatch } = this.buildProviderPatch(
       opts.providerData,
     );
-    // FLOW #4 (hızlı-callback yarışı): CAS `pending` VE `processing` kabul eder.
-    // Direct ödeme akışı `pending→processing→(PayTR çekim)→finally: processing→pending`
-    // yapar. PayTR success callback'i, çekim bitip finally henüz `pending`'e döndürmeden
-    // ("processing" penceresinde) gelirse, eski `status: pending`-only CAS onu kaçırır
-    // (count=0) → fulfillment ATLANIR ama PayTR'ye OK döner → alıcı öder, sipariş
-    // hazırlanmaz (yalnız reconciliation gecikmeyle yakalar). `processing`'i de kabul
-    // etmek tamamlamayı hemen claim ettirir. updateMany tek-claim garantisini korur
-    // (yalnız bir çağrı completed'a çevirebilir); çift-çekim ayrı bir gate ile önlenir.
+    const attempt = await this.capturableAttempt(
+      tx,
+      payment,
+      opts.capturedMerchantOid,
+    );
+    if (
+      attempt &&
+      providerColumns.installmentCount !== undefined &&
+      providerColumns.installmentCount !== attempt.installmentCount
+    ) {
+      this.logger.error(
+        `INSTALLMENT_COUNT_MISMATCH payment=${payment.id} oid=${attempt.merchantOid}: PayTR reported ${providerColumns.installmentCount}, the form was signed for ${attempt.installmentCount}; completed with the signed count`,
+      );
+    }
+    // FLOW #4 (fast-callback race): the CAS accepts `pending` AND
+    // `processing`. The direct form goes pending -> processing -> (PayTR
+    // charge) -> finally processing -> pending; a success callback inside
+    // the `processing` window would be missed by a pending-only CAS (buyer
+    // pays, order never prepared). updateMany keeps the single-claim
+    // guarantee; double charges are stopped by a separate gate.
     const claimed = await tx.payment.updateMany({
       where: {
         id: payment.id,
@@ -188,13 +235,22 @@ export class PaymentFulfillmentService {
         status: PaymentStatus.completed,
         paidAt: new Date(),
         providerPaymentId: opts.transactionId || payment.providerPaymentId,
-        // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
-        // providerConversationId üzerinden doğru oid'i çağırır.
+        // FLOW-M5: sync to the charged oid (else keep the current one), so a
+        // refund calls PayTR with the right oid.
         ...(opts.capturedMerchantOid
           ? { providerConversationId: opts.capturedMerchantOid }
           : {}),
-        // Gözlemlenebilirlik: PayTR'nin bildirdiği gerçek taksit/currency (varsa).
+        // Observability: the count and currency PayTR reported (if any).
         ...providerColumns,
+        // The captured attempt wins over the reported count (trigger match).
+        ...(attempt
+          ? {
+              chargeAttemptId: attempt.id,
+              chargedAmount: attempt.chargedAmount,
+              installmentFeeAmount: attempt.installmentFeeAmount,
+              installmentCount: attempt.installmentCount,
+            }
+          : {}),
         metadata: {
           ...((payment.metadata as any) || {}),
           auditHistory,
@@ -202,7 +258,89 @@ export class PaymentFulfillmentService {
         } as object,
       },
     });
-    return claimed.count > 0;
+    if (claimed.count === 0) return null;
+    if (!attempt) return { attemptId: null, feeAmount: NO_FEE };
+    await tx.paymentChargeAttempt.updateMany({
+      where: { id: attempt.id, capturedAt: null },
+      data: { capturedAt: new Date() },
+    });
+    const scope = Sentry.getIsolationScope();
+    scope.setTag("installment_count", String(attempt.installmentCount));
+    scope.setTag("installment_segment", attempt.buyerSegment);
+    scope.setTag("installment_rule", attempt.installmentRuleId ?? "default");
+    if (attempt.cardFamily) scope.setTag("card_family", attempt.cardFamily);
+    return { attemptId: attempt.id, feeAmount: attempt.installmentFeeAmount };
+  }
+
+  /**
+   * The charge attempt a capture links: this payment's attempt for the
+   * captured oid, not captured yet, priced from the payment's `amount`.
+   * Without an oid or an attempt (a form signed before attempts, the dev
+   * bypass) the capture stays legacy (`chargedAmount` NULL = `amount`). An
+   * attempt whose T is not the payment's `amount` cannot be linked (DB CHECK
+   * `charged_amount = amount + fee`): with a fee that would lose it, so the
+   * capture fails loudly and nothing is written; without one the payment is
+   * captured legacy-style.
+   */
+  private async capturableAttempt(
+    tx: Prisma.TransactionClient,
+    payment: { id: string; amount: Prisma.Decimal.Value },
+    capturedMerchantOid: string | undefined,
+  ): Promise<ChargeAttemptAmounts | null> {
+    if (!capturedMerchantOid) return null;
+    const attempt = await chargeAttemptByOid(
+      tx,
+      payment.id,
+      capturedMerchantOid,
+    );
+    if (!attempt || attempt.capturedAt) return null;
+    if (attempt.baseAmount.equals(new Prisma.Decimal(payment.amount))) {
+      return attempt;
+    }
+    const message =
+      `CHARGE_ATTEMPT_BASE_MISMATCH payment=${payment.id} attempt=${attempt.id}: ` +
+      `signed for T=${attempt.baseAmount.toFixed(2)}, payment amount is ${new Prisma.Decimal(payment.amount).toFixed(2)}`;
+    if (attempt.installmentFeeAmount.gt(0)) {
+      this.logger.error(`${message}; capture refused, manual review`);
+      throw new Error(message);
+    }
+    this.logger.error(`${message}; captured without the attempt`);
+    return null;
+  }
+
+  /**
+   * Splits the captured installment fee F over the payment's orders
+   * (`Order.installmentFeeAmount`), largest remainder in the keep guard's
+   * order, so the shares sum to F exactly. Every order of the payment takes
+   * its share, a cancelled one too (its refund gives it back). Inside the
+   * capture transaction; nothing to do without a fee.
+   */
+  private async allocateCapturedFee(
+    tx: Prisma.TransactionClient,
+    capture: CapturedCharge,
+    where: Prisma.OrderWhereInput,
+  ): Promise<void> {
+    if (!capture.feeAmount.gt(0)) return;
+    const orders = await tx.order.findMany({
+      where,
+      select: { id: true, totalAmount: true },
+      orderBy: INSTALLMENT_FEE_SPLIT_ORDER_BY,
+    });
+    if (orders.length === 0) {
+      throw new Error(
+        `Installment fee of attempt ${capture.attemptId} has no order to allocate to`,
+      );
+    }
+    const shares = allocateInstallmentFee(
+      capture.feeAmount,
+      orders.map((order) => order.totalAmount),
+    );
+    for (const [i, order] of orders.entries()) {
+      await tx.order.update({
+        where: { id: order.id },
+        data: { installmentFeeAmount: shares[i] },
+      });
+    }
   }
 
   constructor(
@@ -308,6 +446,9 @@ export class PaymentFulfillmentService {
         orderId: payment.orderId ?? null,
         checkoutGroupId: null,
       });
+      // The fee share is the order's whatever happens below (a cancelled
+      // order's auto-refund gives it back).
+      await this.allocateCapturedFee(tx, claimed, { id: payment.orderId });
 
       // Verify order is still pending_payment before promoting to preparing.
       // Race window: cron may have cancelled the order while PayTR callback was in flight.
@@ -852,6 +993,10 @@ export class PaymentFulfillmentService {
         // giren iptal ezilmez; iptal edilen kalem kısmi otomatik iadeye gider.
         await lockPaymentOrders(tx, {
           orderId: null,
+          checkoutGroupId: payment.checkoutGroupId,
+        });
+        // Every order of the cart takes its fee share, a cancelled one too.
+        await this.allocateCapturedFee(tx, claimed, {
           checkoutGroupId: payment.checkoutGroupId,
         });
 

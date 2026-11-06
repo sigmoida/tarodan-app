@@ -4,6 +4,7 @@ import { PrismaService } from "../../../prisma";
 import { EventService } from "../../events";
 import { LedgerService } from "../../ledger/ledger.service";
 import { OrderShipmentProvisioner } from "../../surat-cargo/sync/order-shipment-provisioner.service";
+import { orderInstallmentFeeOf } from "../helpers/charged-amount";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -66,9 +67,11 @@ export class FulfillmentFinalizer {
           buyerId: order.buyerId,
           sellerId: order.sellerId,
           gross,
+          // Goods scale: the installment fee never reaches the seller net.
           sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
           commission,
           withholdingTax,
+          installmentFee: await this.installmentFeeOf(order.id),
         });
       }
     } catch (e: any) {
@@ -167,6 +170,19 @@ export class FulfillmentFinalizer {
       );
       throw error;
     }
+  }
+
+  /**
+   * The order's share of the installment fee, read from the row the capture
+   * wrote (`Order.installmentFeeAmount`), whatever object the caller passed:
+   * the immediate path and the outbox backstop load the order differently.
+   */
+  private async installmentFeeOf(orderId: string): Promise<number> {
+    const row = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { installmentFeeAmount: true },
+    });
+    return row ? orderInstallmentFeeOf(row).toNumber() : 0;
   }
 
   /**
