@@ -9,8 +9,13 @@ import {
   TradeStatus,
   PaymentStatus,
   type FiscalInvoiceType,
+  type RefundRequestStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 import { LIVE_ORDER } from "../../account-lane/live-lane.where";
 import { OrderService } from "../order.service";
 import { InvoicingService } from "../../invoicing/invoicing.service";
@@ -27,7 +32,7 @@ import { CacheService } from "../../cache/cache.service";
 import { adminUrl } from "../../../config/app-urls";
 import type { CronRunSummary } from "../../../monitoring/cron-run.helper";
 
-const OPEN_REFUND_STATUSES = [
+const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
   "pending_review",
   "approved",
   "wait_for_delivery",
@@ -35,7 +40,7 @@ const OPEN_REFUND_STATUSES = [
   "return_in_transit",
   "return_delivered",
   "disputed",
-] as const;
+];
 
 @Injectable()
 export class OrderSchedulerService implements OnModuleInit {
@@ -99,9 +104,9 @@ export class OrderSchedulerService implements OnModuleInit {
                 adminLink: `${adminBaseUrl}/operations/orders/${encodeURIComponent(order.id)}`,
               },
             );
-          } catch (err: any) {
+          } catch (err: unknown) {
             this.logger.error(
-              `Takılı kargo admin bildirimi başarısız (order=${order.id}): ${err?.message}`,
+              `Takılı kargo admin bildirimi başarısız (order=${order.id}): ${errorMessage(err)}`,
             );
           }
         }
@@ -121,16 +126,18 @@ export class OrderSchedulerService implements OnModuleInit {
               NotificationType.ORDER_SHIPMENT_DELAYED,
               { orderId: order.id, orderNumber: order.orderNumber, audience },
             );
-          } catch (err: any) {
+          } catch (err: unknown) {
             this.logger.warn(
-              `Takılı kargo kullanıcı bildirimi başarısız (order=${order.id}, user=${userId}): ${err?.message}`,
+              `Takılı kargo kullanıcı bildirimi başarısız (order=${order.id}, user=${userId}): ${errorMessage(err)}`,
             );
           }
         }
       }
       return fresh.length;
-    } catch (err: any) {
-      this.logger.warn(`notifyAdminsOfStuckShipments failed: ${err?.message}`);
+    } catch (err: unknown) {
+      this.logger.warn(
+        `notifyAdminsOfStuckShipments failed: ${errorMessage(err)}`,
+      );
       // Tekilleştirme çalışmadıysa alarm görünür kalsın (sessizlikten iyidir).
       return orders.length;
     }
@@ -212,7 +219,7 @@ export class OrderSchedulerService implements OnModuleInit {
     for (const { id } of candidates) {
       try {
         const openRefund = await this.prisma.refundRequest.findFirst({
-          where: { orderId: id, status: { in: OPEN_REFUND_STATUSES as any } },
+          where: { orderId: id, status: { in: OPEN_REFUND_STATUSES } },
           select: { id: true },
         });
         if (openRefund) {
@@ -226,11 +233,11 @@ export class OrderSchedulerService implements OnModuleInit {
         );
         if (result.completed) processed++;
         else skipped++;
-      } catch (e: any) {
+      } catch (e: unknown) {
         failed++;
         this.logger.error(
-          `auto-complete failed for ${id}: ${e?.message}`,
-          e?.stack,
+          `auto-complete failed for ${id}: ${errorMessage(e)}`,
+          errorStack(e),
         );
       }
     }
@@ -363,8 +370,8 @@ export class OrderSchedulerService implements OnModuleInit {
     );
     const sellerInvoices = await this.sellerInvoice
       .remindMissing({ deadlineDays: sellerInvoiceDeadlineDays })
-      .catch((e: any) => {
-        this.logger.warn(`satıcı fatura taraması hatası: ${e?.message}`);
+      .catch((e: unknown) => {
+        this.logger.warn(`satıcı fatura taraması hatası: ${errorMessage(e)}`);
         return { missing: 0, reminded: 0, missingOrders: [] };
       });
     if (sellerInvoices.missing > 0) {
@@ -552,9 +559,9 @@ export class OrderSchedulerService implements OnModuleInit {
               where: { id: o.id },
               data: { revenueInvoicedAt: new Date() },
             })
-            .catch((e: any) =>
+            .catch((e: unknown) =>
               this.logger.warn(
-                `revenueInvoicedAt backfill işareti yazılamadı ${o.id}: ${e?.message}`,
+                `revenueInvoicedAt backfill işareti yazılamadı ${o.id}: ${errorMessage(e)}`,
               ),
             );
           continue;
@@ -562,9 +569,9 @@ export class OrderSchedulerService implements OnModuleInit {
         try {
           await this.orderService.emitDeliveryRevenueInvoices(o.id);
           invoiced++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           this.logger.warn(
-            `processDeliveredOrders fatura hatası ${o.id}: ${e?.message}`,
+            `processDeliveredOrders fatura hatası ${o.id}: ${errorMessage(e)}`,
           );
         }
       }
@@ -591,7 +598,7 @@ export class OrderSchedulerService implements OnModuleInit {
           { returnWindowEndsAt: null, deliveredAt: { lte: legacyCutoff } },
         ],
         refundRequests: {
-          none: { status: { in: OPEN_REFUND_STATUSES as any } },
+          none: { status: { in: OPEN_REFUND_STATUSES } },
         },
       },
       select: { id: true },
@@ -602,9 +609,9 @@ export class OrderSchedulerService implements OnModuleInit {
       try {
         const r = await this.orderService.autoCompleteDeliveredOrder(o.id);
         if (r.completed) completed++;
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.warn(
-          `processDeliveredOrders tamamlama hatası ${o.id}: ${e?.message}`,
+          `processDeliveredOrders tamamlama hatası ${o.id}: ${errorMessage(e)}`,
         );
       }
     }
@@ -648,7 +655,7 @@ export class OrderSchedulerService implements OnModuleInit {
               "trade_commission",
               "trade_service_fee",
               "trade_shipping",
-            ] as any,
+            ] satisfies FiscalInvoiceType[],
           },
         },
         select: { sourceId: true, type: true },
@@ -669,9 +676,9 @@ export class OrderSchedulerService implements OnModuleInit {
         try {
           await this.invoicing.issueTradeCashFeeInvoice(c.id);
           tradeInvoiced++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           this.logger.warn(
-            `processDeliveredOrders takas faturası hatası ${c.id}: ${e?.message}`,
+            `processDeliveredOrders takas faturası hatası ${c.id}: ${errorMessage(e)}`,
           );
         }
       }
