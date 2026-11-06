@@ -11789,7 +11789,12 @@
       "installmentPricingChanged": "The installment amount has changed. Please check the new amount and try again.",
       "installmentUnavailable": "Installments are unavailable right now. You can continue with a single payment.",
       "installmentOptionsInvalidRequest": "Send one card (the first card digits or a saved card) and one payment or amount to get installment options.",
-      "installmentOptionsTooManyRequests": "Installment options were requested too often. Please try again shortly."
+      "installmentOptionsTooManyRequests": "Installment options were requested too often. Please try again shortly.",
+      "paymentAmountOutOfDate": "The payment amount is out of date. Please refresh the page and try again.",
+      "installmentMail": {
+        "label": "Installments",
+        "summary": "{count} installments: {monthly} TL per month, installment fee {fee} TL, total {total} TL"
+      }
     },
     "product": {
       "alreadyLiked": "You have already liked this product",

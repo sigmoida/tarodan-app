@@ -108,6 +108,49 @@ export interface PaymentsInstallmentsConfig {
   minAmount: number;
 }
 
+// ── Signing (`POST /payments/direct-form` -> `installment`) ───────────────
+
+/**
+ * The installment the buyer chose, sent with `direct-form` (optional: an old
+ * client sends nothing and pays in a single payment). The server prices the
+ * count again from the payment row, the same rates, rules and settings, and
+ * signs that amount; `expectedTotal` is the `totalAmount` the client showed,
+ * and a different server total is a 409
+ * `server.payment.installmentPricingChanged` (refetch the options), never a
+ * different charge.
+ */
+export interface DirectFormInstallmentSelection {
+  /** 1 = single payment, else 2..12 (`INSTALLMENT_COUNT_MAX`). */
+  count: number;
+  /**
+   * First 6 to 8 digits of a NEW card; required for a count above 1 without
+   * a saved card, refused together with `savedCardId`.
+   */
+  bin?: string;
+  /** C in TL, two decimals: the option's `totalAmount`. */
+  expectedTotal: number;
+}
+
+/**
+ * The installment fields of a payment in the payer's own views
+ * (`GET /payments/:id/status`, `GET /payments/my-payments`, the order detail
+ * payment block). Additive and optional: absent for other viewers (the
+ * seller) and on old API versions. `chargedAmount` is what the card was
+ * charged: `amount` plus `installmentFeeAmount`.
+ */
+export interface PaymentInstallmentFields {
+  /** 1 = single payment. */
+  installmentCount?: number;
+  /** F: the installment fee (vade farkı) paid, VAT included; 0 when single. */
+  installmentFeeAmount?: number;
+  /** C: the amount charged to the card. */
+  chargedAmount?: number;
+  /** PayTR card family of the captured charge, e.g. `world`. */
+  cardFamily?: string;
+  /** Issuing bank of the captured charge, as PayTR names it. */
+  cardBank?: string;
+}
+
 // ── Settings (PlatformSetting rows) ───────────────────────────────────────
 
 /**
