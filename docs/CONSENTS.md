@@ -45,9 +45,11 @@ versions have lost the `-draft` suffix.
 
 **Release blocker:** `distance_sales` is a draft too: its text gained the
 installment clause (tarodan-ops plan `2026-11-03-installment-payments`,
-AS-L1). The release that turns installments on must not go to production
-before legal has signed the clause off and the version is a date without the
-`-draft` suffix.
+AS-L1). The version is not behind the installment flag: from the first deploy
+of this text every checkout records its distance sales consent against the
+draft, even with installments off. So **no production release may carry this
+text** (not only the one that turns installments on) before legal has signed
+the clause off and the version is a date without the `-draft` suffix.
 
 The old `DISTANCE_SALES_CONSENT_VERSION` constant joined this catalogue. The
 old `checkout_groups.distance_sales_accepted_at/_version` columns are no longer
