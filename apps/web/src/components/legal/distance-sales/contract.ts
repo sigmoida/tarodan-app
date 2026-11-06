@@ -125,6 +125,7 @@ const PRE_INFORMATION = (t: Translate): LegalPart => ({
               ),
             },
             { label: t("legal.distanceSales.varsaIndirimKuponKampanya") },
+            { label: t("legal.distanceSales.installmentTermsField") },
             { label: t("legal.distanceSales.odenecekToplamTutar") },
           ],
         },
@@ -160,6 +161,10 @@ const PRE_INFORMATION = (t: Translate): LegalPart => ({
           text: t(
             "legal.distanceSales.saticiMevzuattaOngorulenAzamiSurelerSakli",
           ),
+        },
+        {
+          type: "p",
+          text: t("legal.distanceSales.installmentPaymentTerms"),
         },
         {
           type: "p",
@@ -357,6 +362,10 @@ const SALES_CONTRACT = (t: Translate): LegalPart => ({
         {
           type: "p",
           text: t("legal.distanceSales.teslimAnindaKargoPaketiHasarliysaAlici"),
+        },
+        {
+          type: "p",
+          text: t("legal.distanceSales.installmentRefundTerms"),
         },
       ],
     },

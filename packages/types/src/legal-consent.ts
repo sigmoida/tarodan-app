@@ -69,9 +69,12 @@ export const CONSENT_DOCUMENTS: Record<
   // points").
   kvkk: { version: "2026-08-04", requiredForAccount: true, path: "/privacy" },
   // Distance sales consent is per ORDER, not per account; taken at checkout
-  // or at the payment step.
+  // or at the payment step. DRAFT: the installment clause (tarodan-ops plan
+  // 2026-11-03-installment-payments, AS-L1) waits for legal sign-off; the
+  // release that turns installments on waits for the signed text and its
+  // dated version.
   distance_sales: {
-    version: "2026-08-03",
+    version: "2026-11-06-draft",
     requiredForAccount: false,
     path: "/distance-sales",
   },

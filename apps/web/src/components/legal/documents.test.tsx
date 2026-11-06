@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { serverTreeText } from "@/test-utils/serverTree";
 import { EMBED_DOCS } from "@/lib/embed";
+import { CONSENT_DOCUMENTS, isDraftConsentVersion } from "@tarodan/types";
 
 /**
  * Çeviri yerine anahtarın kendisi döner: hangi belgenin / hangi ekin çizildiği
@@ -103,5 +104,25 @@ describe("Çerez politikası — tercih paneli yalnız web'de", () => {
     expect(text).toContain("legal.cookies.page.s1Title");
     expect(text).not.toContain("cookie-preferences-panel");
     expect(text).not.toContain("legal.cookies.page.s2Title");
+  });
+});
+
+describe("Distance sales contract: the installment clause (AS-L1)", () => {
+  it.each([false, true])(
+    "web and the mobile WebView (embed=%s) carry the pre-information field, the payment terms and the refund terms",
+    async (embed) => {
+      const text = await serverTreeText(
+        await LegalDocContent({ doc: "distance-sales", embed }),
+      );
+      expect(text).toContain("legal.distanceSales.installmentTermsField");
+      expect(text).toContain("legal.distanceSales.installmentPaymentTerms");
+      expect(text).toContain("legal.distanceSales.installmentRefundTerms");
+    },
+  );
+
+  it("the changed text has a new draft version until legal signs off", () => {
+    const { version } = CONSENT_DOCUMENTS.distance_sales;
+    expect(isDraftConsentVersion(version)).toBe(true);
+    expect(version > "2026-08-03").toBe(true);
   });
 });
