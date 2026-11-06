@@ -35,6 +35,13 @@ import { errorStack } from "../../common/helpers/error-message";
 import { i18nMessage } from "../i18n";
 import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 import { resolveUploadTarget } from "../media/helpers/upload-target";
+import type { Response } from "express";
+import type { RequestUser } from "../auth/interfaces/jwt-payload.interface";
+
+/** A request behind the JWT guard: the user is always set. */
+type AuthenticatedRequest = { user: Pick<RequestUser, "id"> };
+/** A `@Public()` request: the user is set only when a valid token came along. */
+type OptionalUserRequest = { user?: Pick<RequestUser, "id"> };
 
 @Controller("collections")
 export class CollectionController {
@@ -52,7 +59,7 @@ export class CollectionController {
    */
   @Post()
   async createCollection(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: CreateCollectionDto,
   ): Promise<CollectionResponseDto> {
     return this.collectionService.createCollection(req.user.id, dto);
@@ -73,7 +80,7 @@ export class CollectionController {
     @Query("search") search?: string,
     @Query("categoryId") categoryId?: string,
     @Query("category") category?: string,
-    @Request() req?: any,
+    @Request() req?: OptionalUserRequest,
   ): Promise<CollectionListResponseDto> {
     return this.collectionService.browsePublicCollections(
       page,
@@ -92,7 +99,7 @@ export class CollectionController {
    */
   @Get("me")
   async getMyCollections(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query("page") page?: number,
     @Query("pageSize") pageSize?: number,
   ): Promise<CollectionListResponseDto> {
@@ -111,7 +118,7 @@ export class CollectionController {
   @Get("liked")
   @HttpCode(HttpStatus.OK)
   async getLikedCollections(
-    @Request() req: any,
+    @Request() req: OptionalUserRequest & { res?: Response },
     @Query("page") page?: number | string,
     @Query("pageSize") pageSize?: number | string,
   ): Promise<CollectionListResponseDto> {
@@ -158,7 +165,7 @@ export class CollectionController {
   @Get("user/:userId")
   async getUserCollections(
     @Param("userId", ParseUUIDPipe) userId: string,
-    @Request() req: any,
+    @Request() req: OptionalUserRequest,
     @Query("page") page?: number,
     @Query("pageSize") pageSize?: number,
   ): Promise<CollectionListResponseDto> {
@@ -178,7 +185,7 @@ export class CollectionController {
   @Get("slug/:slug")
   async getCollectionBySlug(
     @Param("slug") slug: string,
-    @Request() req: any,
+    @Request() req: OptionalUserRequest,
   ): Promise<CollectionResponseDto> {
     return this.collectionService.getCollectionBySlug(slug, req.user?.id);
   }
@@ -193,7 +200,7 @@ export class CollectionController {
   @HttpCode(HttpStatus.OK)
   async likeCollection(
     @Param("id") idOrSlug: string,
-    @Request() req: any,
+    @Request() req: OptionalUserRequest,
   ): Promise<{ liked: boolean; likeCount: number }> {
     if (!req.user || !req.user.id) {
       throw new BadRequestException(
@@ -217,7 +224,7 @@ export class CollectionController {
   @HttpCode(HttpStatus.OK)
   async unlikeCollection(
     @Param("id") idOrSlug: string,
-    @Request() req: any,
+    @Request() req: OptionalUserRequest,
   ): Promise<{ liked: boolean; likeCount: number }> {
     if (!req.user || !req.user.id) {
       throw new BadRequestException(
@@ -244,7 +251,7 @@ export class CollectionController {
   @Get(":id")
   async getCollectionById(
     @Param("id") idOrSlug: string,
-    @Request() req: any,
+    @Request() req: OptionalUserRequest,
   ): Promise<CollectionResponseDto> {
     const isUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -263,7 +270,7 @@ export class CollectionController {
   @Patch(":id")
   async updateCollection(
     @UuidParam("id") id: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: UpdateCollectionDto,
   ): Promise<CollectionResponseDto> {
     return this.collectionService.updateCollection(id, req.user.id, dto);
@@ -277,7 +284,7 @@ export class CollectionController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteCollection(
     @UuidParam("id") id: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<void> {
     return this.collectionService.deleteCollection(id, req.user.id);
   }
@@ -292,7 +299,7 @@ export class CollectionController {
   @UseInterceptors(FileInterceptor("image", UPLOAD_MULTER_OPTIONS))
   async addItemToCollection(
     @UuidParam("id") id: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: AddCollectionItemDto,
     @UploadedFile() imageFile?: Express.Multer.File,
   ): Promise<CollectionItemResponseDto> {
@@ -357,7 +364,7 @@ export class CollectionController {
   async removeItemFromCollection(
     @UuidParam("id") id: string,
     @Param("itemId", ParseUUIDPipe) itemId: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<void> {
     return this.collectionService.removeItemFromCollection(
       id,
@@ -374,7 +381,7 @@ export class CollectionController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async reorderItems(
     @UuidParam("id") id: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: ReorderCollectionItemsDto,
   ): Promise<void> {
     return this.collectionService.reorderItems(id, req.user.id, dto);
@@ -388,7 +395,7 @@ export class CollectionController {
   @UseInterceptors(FileInterceptor("cover", UPLOAD_MULTER_OPTIONS))
   async updateCollectionCover(
     @UuidParam("id") id: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @UploadedFile() coverFile?: Express.Multer.File,
   ): Promise<CollectionResponseDto> {
     if (!coverFile) {

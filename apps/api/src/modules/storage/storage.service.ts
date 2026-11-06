@@ -11,6 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import {
   S3Client,
+  S3ClientConfig,
   PutObjectCommand,
   PutObjectCommandInput,
   CopyObjectCommand,
@@ -23,6 +24,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as crypto from "crypto";
 import { fromBuffer as fileTypeFromBuffer } from "file-type";
 import { i18nMessage } from "../i18n";
+import { errorMessage } from "../../common/helpers/error-message";
 
 export interface UploadResult {
   key: string;
@@ -224,7 +226,7 @@ export class StorageService implements OnModuleInit {
     this.hasCredentials = true;
 
     // S3 Client oluştur (MinIO veya AWS S3)
-    const s3Config: any = {
+    const s3Config: S3ClientConfig = {
       region: this.configService.get("AWS_REGION", "eu-west-1"),
       credentials: {
         accessKeyId,
@@ -261,8 +263,8 @@ export class StorageService implements OnModuleInit {
       );
       this.isS3Available = true;
       this.logger.log(`✅ AWS S3 connection established: ${this.baseBucket}`);
-    } catch (error: any) {
-      this.logger.error(`❌ AWS S3 connection failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error(`❌ AWS S3 connection failed: ${errorMessage(error)}`);
       this.isS3Available = false;
     }
   }
@@ -392,8 +394,8 @@ export class StorageService implements OnModuleInit {
         // Private servis uçları (message-attachment) MediaFile id ile çalışır.
         mediaFileId,
       };
-    } catch (error: any) {
-      this.logger.error(`❌ S3 upload error: ${error.message}`, error);
+    } catch (error) {
+      this.logger.error(`❌ S3 upload error: ${errorMessage(error)}`, error);
       throw new InternalServerErrorException(
         i18nMessage("server.storage.uploadFailed"),
       );
@@ -436,9 +438,9 @@ export class StorageService implements OnModuleInit {
         }),
       );
       return { key };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `❌ S3 copy error (${sourceKey} → ${key}): ${error.message}`,
+        `❌ S3 copy error (${sourceKey} → ${key}): ${errorMessage(error)}`,
       );
       throw new InternalServerErrorException(
         i18nMessage("server.storage.copyFailed"),
@@ -607,8 +609,8 @@ export class StorageService implements OnModuleInit {
 
         await this.client().send(command);
         this.logger.log(`✅ File deleted: ${fullKey}`);
-      } catch (error: any) {
-        this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
+      } catch (error) {
+        this.logger.warn(`⚠️ S3 delete error: ${errorMessage(error)}`);
         if (options.throwOnError) throw error;
       }
     }
@@ -762,8 +764,10 @@ export class StorageService implements OnModuleInit {
       return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
-    } catch (error: any) {
-      this.logger.error(`❌ Presigned upload URL error: ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Presigned upload URL error: ${errorMessage(error)}`,
+      );
       throw new InternalServerErrorException(
         i18nMessage("server.storage.presignFailed"),
       );
@@ -801,8 +805,10 @@ export class StorageService implements OnModuleInit {
       return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
-    } catch (error: any) {
-      this.logger.error(`❌ Presigned download URL error: ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Presigned download URL error: ${errorMessage(error)}`,
+      );
       throw new InternalServerErrorException(
         i18nMessage("server.storage.presignFailed"),
       );
@@ -828,8 +834,10 @@ export class StorageService implements OnModuleInit {
         throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
       }
       return Buffer.from(await body.transformToByteArray());
-    } catch (error: any) {
-      this.logger.error(`❌ S3 download error (${key}): ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ S3 download error (${key}): ${errorMessage(error)}`,
+      );
       throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
     }
   }
