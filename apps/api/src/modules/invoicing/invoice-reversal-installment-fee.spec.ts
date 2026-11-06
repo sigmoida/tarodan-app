@@ -665,4 +665,71 @@ describe("InvoiceReversalService: installment fee document", () => {
 
     expect(returns()).toEqual([]);
   });
+  it("cuts no return when another handler cancelled the document after it was read", async () => {
+    const { service, refund, store, returns, db } = makeService();
+    const transaction = db.$transaction.getMockImplementation();
+    // Another attempt's handler cancels the e-Arşiv between this handler's
+    // read and its return transaction.
+    db.$transaction.mockImplementationOnce(async (fn) => {
+      Object.assign(store.invoices[0], {
+        status: "cancelled",
+        cancelReason: "refund",
+      });
+      return transaction ? transaction(fn) : fn(db);
+    });
+
+    await service.handleOrderRefund("o1", refund("ra1", "o1", 26.55));
+
+    expect(returns()).toEqual([]);
+  });
+
+  describe("a refund event without an attempt (queued before attempts were carried)", () => {
+    const priorReturn = {
+      id: "ret-0",
+      type: "return_invoice",
+      sourceId: "fee-1:ra1",
+      status: "sent",
+      billingReference: "TRD2026000000001",
+      total: D("26.55"),
+      netAmount: D("22.13"),
+    };
+
+    it("cancels a fresh e-Arşiv", async () => {
+      const { service, store, returns, provider } = makeService({
+        strategy: "CANCEL",
+      });
+
+      await service.handleOrderRefund("o1");
+
+      expect(provider.cancelEArchive).toHaveBeenCalledTimes(1);
+      expect(store.invoices[0].status).toBe("cancelled");
+      expect(returns()).toEqual([]);
+    });
+
+    it("returns the whole document once the cancel window closed", async () => {
+      const { service, returns } = makeService();
+
+      await service.handleOrderRefund("o1");
+
+      expect(returns()).toMatchObject([
+        { sourceId: "fee-1", total: 66.38, net: 55.32, tax: 11.06 },
+      ]);
+    });
+
+    it("returns only what earlier returns left, never cancelling", async () => {
+      const { service, store, provider } = makeService({
+        strategy: "CANCEL",
+        invoices: [sentFeeInvoice(), priorReturn],
+      });
+
+      await service.handleOrderRefund("o1");
+
+      expect(provider.cancelEArchive).not.toHaveBeenCalled();
+      expect(
+        store.invoices
+          .filter((i) => i.sourceId === "fee-1")
+          .map((i) => [Number(i.total), Number(i.netAmount)]),
+      ).toEqual([[39.83, 33.19]]);
+    });
+  });
 });

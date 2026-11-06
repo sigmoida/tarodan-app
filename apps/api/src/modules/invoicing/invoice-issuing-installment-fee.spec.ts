@@ -228,6 +228,26 @@ describe("InvoiceIssuingService.issueOrderRevenueInvoices with an installment fe
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
 
+  it("stamps the order when the fee went back in full before delivery, so the backfill does not retry it forever", async () => {
+    const { service, prisma, cut } = makeService({
+      basis: basisOf({
+        orders: [{ id: "o1", fee: 66.38, refundedFee: 66.38 }],
+      }),
+    });
+    jest.spyOn(service, "issuePackageFeeInvoices").mockResolvedValue();
+    jest.spyOn(service, "issuePlatformSaleInvoice").mockResolvedValue();
+
+    await service.issueOrderRevenueInvoices("o1");
+
+    expect(cut).not.toHaveBeenCalled();
+    expect(prisma.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "o1" },
+        data: { revenueInvoicedAt: expect.any(Date) },
+      }),
+    );
+  });
+
   it("waits for the whole package like the other package documents", async () => {
     const { service } = makeService({ pendingOrders: 1 });
     const fee = jest

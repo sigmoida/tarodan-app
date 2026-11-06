@@ -336,3 +336,167 @@ describe("installmentFeeReturnOf", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * Properties over many amounts and event orders, not only the worked
+ * examples. The generator is seeded, so every run checks the same cases.
+ */
+describe("installment fee amounts (properties)", () => {
+  const seeded = (seed: number) => {
+    let state = seed;
+    return () => {
+      state = (state * 1103515245 + 12345) % 2147483648;
+      return state / 2147483648;
+    };
+  };
+  const kurus = (tl: number) => Math.round(tl * 100);
+  /** `total` kuruş split at `count - 1` random points (parts may be 0). */
+  const partition = (rnd: () => number, total: number, count: number) => {
+    const cuts = Array.from({ length: count - 1 }, () =>
+      Math.floor(rnd() * (total + 1)),
+    ).sort((a, b) => a - b);
+    return [...cuts, total].map((cut, i, all) => cut - (i ? all[i - 1] : 0));
+  };
+
+  it("splits net exactly half up at every rate, so net + VAT is the gross", () => {
+    // Exact reference in integers: round half up of gross * 100 / (100 + rate).
+    const halfUp = (gross: bigint, rate: bigint) =>
+      (2n * 100n * gross + (100n + rate)) / (2n * (100n + rate));
+    const grosses = [
+      ...Array.from({ length: 30_001 }, (_, k) => k),
+      // Up to the column's limit, Decimal(10, 2).
+      123_456_789,
+      999_999_995,
+      4_294_967_297,
+      9_999_999_998,
+      9_999_999_999,
+    ];
+    const wrong: string[] = [];
+    for (const rate of [1, 8, 10, 18, 20]) {
+      for (const gross of grosses) {
+        const { net, tax } = splitVatIncluded(gross / 100, rate);
+        if (
+          kurus(net) + kurus(tax) !== gross ||
+          BigInt(kurus(net)) !== halfUp(BigInt(gross), BigInt(rate))
+        ) {
+          wrong.push(`${gross} at ${rate} %: ${net} + ${tax}`);
+        }
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it("never reverses more than the document and ends at what it should carry, whatever the order of events", () => {
+    // A package fee F, refunds finalized one after the other, the document
+    // cut after some of them (net of those), each refund's event handled
+    // one to three times at any point after it was finalized (outbox
+    // replays, a late handler of a refund from before the cut). One return
+    // per attempt at most, like `(type, sourceId)`.
+    const rnd = seeded(20261106);
+    const broken: string[] = [];
+    for (let run = 0; run < 20_000; run++) {
+      // Small fees too: a closing return of a kuruş after several others.
+      const fee = 1 + Math.floor(rnd() * (rnd() < 0.5 ? 300 : 20_000));
+      const refunded = rnd() < 0.5 ? fee : Math.floor(rnd() * (fee + 1));
+      const shares = partition(rnd, refunded, 1 + Math.floor(rnd() * 5));
+      const cutAfter = Math.floor(rnd() * (shares.length + 1));
+      const issuedTotal =
+        fee - shares.slice(0, cutAfter).reduce((s, x) => s + x, 0);
+      if (issuedTotal <= 0) continue;
+      const issued = {
+        total: issuedTotal / 100,
+        net: splitVatIncluded(issuedTotal / 100, 20).net,
+      };
+
+      type Step = { kind: "finalize" | "cut" | "handle"; refund: number };
+      const steps: Step[] = shares.map((_, refund) => ({
+        kind: "finalize",
+        refund,
+      }));
+      steps.splice(cutAfter, 0, { kind: "cut", refund: -1 });
+      shares.forEach((_, refund) => {
+        for (let times = 1 + Math.floor(rnd() * 3); times > 0; times--) {
+          const after =
+            steps.findIndex(
+              (s) => s.kind === "finalize" && s.refund === refund,
+            ) + 1;
+          const at = after + Math.floor(rnd() * (steps.length - after + 1));
+          steps.splice(at, 0, { kind: "handle", refund });
+        }
+      });
+
+      let finalized = 0;
+      let cut = false;
+      const returns = new Map<number, { total: number; net: number }>();
+      const reversed = () =>
+        [...returns.values()].reduce((s, r) => s + kurus(r.total), 0);
+      for (const step of steps) {
+        if (step.kind === "finalize") finalized += shares[step.refund];
+        if (step.kind === "cut") cut = true;
+        if (step.kind !== "handle" || !cut || returns.has(step.refund))
+          continue;
+        const target = Math.max(0, fee - finalized);
+        const due = installmentFeeReturnOf({
+          issued,
+          priorReturns: [...returns.values()],
+          targetGross: target / 100,
+          refundedFee: shares[step.refund] / 100,
+          vatRatePct: 20,
+        });
+        if (!due) continue;
+        returns.set(step.refund, { total: due.total, net: due.net });
+        if (
+          !(kurus(due.total) > 0) ||
+          kurus(due.net) < 0 ||
+          kurus(due.tax) < 0 ||
+          kurus(due.net) + kurus(due.tax) !== kurus(due.total) ||
+          issuedTotal - reversed() < target
+        ) {
+          broken.push(
+            `run ${run}: ${JSON.stringify({ fee, shares, cutAfter, due })}`,
+          );
+        }
+      }
+      const left = issuedTotal - reversed();
+      if (left !== Math.max(0, fee - refunded)) {
+        broken.push(
+          `run ${run}: ${JSON.stringify({ fee, shares, cutAfter, left })}`,
+        );
+      }
+    }
+    expect(broken).toEqual([]);
+  });
+
+  it("sums the returns of a fully reversed document to its net and VAT exactly (up to two returns)", () => {
+    const rnd = seeded(66_38);
+    const off: string[] = [];
+    for (let run = 0; run < 50_000; run++) {
+      const total = 1 + Math.floor(rnd() * 50_000);
+      const issued = {
+        total: total / 100,
+        net: splitVatIncluded(total / 100, 20).net,
+      };
+      const [first, second] = partition(rnd, total, 2);
+      const prior: Array<{ total: number; net: number }> = [];
+      for (const [share, target] of [
+        [first, second],
+        [second, 0],
+      ]) {
+        const due = installmentFeeReturnOf({
+          issued,
+          priorReturns: prior,
+          targetGross: target / 100,
+          refundedFee: share / 100,
+          vatRatePct: 20,
+        });
+        if (due) prior.push({ total: due.total, net: due.net });
+      }
+      const net = prior.reduce((s, r) => s + kurus(r.net), 0);
+      const sum = prior.reduce((s, r) => s + kurus(r.total), 0);
+      if (sum !== total || net !== kurus(issued.net)) {
+        off.push(`${total} = ${first} + ${second}: net ${net}`);
+      }
+    }
+    expect(off).toEqual([]);
+  });
+});
