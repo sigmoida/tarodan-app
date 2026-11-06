@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { ModuleRef } from "@nestjs/core";
@@ -474,6 +475,26 @@ describe("PaymentService trade cash refund idempotency", () => {
     ).rejects.toThrow();
     expect(mockTx.refundAttempt.create).not.toHaveBeenCalled();
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  it("refuses a trade cash payment that carries an installment fee (D6), before any attempt", async () => {
+    // Trades never take installments; this path refunds the goods scale only.
+    mockPrisma.payment.findMany.mockResolvedValue([
+      { ...basePayment(), installmentFeeAmount: new Prisma.Decimal("6.64") },
+    ]);
+    const errorLog = jest.spyOn(Logger.prototype, "error");
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toThrow();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "TRADE_REFUND_INSTALLMENT_FEE: trade cash payment pay-1",
+      ),
+    );
+    expect(mockTx.refundAttempt.create).not.toHaveBeenCalled();
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+    errorLog.mockRestore();
   });
 
   it("keeps a definitive provider rejection retryable", async () => {
