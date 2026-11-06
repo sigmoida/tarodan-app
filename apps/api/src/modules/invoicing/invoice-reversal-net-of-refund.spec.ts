@@ -959,3 +959,174 @@ describe("cancel claim of a generic document", () => {
     expect(t.returns().map((r) => Number(r.total))).toEqual([400]);
   });
 });
+
+/**
+ * QA review (fix/invoice-double-reversal): what mutation testing showed
+ * unpinned. A legacy fee document cut net of a refund, a VAT rate change on
+ * a package fee document, and the strict reads: a read error must make the
+ * handler fail (the outbox retries), never read as "nothing refunded" and
+ * cap the return away for good.
+ */
+describe("legacy fee documents and strict reads", () => {
+  /** A legacy package (no component breakdown): seller commission 100.00. */
+  function legacySeed(refundedSellerCommission: number): Seed {
+    const seed = packageSeed();
+    seed.ledgers!.o1 = {
+      componentBreakdownComplete: false,
+      sellerCommission: 100,
+      refundedSellerCommission,
+      buyerFee: 0,
+      refundedBuyerFee: 0,
+      buyerCommissionAmount: 0,
+      buyerPlatformFeeAmount: 0,
+      sellerCommissionAmount: 0,
+      sellerPlatformFeeAmount: 0,
+      refundedBuyerCommissionAmount: 0,
+      refundedBuyerPlatformFeeAmount: 0,
+      refundedSellerCommissionAmount: 0,
+      refundedSellerPlatformFeeAmount: 0,
+    };
+    seed.attempts!.ra1.idempotencyKey = "admin-refund-1";
+    return seed;
+  }
+  const commissionDoc = (t: ReturnType<typeof build>) =>
+    t.store.invoices.find((i) => i.type === "commission");
+
+  it("does not reverse a legacy commission cut at 72.00 net of a 40.00 refund again on its late event", async () => {
+    const t = build(legacySeed(40));
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePackageFeeInvoices("p1");
+    expect(Number(commissionDoc(t)?.total)).toBe(72);
+
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+
+    expect(t.returns()).toHaveLength(0);
+  });
+
+  it("reverses 48.00 of a legacy commission cut at 120.00 before the refund, once", async () => {
+    const seed = legacySeed(0);
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePackageFeeInvoices("p1");
+    expect(Number(commissionDoc(t)?.total)).toBe(120);
+
+    seed.ledgers!.o1.refundedSellerCommission = 40;
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+
+    expect(t.returns().map((r) => Number(r.total))).toEqual([48]);
+  });
+
+  it("fails the legacy handler on a package read error instead of reversing a document cut net of the refund", async () => {
+    const t = build(legacySeed(40));
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePackageFeeInvoices("p1");
+
+    t.store.orderPackage.findUnique.mockRejectedValueOnce(
+      new Error("connection reset"),
+    );
+    await expect(
+      t.reversals.handleOrderRefund("o1", event("ra1", 0.4)),
+    ).rejects.toThrow(/connection reset/);
+    expect(t.returns()).toHaveLength(0);
+
+    // The outbox retries: the document still has no room for the refund.
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+    expect(t.returns()).toHaveLength(0);
+  });
+
+  it("compares a package fee document at the rate it was cut with: a later VAT change is no refund", async () => {
+    const t = build(packageSeed());
+    await t.issuing.issuePackageFeeInvoices("p1");
+    expect(
+      Number(
+        t.store.invoices.find((i) => i.type === "buyer_commission")?.total,
+      ),
+    ).toBe(36);
+
+    t.config.ELOGO_VAT_RATE = "10";
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+
+    expect(t.returns()).toHaveLength(0);
+  });
+
+  it("still reverses a refund in full after a VAT increase (no under-reversal)", async () => {
+    const seed = platformSale();
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePlatformSaleInvoice("o1");
+    expect(Number(t.store.invoices[0].total)).toBe(400);
+
+    t.config.ELOGO_VAT_RATE = "25";
+    refund(seed, 160);
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+
+    expect(t.returns().map((r) => Number(r.total))).toEqual([160]);
+  });
+
+  it("fails the buyer shipping handler on a refund component read error, then reverses it on the retry", async () => {
+    const seed = packageSeed();
+    seed.orders!.o1.buyerShippingAmount = 25;
+    const ledger = seed.ledgers!.o1;
+    ledger.buyerCommissionAmount = 0;
+    ledger.refundedBuyerCommissionAmount = 0;
+    ledger.buyerFee = 0;
+    ledger.refundedBuyerFee = 0;
+    seed.refundRequests!.rr1.financialComponents = [
+      {
+        componentCode: "outbound_shipping",
+        treatment: "buyer_refund",
+        netAmount: 25,
+        taxAmount: 5,
+      },
+    ];
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePackageFeeInvoices("p1");
+    const doc = t.store.invoices.find((i) => i.type === "buyer_shipping");
+    expect(Number(doc?.total)).toBe(30);
+
+    seed.shippingRefunds = [
+      {
+        orderId: "o1",
+        refundRequestId: "rr1",
+        netAmount: 25,
+        refundedAt: null,
+      },
+    ];
+    t.store.refundFinancialComponent.findMany.mockRejectedValueOnce(
+      new Error("connection reset"),
+    );
+    await expect(
+      t.reversals.handleOrderRefund("o1", event("ra1", 1, true)),
+    ).rejects.toThrow(/connection reset/);
+    expect(t.returns()).toHaveLength(0);
+
+    await t.reversals.handleOrderRefund("o1", event("ra1", 1, true));
+    const ret = t
+      .returns()
+      .filter((r) => r.billingReference === doc?.invoiceNumber);
+    expect(ret.map((r) => Number(r.total))).toEqual([30]);
+  });
+
+  it("keeps a stale claim and reverses nothing while eLogo cannot say whether the document was cancelled", async () => {
+    const seed = platformSale();
+    const t = build(seed);
+    await t.issuing.issuePlatformSaleInvoice("o1");
+    refund(seed, 400);
+    const doc = t.store.invoices[0];
+    const stale = formatInvoiceCancelClaim("old", new Date(0));
+    doc.cancelReason = stale;
+    t.state.status = async () => ({ state: "unknown" });
+
+    await expect(
+      t.reversals.handleOrderRefund("o1", event("ra1", 1, true)),
+    ).rejects.toThrow(/INVOICE_CANCEL_OUTCOME_UNKNOWN/);
+
+    expect(doc.cancelReason).toBe(stale);
+    expect(doc.status).toBe("sent");
+    expect(t.cancels).toHaveLength(0);
+    expect(t.returns()).toHaveLength(0);
+  });
+});
