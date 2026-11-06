@@ -1110,6 +1110,27 @@ describe("legacy fee documents and strict reads", () => {
     expect(ret.map((r) => Number(r.total))).toEqual([30]);
   });
 
+  it("backs off when another run takes the cancel claim between its claim check and its cut", async () => {
+    const seed = platformSale();
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePlatformSaleInvoice("o1");
+    refund(seed, 160);
+    const doc = t.store.invoices[0];
+    t.store.$transaction.mockImplementationOnce(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        // The closing refund's handler claims the cancel right now.
+        doc.cancelReason = formatInvoiceCancelClaim("closing", new Date());
+        return fn(t.store);
+      },
+    );
+
+    await expect(
+      t.reversals.handleOrderRefund("o1", event("ra1", 0.4)),
+    ).rejects.toThrow(/INVOICE_CANCEL_IN_PROGRESS/);
+    expect(t.returns()).toHaveLength(0);
+  });
+
   it("keeps a stale claim and reverses nothing while eLogo cannot say whether the document was cancelled", async () => {
     const seed = platformSale();
     const t = build(seed);
