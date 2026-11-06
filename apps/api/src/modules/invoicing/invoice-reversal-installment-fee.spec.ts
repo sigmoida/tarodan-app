@@ -22,9 +22,20 @@ import type { EInvoiceProvider } from "./provider/e-invoice-provider";
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 const OLD = new Date("2026-10-01T10:00:00Z");
 
+/** A stored row of the fake: the columns the reversal reads and writes. */
+type Row = { id: string; [column: string]: unknown };
+
+interface Where {
+  id?: string;
+  type?: string;
+  billingReference?: string;
+  status?: { not?: string };
+  type_sourceId?: { type: string; sourceId: string };
+}
+
 interface Store {
-  invoices: Array<Record<string, any>>;
-  attempts: Record<string, Record<string, any>>;
+  invoices: Row[];
+  attempts: Record<string, Row>;
   /** The package's fee after the finalized refunds so far, by package. */
   refundedFee: Record<string, number>;
   feeOf: Record<string, number>;
@@ -32,7 +43,7 @@ interface Store {
   paymentPackageIds: string[];
 }
 
-function sentFeeInvoice(over: Record<string, any> = {}): Record<string, any> {
+function sentFeeInvoice(over: Partial<Row> = {}): Row {
   return {
     id: "fee-1",
     type: "buyer_installment_fee",
@@ -82,32 +93,34 @@ function makeService(
   let seq = 1;
   let ids = 0;
 
-  const matches = (row: Record<string, any>, where: Record<string, any>) =>
+  const matches = (row: Row, where: Where) =>
     (where.type === undefined || row.type === where.type) &&
     (where.billingReference === undefined ||
       row.billingReference === where.billingReference) &&
     (where.status?.not === undefined || row.status !== where.status.not);
 
   const fiscalInvoice = {
-    findUnique: jest.fn(async ({ where }: any) =>
+    findUnique: jest.fn(async ({ where }: { where: Where }) =>
       where.id
         ? (store.invoices.find((i) => i.id === where.id) ?? null)
         : (store.invoices.find(
             (i) =>
-              i.type === where.type_sourceId.type &&
-              i.sourceId === where.type_sourceId.sourceId,
+              i.type === where.type_sourceId?.type &&
+              i.sourceId === where.type_sourceId?.sourceId,
           ) ?? null),
     ),
-    findMany: jest.fn(async ({ where }: any) =>
+    findMany: jest.fn(async ({ where }: { where: Where }) =>
       store.invoices.filter((i) => matches(i, where)),
     ),
-    update: jest.fn(async ({ where, data }: any) => {
-      const row = store.invoices.find((i) => i.id === where.id);
-      if (!row) throw new Error("not found");
-      Object.assign(row, data);
-      return row;
-    }),
-    create: jest.fn(async ({ data }: any) => {
+    update: jest.fn(
+      async ({ where, data }: { where: Where; data: Partial<Row> }) => {
+        const row = store.invoices.find((i) => i.id === where.id);
+        if (!row) throw new Error("not found");
+        Object.assign(row, data);
+        return row;
+      },
+    ),
+    create: jest.fn(async ({ data }: { data: Partial<Row> }) => {
       const row = { id: `ret-${++ids}`, ...data };
       store.invoices.push(row);
       return row;
@@ -117,11 +130,12 @@ function makeService(
     fiscalInvoice,
     refundAttempt: {
       findUnique: jest.fn(
-        async ({ where }: any) => store.attempts[where.id] ?? null,
+        async ({ where }: { where: { id: string } }) =>
+          store.attempts[where.id] ?? null,
       ),
     },
     order: {
-      findUnique: jest.fn(async ({ where }: any) => ({
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => ({
         packageId: orderPackage[where.id] ?? null,
       })),
     },
@@ -211,7 +225,7 @@ function makeService(
     store.invoices
       .filter((i) => i.type === "return_invoice")
       .map((i) => ({
-        sourceId: i.sourceId,
+        sourceId: String(i.sourceId),
         billingReference: i.billingReference,
         total: Number(i.total),
         net: Number(i.netAmount),

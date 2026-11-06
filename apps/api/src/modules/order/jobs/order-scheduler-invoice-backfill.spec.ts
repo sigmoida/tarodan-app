@@ -43,15 +43,15 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
     };
     const orderService = { emitDeliveryRevenueInvoices: jest.fn() };
     const service = new OrderSchedulerService(
-      prisma as any,
-      orderService as any,
-      { get: jest.fn() } as any,
-      {} as any,
+      prisma as never,
+      orderService as never,
+      { get: jest.fn() } as never,
+      {} as never,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
-      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
-      { createInAppNotification: jest.fn() } as any,
-      { get: jest.fn(), set: jest.fn() } as any,
-      { add: jest.fn() } as any,
+      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as never,
+      { createInAppNotification: jest.fn() } as never,
+      { get: jest.fn(), set: jest.fn() } as never,
+      { add: jest.fn() } as never,
     );
     return { service, prisma, orderService };
   };
@@ -222,6 +222,14 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
    * — escrow ve iade uygunluğu da onu okur. Damgasız eski siparişte bugünkü
    * değerle `deliveredAt ≤ şimdi − N gün` kesilir.
    */
+  /** The completion query's window: stamped first, then legacy. */
+  interface CompletionWhere {
+    OR: Array<{
+      returnWindowEndsAt?: { lte: Date } | null;
+      deliveredAt?: { lte: Date };
+    }>;
+  }
+
   describe("iade penceresi kapanışı — damga ve süre kaynağı", () => {
     const NOW = new Date("2026-10-05T12:00:00.000Z");
     const DAY = 24 * 60 * 60 * 1000;
@@ -237,14 +245,17 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
             : null,
       );
       await service.runProcessDeliveredOrders();
-      const completionCall: any[] =
-        prisma.order.findMany.mock.calls.find(
-          (call: any[]) => call[0]?.where?.OR?.[1]?.deliveredAt?.lte,
-        ) ?? [];
+      const calls = prisma.order.findMany.mock.calls as unknown as Array<
+        [{ where: CompletionWhere }]
+      >;
+      const completionCall = calls.find(
+        (call) => call[0]?.where?.OR?.[1]?.deliveredAt?.lte,
+      );
+      if (!completionCall) throw new Error("no completion query");
       return completionCall[0].where;
     };
-    const legacyCutoffAge = (where: any) =>
-      (NOW.getTime() - (where.OR[1].deliveredAt.lte as Date).getTime()) / DAY;
+    const legacyCutoffAge = (where: CompletionWhere) =>
+      (NOW.getTime() - (where.OR[1].deliveredAt?.lte as Date).getTime()) / DAY;
 
     it("damgalı sipariş kendi pencere sonunda tamamlanır", async () => {
       const where = await completionWhere("30");
