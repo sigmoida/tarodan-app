@@ -191,6 +191,89 @@ describe("PaytrReportMatchingService.matchStatementLines", () => {
     errorLog.mockRestore();
   });
 
+  describe("the card PayTR charged against the attempt (plan 5.6)", () => {
+    const attempt = {
+      id: "att-1",
+      chargedAmount: new Prisma.Decimal("106.64"),
+      installmentCount: 3,
+      cardFamily: "world",
+      bin6: "454671",
+      installmentRatePct: new Prisma.Decimal("8.000"),
+    };
+    async function run(line: Record<string, unknown>) {
+      const prisma = makePrisma({
+        lines: [makeLine({ amount: 106.64, ...line })],
+        payment: { id: "pay-1", amount: 100, chargedAmount: null },
+      });
+      prisma.paymentChargeAttempt.findFirst.mockResolvedValue(attempt);
+      const errorLog = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      const warnLog = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      const r = await new PaytrReportMatchingService(
+        prisma as never,
+      ).matchStatementLines();
+      const logs = {
+        errors: errorLog.mock.calls.map((c) => String(c[0])),
+        warnings: warnLog.mock.calls.map((c) => String(c[0])),
+      };
+      errorLog.mockRestore();
+      warnLog.mockRestore();
+      return { r, prisma, ...logs };
+    }
+
+    it("matches and alarms INSTALLMENT_CARD_MISMATCH when another card family and BIN paid (no card digits logged)", async () => {
+      const { r, prisma, errors } = await run({
+        cardBrand: "BONUS",
+        maskedPan: "540667******5403",
+        feeRate: new Prisma.Decimal("8.00"),
+      });
+
+      // The money is collected and the count is right: still matched.
+      expect(r.matched).toBe(1);
+      expect(updateData(prisma, "line-1")).toEqual([
+        expect.objectContaining({ matchStatus: PaytrMatchStatus.matched }),
+      ]);
+      const alarm = errors.find((e) =>
+        e.startsWith("INSTALLMENT_CARD_MISMATCH"),
+      );
+      expect(alarm).toMatch(/line line-1 oid=ORD1 payment pay-1 attempt att-1/);
+      expect(alarm).toMatch(/family, bin differs/);
+      expect(alarm).not.toMatch(/540667|5403|454671/);
+    });
+
+    it("warns INSTALLMENT_RATE_DRIFT when the deduction rate is far from the priced one", async () => {
+      const { errors, warnings } = await run({
+        cardBrand: "WORLD",
+        maskedPan: "454671******1234",
+        feeRate: new Prisma.Decimal("9.10"),
+      });
+
+      expect(errors.filter((e) => e.includes("INSTALLMENT_"))).toEqual([]);
+      expect(warnings).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(
+            /^INSTALLMENT_RATE_DRIFT: sale line line-1 .*1\.10 points/,
+          ),
+        ]),
+      );
+    });
+
+    it("says nothing when the quoted card paid at the priced rate", async () => {
+      const { errors, warnings } = await run({
+        cardBrand: "WORLD",
+        maskedPan: "454671******1234",
+        feeRate: new Prisma.Decimal("8.00"),
+      });
+
+      expect(
+        [...errors, ...warnings].filter((e) => e.includes("INSTALLMENT_")),
+      ).toEqual([]);
+    });
+  });
+
   it("selects only unmatched, unresolved lines not attempted in the last day, newest-first", async () => {
     const prisma = makePrisma({ lines: [] });
     const service = new PaytrReportMatchingService(prisma as any);

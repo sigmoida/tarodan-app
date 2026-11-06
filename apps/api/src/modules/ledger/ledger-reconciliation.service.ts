@@ -26,7 +26,10 @@ export interface ReconciliationReport {
   overRefundedOrders: number;
   /** Damgalı (ledgerRecordedAt dolu) PayTR döküm satırlarının kesinti toplamı. */
   pspFeeStampedTotal: number;
-  /** Penceredeki ledger psp_fee DEBIT toplamı — damgalı toplama eşit olmalı. */
+  /**
+   * The window's ledger DEBIT total of `psp_fee` + `installment_platform_cost`
+   * (the two parts of a PayTR deduction, ADR 0019); equal to the stamped total.
+   */
   pspFeeLedgerTotal: number;
   /** 2+ gündür damgalanmamış (deftere yazılamamış) eşleşmiş fee'li satır sayısı. */
   pspFeeAccrualLag: number;
@@ -36,6 +39,15 @@ export interface ReconciliationReport {
   revenueSplitDifference: number;
   driftAlarms: string[];
 }
+
+/**
+ * The accounts a PayTR deduction is booked on (`accruePspFees`): what any sale
+ * costs, and the installment cost a segment rule made the platform absorb.
+ */
+const PSP_DEDUCTION_ACCOUNTS: readonly LedgerAccount[] = [
+  LedgerAccount.psp_fee,
+  LedgerAccount.installment_platform_cost,
+];
 
 /** PSP kesinti tahakkuku bu süreden uzun gecikirse alarm (gece cron'u art arda hata veriyordur). */
 const PSP_FEE_LAG_DAYS = 2;
@@ -156,11 +168,13 @@ export class LedgerReconciliationService implements OnModuleInit {
       }
     }
 
-    // 4) PSP kesinti bütünlüğü (Faz 6.5 "ledger vs PSP raporu" kapanışı):
-    //    damgalı döküm satırlarının fee toplamı = penceredeki psp_fee DEBIT toplamı.
-    //    Damga ile defter yazımı aynı anda atıldığından iki taraf da kendi zaman
-    //    alanıyla (ledgerRecordedAt / createdAt) AYNI pencereye dilimlenir; sapma
-    //    = kaybolan/çift yazılan defter satırı ya da damgalanıp yazılamayan satır.
+    // 4) PSP deduction integrity (Phase 6.5, "ledger vs PSP report"): the fee
+    //    total of the stamped statement lines = the window's DEBIT total of
+    //    psp_fee + installment_platform_cost (a segment-rule installment sale
+    //    splits its deduction between the two, ADR 0019). The stamp and the
+    //    ledger write happen together, so each side is sliced into the SAME
+    //    window by its own time field (ledgerRecordedAt / createdAt); a gap =
+    //    a lost or double ledger row, or a line stamped but not written.
     const stampedLines = await this.prisma.paytrStatementLine.findMany({
       where: { ledgerRecordedAt: { gte: since } },
       select: { fee: true },
@@ -171,7 +185,7 @@ export class LedgerReconciliationService implements OnModuleInit {
     );
     const pspFeeLedgerTotal = entries.reduce(
       (sum, e) =>
-        e.account === LedgerAccount.psp_fee &&
+        PSP_DEDUCTION_ACCOUNTS.includes(e.account) &&
         e.direction === LedgerDirection.debit
           ? sum + Number(e.amount)
           : sum,
