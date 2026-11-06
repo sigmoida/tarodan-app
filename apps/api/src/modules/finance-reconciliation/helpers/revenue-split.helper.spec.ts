@@ -39,6 +39,7 @@ const trade = {
 const inputs = {
   collectedTotal: physical.total + 500 + 240 + 120 + 240,
   collectedCount: 3 + 1 + 2 + 1,
+  installmentFee: 0,
   physical,
   trade,
   virtualOrders: { count: 2, gross: 360 },
@@ -73,6 +74,7 @@ describe("assembleRevenueSplit", () => {
       shipping: 260,
       withholding: 10,
       shippingDeficit: -54.4,
+      installmentFee: 0,
     });
     expect(platformFeesNet).toBe(788);
     expect(section.difference).toBe(0);
@@ -83,6 +85,39 @@ describe("assembleRevenueSplit", () => {
       productTaxTotal: 0,
       commissionLedgerDrift: 0,
     });
+  });
+
+  it("closes the identity with installment payments: the vade farkı is collected on top of the orders (ADR 0019)", () => {
+    // Plan 4.4: one cart paid in 3 installments adds F 66.38 to the
+    // collections (C 1,066.38 for T 1,000.00); the order lines stay T.
+    const { section, platformFeesNet } = assembleRevenueSplit(
+      {
+        ...inputs,
+        collectedTotal: inputs.collectedTotal + 66.38,
+        installmentFee: 66.38,
+      },
+      rates,
+    );
+
+    expect(section.total.amount).toBe(2663.58);
+    expect(
+      section.components.find((c) => c.key === "installmentFee")?.amount,
+    ).toBe(66.38);
+    // The seller share and the platform fees do not see the fee.
+    expect(
+      section.components.find((c) => c.key === "sellerShare")?.amount,
+    ).toBe(1098);
+    expect(platformFeesNet).toBe(788);
+    expect(section.difference).toBe(0);
+  });
+
+  it("shows a fee collected without its line as a red difference", () => {
+    const { section } = assembleRevenueSplit(
+      { ...inputs, collectedTotal: inputs.collectedTotal + 66.38 },
+      rates,
+    );
+    expect(section.difference).toBe(66.38);
+    expect(section.balanced).toBe(false);
   });
 
   it("links the trade counterpart to the orders screen's Takaslar tab (old list route redirects)", () => {

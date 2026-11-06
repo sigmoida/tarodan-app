@@ -71,8 +71,13 @@ function makePrisma(overrides: Record<string, any> = {}) {
       aggregate: jest.fn().mockResolvedValue({ _sum: { netAmount: 0 } }),
     },
     ledgerEntry: {
-      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 30 } }),
+      // PayTR's deductions by account: psp_fee only (no segment rule cost).
+      groupBy: jest
+        .fn()
+        .mockResolvedValue([{ account: "psp_fee", _sum: { amount: 30 } }]),
     },
+    // The installment summary (one reporting query): no installment payment.
+    $queryRaw: jest.fn().mockResolvedValue([]),
     refundAttempt: {
       aggregate: jest
         .fn()
@@ -201,7 +206,9 @@ describe("FinanceReconciliationService.build", () => {
       tradeFeeReversed: 0,
       virtualRefundsNet: 0,
       platformAbsorbed: 0,
+      installmentFeeIncome: 0,
       pspFee: -30,
+      installmentPlatformCost: 0,
     });
     expect(s.result).toMatchObject({
       key: "tarodanNet",
@@ -222,6 +229,7 @@ describe("FinanceReconciliationService.build", () => {
       buyerFees: 5,
       buyerVat: 1,
       returnShippingCharged: 0,
+      installmentFee: 0,
       unclassified: 96,
     });
   });
@@ -266,6 +274,146 @@ describe("FinanceReconciliationService.build", () => {
       difference: 90,
       balanced: false,
       count: 1,
+    });
+  });
+
+  describe("installment payments (ADR 0019)", () => {
+    // Plan 4.4: a default-rule cart, F 66.38 (VAT 20 % inside, net 55.32),
+    // 26.55 of it refunded with a partial refund; and a premium sale at a
+    // 100 % share whose deduction 80.00 splits into psp_fee 30.00 and
+    // installment_platform_cost 50.00.
+    const installmentPrisma = () =>
+      makePrisma({
+        ledgerEntry: {
+          groupBy: jest.fn().mockResolvedValue([
+            { account: "psp_fee", _sum: { amount: 30 } },
+            { account: "installment_platform_cost", _sum: { amount: 50 } },
+          ]),
+        },
+        $queryRaw: jest.fn().mockResolvedValue([
+          {
+            installment_count: 3,
+            segment: "free",
+            payments: 1,
+            fee_collected: 66.38,
+            fee_refunded: 26.55,
+            fee_income_net: (66.38 - 26.55) / 1.2,
+            platform_cost_expected: 0,
+            platform_cost_booked: 0,
+          },
+          {
+            installment_count: 3,
+            segment: "premium",
+            payments: 1,
+            fee_collected: 0,
+            fee_refunded: 0,
+            fee_income_net: 0,
+            platform_cost_expected: 50,
+            platform_cost_booked: 50,
+          },
+        ]),
+        refundAttempt: {
+          aggregate: jest
+            .fn()
+            .mockImplementation(({ where }: any) =>
+              where.provider
+                ? agg({ amount: 228.55 })
+                : agg({ amount: 228.55, installmentFeeAmount: 26.55 }, 3),
+            ),
+        },
+        payment: {
+          aggregate: jest.fn().mockResolvedValue({
+            _sum: { amount: 2357.2, installmentFeeAmount: 66.38 },
+          }),
+        },
+        paytrStatementLine: {
+          findFirst: jest.fn().mockResolvedValue({
+            transactionDate: new Date("2026-08-01T00:00:00Z"),
+          }),
+          aggregate: jest
+            .fn()
+            .mockImplementation(({ where }: any) =>
+              where.type === "sale"
+                ? agg({ amount: 2663.58, fee: 80 })
+                : agg({ amount: 228.55 }),
+            ),
+        },
+      });
+
+    it("S3 shows the vade farkı income without its VAT and the segment-rule cost next to the PayTR fee", async () => {
+      const r = await makeService(installmentPrisma()).build();
+      const s = section(r, "platformNet");
+
+      expect(byKey(s)).toMatchObject({
+        installmentFeeIncome: 33.19,
+        pspFee: -30,
+        installmentPlatformCost: -50,
+      });
+      // 788 - 15 - 15 + 33.19 - 30 - 50
+      expect(s.result.amount).toBe(711.19);
+    });
+
+    it("S4 compares sales on the charged scale and the fee as psp_fee + installment cost", async () => {
+      const r = await makeService(installmentPrisma()).build();
+      const rows = Object.fromEntries(
+        r.comparison.rows.map((x: any) => [x.key, x]),
+      );
+
+      expect(rows.sales).toMatchObject({
+        ours: 2663.58,
+        theirs: 2663.58,
+        balanced: true,
+      });
+      expect(rows.pspFee).toMatchObject({
+        ours: 80,
+        theirs: 80,
+        balanced: true,
+      });
+      expect(rows.refunds).toMatchObject({ ours: 228.55, balanced: true });
+    });
+
+    it("the buyer refunds show the vade farkı given back on its own line", async () => {
+      const r = await makeService(installmentPrisma()).build();
+      const s = section(r, "buyerRefunds");
+
+      expect(byKey(s).installmentFee).toBe(26.55);
+      // 228.55 - 100 - 5 - 1 - 26.55
+      expect(byKey(s).unclassified).toBe(96);
+    });
+
+    it("returns the rows by count and segment with their totals", async () => {
+      const r = await makeService(installmentPrisma()).build();
+
+      expect(r.installments.rows).toEqual([
+        {
+          installmentCount: 3,
+          segment: "free",
+          payments: 1,
+          feeCollected: 66.38,
+          feeRefunded: 26.55,
+          feeIncomeNet: 33.19,
+          platformCostExpected: 0,
+          platformCostBooked: 0,
+        },
+        {
+          installmentCount: 3,
+          segment: "premium",
+          payments: 1,
+          feeCollected: 0,
+          feeRefunded: 0,
+          feeIncomeNet: 0,
+          platformCostExpected: 50,
+          platformCostBooked: 50,
+        },
+      ]);
+      expect(r.installments.totals).toEqual({
+        payments: 2,
+        feeCollected: 66.38,
+        feeRefunded: 26.55,
+        feeIncomeNet: 33.19,
+        platformCostExpected: 50,
+        platformCostBooked: 50,
+      });
     });
   });
 

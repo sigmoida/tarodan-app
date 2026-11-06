@@ -34,8 +34,18 @@ describe("FinanceReconciliationService — test lane", () => {
       // S1 fiziksel bölünme tek SQL — şeridi WHERE is_test = false ile süzer.
       $queryRaw: jest.fn(async () => [{}]),
     };
+    // A groupBy (the ledger's deduction accounts) is a money aggregate too.
+    const groupBy = (model: string) =>
+      jest.fn(async (args: any) => {
+        seen.push({ model, where: args?.where });
+        return [];
+      });
     for (const m of models)
-      prisma[m] = { aggregate: agg(m), findFirst: jest.fn(async () => null) };
+      prisma[m] = {
+        aggregate: agg(m),
+        groupBy: groupBy(m),
+        findFirst: jest.fn(async () => null),
+      };
     const config = { get: () => undefined } as never;
     // S1 de gerçek servisle koşar: Σ ile bileşenlerin aynı filtreden geçmesi şart.
     const revenueSplit = new RevenueSplitService(prisma as never, config);

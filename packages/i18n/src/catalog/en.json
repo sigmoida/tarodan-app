@@ -7510,7 +7510,8 @@
               "serviceVat": "Service VAT",
               "shipping": "Shipping (to carrier)",
               "withholding": "Withholding tax",
-              "shippingDeficit": "Shipping deficit (hold clamped)"
+              "shippingDeficit": "Shipping deficit (hold clamped)",
+              "installmentFee": "Installment fee (VAT included)"
             }
           },
           "sellerShare": {
@@ -7544,7 +7545,9 @@
               "tradeFeeReversed": "Trade full refunds (fee reversed)",
               "virtualRefundsNet": "Membership / boost refunds",
               "platformAbsorbed": "Refund items absorbed by the platform",
+              "installmentFeeIncome": "Installment fee income (excl. VAT)",
               "pspFee": "PayTR fee",
+              "installmentPlatformCost": "Installment campaign cost",
               "tarodanNet": "Tarodan net"
             }
           },
@@ -7557,6 +7560,7 @@
               "buyerFees": "Buyer fees",
               "buyerVat": "Buyer VAT",
               "returnShippingCharged": "Return shipping charged to buyer",
+              "installmentFee": "Installment fee",
               "unclassified": "Unclassified (legacy policy / manual / trade)"
             }
           }

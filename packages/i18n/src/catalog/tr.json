@@ -7510,7 +7510,8 @@
               "serviceVat": "Hizmet KDV'si",
               "shipping": "Kargo (Sürat'a)",
               "withholding": "Stopaj",
-              "shippingDeficit": "Kargo açığı (hold sıfırlandı)"
+              "shippingDeficit": "Kargo açığı (hold sıfırlandı)",
+              "installmentFee": "Vade farkı (KDV dahil)"
             }
           },
           "sellerShare": {
@@ -7544,7 +7545,9 @@
               "tradeFeeReversed": "Takas tam iadesi (ücret geri)",
               "virtualRefundsNet": "Üyelik / öne çıkarma iadeleri",
               "platformAbsorbed": "Platformun karşıladığı iade kalemleri",
+              "installmentFeeIncome": "Vade farkı geliri (KDV hariç)",
               "pspFee": "PayTR kesintisi",
+              "installmentPlatformCost": "Taksit kampanya maliyeti",
               "tarodanNet": "Tarodan hak edişi"
             }
           },
@@ -7557,6 +7560,7 @@
               "buyerFees": "Alıcı ücretleri",
               "buyerVat": "Alıcı KDV'si",
               "returnShippingCharged": "Alıcıya yansıtılan iade kargosu",
+              "installmentFee": "Vade farkı",
               "unclassified": "Ayrıştırılamayan (eski politika / elle / takas)"
             }
           }
