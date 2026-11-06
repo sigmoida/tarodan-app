@@ -37,7 +37,10 @@ import type {
   PspLineFilter,
   PspStatementLinesQueryDto,
 } from "./dto/psp-reconciliation.dto";
-import { chargedAmountOf } from "../../payment/helpers/charged-amount";
+import {
+  chargedAmountOf,
+  expectedPaytrChargeOf,
+} from "../../payment/helpers/charged-amount";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** `YYYY-MM-DD` gününün kendisi ve ±1 komşusu (oid kayması toleransı). */
@@ -506,13 +509,14 @@ export class AdminPspReconciliationService {
     const membershipIds = [
       ...new Set(rows.map((r) => r.membershipPaymentId).filter(Boolean)),
     ] as string[];
-    const [payments, memberships] = await Promise.all([
+    const [payments, memberships, attempts] = await Promise.all([
       paymentIds.length
         ? this.prisma.payment.findMany({
             where: { id: { in: paymentIds } },
             select: {
               id: true,
               amount: true,
+              chargedAmount: true,
               order: { select: { orderNumber: true } },
               checkoutGroup: { select: { groupNumber: true } },
               tradeCashPayment: {
@@ -531,9 +535,24 @@ export class AdminPspReconciliationService {
             },
           })
         : [],
+      // The charge attempt each line's oid was signed with: what PayTR had
+      // to charge for it (PSP scale, ADR 0019).
+      paymentIds.length
+        ? this.prisma.paymentChargeAttempt.findMany({
+            where: {
+              paymentId: { in: paymentIds },
+              merchantOid: { in: [...new Set(rows.map((r) => r.merchantOid))] },
+            },
+            select: { paymentId: true, merchantOid: true, chargedAmount: true },
+          })
+        : [],
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
+    const attemptOf = (paymentId: string, merchantOid: string) =>
+      attempts.find(
+        (a) => a.paymentId === paymentId && a.merchantOid === merchantOid,
+      ) ?? null;
 
     return {
       data: rows.map((row) => {
@@ -548,7 +567,15 @@ export class AdminPspReconciliationService {
           payment: payment
             ? {
                 id: payment.id,
+                // Goods scale (T): the order totals.
                 amount: payment.amount,
+                // PSP scale: what PayTR had to charge for this line's oid
+                // (its attempt's C, else the payment's charged amount), the
+                // figure a sale line is matched against.
+                chargedAmount: expectedPaytrChargeOf(
+                  payment,
+                  attemptOf(payment.id, row.merchantOid),
+                ),
                 orderNumber: payment.order?.orderNumber ?? null,
                 groupNumber: payment.checkoutGroup?.groupNumber ?? null,
                 tradeNumber:
