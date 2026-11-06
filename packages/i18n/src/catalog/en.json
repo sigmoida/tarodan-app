@@ -11816,7 +11816,7 @@
       "installmentUnavailable": "Installments are unavailable right now. You can continue with a single payment.",
       "installmentOptionsInvalidRequest": "Send one card (the first card digits or a saved card) and one payment or amount to get installment options.",
       "installmentOptionsTooManyRequests": "Installment options were requested too often. Please try again shortly.",
-      "paymentAmountOutOfDate": "The payment amount has changed; your payment is being prepared again.",
+      "paymentAmountOutOfDate": "The payment amount has changed. Please check the current amount and try again.",
       "installmentMail": {
         "label": "Installments",
         "summary": "{count} installments: {monthly} TL per month, installment fee {fee} TL, total {total} TL"

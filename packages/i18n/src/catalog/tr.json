@@ -11816,7 +11816,7 @@
       "installmentUnavailable": "Taksit şu an kullanılamıyor. Tek çekim ile devam edebilirsiniz.",
       "installmentOptionsInvalidRequest": "Taksit seçenekleri için bir kart (kart numarasının ilk haneleri ya da kayıtlı kart) ve bir ödeme ya da tutar gönderilmelidir.",
       "installmentOptionsTooManyRequests": "Taksit seçenekleri çok sık istendi. Lütfen biraz sonra tekrar deneyin.",
-      "paymentAmountOutOfDate": "Ödeme tutarı güncellendi; ödemeniz yeniden hazırlanıyor.",
+      "paymentAmountOutOfDate": "Ödeme tutarı güncellendi. Lütfen güncel tutarı kontrol edip tekrar deneyin.",
       "installmentMail": {
         "label": "Taksit",
         "summary": "{count} taksit: aylık {monthly} TL, vade farkı {fee} TL, toplam {total} TL"
