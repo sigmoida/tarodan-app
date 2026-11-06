@@ -19,7 +19,13 @@ describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M
       // to `amount`.
       paymentChargeAttempt: {
         findFirst: jest.fn().mockResolvedValue(null),
-        findMany: jest.fn().mockResolvedValue(opts.attempts ?? []),
+        // The sweep reads the attempts of the whole batch at once.
+        findMany: jest.fn().mockResolvedValue(
+          (opts.attempts ?? []).map((a) => ({
+            paymentId: opts.candidate.id,
+            ...a,
+          })),
+        ),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       payment: {
