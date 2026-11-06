@@ -51,6 +51,9 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   // (hizmet bedeli + kargo + fark) üstüne KDV EKLENMEDEN tahsil edilir,
   // dolayısıyla saklanan tutar KDV DAHİLDİR ve vergi içinden ayrıştırılır.
   trade_shipping: "gross",
+  // Installment fee (vade farkı, ADR 0019 D4): the buyer paid it VAT
+  // INCLUDED on top of the goods total, so the VAT is split out of it.
+  buyer_installment_fee: "gross",
   // İade faturası kaynak faturanın tutarını terslediği için onun matrahını izler;
   // pratikte `repriceUnsentInvoice`/refund yolu kendi kaynağından hesaplar.
   return_invoice: "gross",

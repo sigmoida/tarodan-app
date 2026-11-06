@@ -4,6 +4,7 @@ import {
   OrderStatus,
   PaymentStatus,
   PaytrMerchant,
+  Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
@@ -46,7 +47,9 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       paymentId: "pay-1",
       orderId: ORDER_ID,
       idempotencyKey: "boost-refund:boost-1:0",
-      amount: 0,
+      amount: new Prisma.Decimal(0),
+      // A boost is never paid in installments (D6).
+      installmentFeeAmount: new Prisma.Decimal(0),
       status: RefundAttemptStatus.prepared,
       providerRefundId: null,
       providerResponse: null,
@@ -101,7 +104,13 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
         update: jest.fn().mockResolvedValue({}),
       },
       payment: {
-        findUnique: jest.fn(() => Promise.resolve({ metadata })),
+        findUnique: jest.fn(() =>
+          Promise.resolve({
+            metadata,
+            amount: new Prisma.Decimal(PAID),
+            installmentFeeAmount: new Prisma.Decimal(0),
+          }),
+        ),
         update: jest.fn(({ data }: { data: { metadata: typeof metadata } }) => {
           metadata = data.metadata;
           return Promise.resolve({});
@@ -467,7 +476,8 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
         paymentId: "pay-1",
         orderId: ORDER_ID,
         idempotencyKey: opts.idempotencyKey,
-        amount: PAID,
+        amount: new Prisma.Decimal(PAID),
+        installmentFeeAmount: new Prisma.Decimal(0),
         status,
         providerRefundId: null,
         providerResponse: null,

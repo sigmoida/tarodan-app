@@ -11,6 +11,7 @@ import { PayTRCredentials } from "../../payment-providers/paytr/paytr-credential
 import { PayTRReportService } from "../../payment-providers/paytr/paytr-report.service";
 import { PayTRTransferService } from "../../payment-providers/paytr/paytr-transfer.service";
 import { PayTRService } from "../../payment-providers/paytr/paytr.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * Direct form mağaza kapsamı: form, kart kasası ve yetenekler ödemenin
@@ -61,6 +62,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — merchant scope", (
       events as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     const ctx = {
       payment: {
@@ -216,6 +218,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
       events as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never,
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     const ctx = {
       payment: {

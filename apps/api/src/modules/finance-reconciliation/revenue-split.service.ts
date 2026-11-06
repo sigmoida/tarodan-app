@@ -175,9 +175,11 @@ export class RevenueSplitService {
     ] = await Promise.all([
       this.resolveRates(),
       this.physicalSplit(),
+      // PSP scale: what the buyers paid, the installment fee (vade farkı)
+      // included (C = amount + installmentFeeAmount, ADR 0019).
       this.prisma.payment.aggregate({
         where: { ...LIVE_PAYMENT, status: { in: paidStatuses } },
-        _sum: { amount: true },
+        _sum: { amount: true, installmentFeeAmount: true },
         _count: { id: true },
       }),
       // MEM- siparişi hem Payment hem MembershipPayment üretir; yalnız yenilemeler
@@ -222,8 +224,12 @@ export class RevenueSplitService {
     const num = (v: unknown) => (v == null ? 0 : Number(v));
     const assembled = assembleRevenueSplit(
       {
-        collectedTotal: num(payments._sum.amount) + num(renewals._sum.amount),
+        collectedTotal:
+          num(payments._sum.amount) +
+          num(payments._sum.installmentFeeAmount) +
+          num(renewals._sum.amount),
         collectedCount: payments._count.id + renewals._count.id,
+        installmentFee: num(payments._sum.installmentFeeAmount),
         physical,
         trade: {
           count: trade._count.id,

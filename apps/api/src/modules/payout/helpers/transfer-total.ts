@@ -1,4 +1,8 @@
 import { PayoutStatus, RefundAttemptStatus, type Prisma } from "@prisma/client";
+import {
+  chargedAmountOf,
+  type ChargedAmountSource,
+} from "../../payment/helpers/charged-amount";
 import { asPaymentMetadata } from "../../payment/helpers/payment-metadata.types";
 import { PAYOUT_FAILURE } from "./payout-failure-reasons";
 
@@ -15,9 +19,27 @@ import { PAYOUT_FAILURE } from "./payout-failure-reasons";
  *                  - totals consumed by OTHER transfers on the same oid
  *   allowedTotal = min(ownAllowed, oidRemaining), in kurus, floored at 0
  *
- * The seller's net (`submerchant_amount`) is not changed here; when it does
- * not fit into `allowedTotal` the payout goes to a manual decision instead of
- * PayTR (the platform pays it outside the order transfer, docs/PAYMENTS.md §6).
+ * All of it is on the PSP scale (ADR 0019): what PayTR holds for the oid. An
+ * order's source total is its charged slice (`orderChargedTotalOf`: goods
+ * total + its installment fee share), the payment amount is what PayTR
+ * charged (`chargedAmountOf`), and the refunds are the attempts'
+ * `return_amount` (goods + fee share). For a single payment every figure is
+ * the goods figure, as before.
+ *
+ * The seller's net (`submerchant_amount`) is not changed here and never sees
+ * the fee: it is the goods-scale net. When it does not fit into
+ * `allowedTotal` the payout goes to a manual decision instead of PayTR (the
+ * platform pays it outside the order transfer, docs/PAYMENTS.md §6).
+ *
+ * Assumption AS-P5 (plan 12.6, to confirm with PayTR): PayTR needs the
+ * slice's margin `total_amount - submerchant_amount` to cover its deduction
+ * on that slice, at the installment rate for an installment oid. The PSP
+ * scale gives an installment slice that margin: it carries the order's fee
+ * share F_o on top of the platform fees, and signing refuses a count whose
+ * margin would not cover the deduction (the keep guard,
+ * `installment-eligibility.ts`). If PayTR does not need the margin, nothing
+ * here changes; if it rejects a slice, the existing retry and the manual
+ * decision handle it.
  */
 
 /** A transfer on the same merchant_oid, as read for the cap. */
@@ -44,8 +66,12 @@ export interface TransferTotalInput {
   net: number;
   /** The order id or trade id the payout settles. */
   sourceKey: string;
-  /** `Order.totalAmount` or `TradeCashPayment.totalAmount`. */
+  /**
+   * PSP scale: the order's charged slice (`orderChargedTotalOf`) or
+   * `TradeCashPayment.totalAmount` (trades never take installments).
+   */
   sourceTotal: unknown;
+  /** PSP scale: what PayTR charged for the oid (`chargedAmountOf`). */
   paymentAmount: unknown;
   /** `Payment.metadata.refundedOrders`: per-order cumulative refunds. */
   refundedOrders: Record<string, unknown> | undefined;
@@ -128,6 +154,10 @@ function consumedKurus(row: OidTransferRow): number {
  * Cash refunded per order/trade, in kurus. Every refund since 2026-07-28 has a
  * RefundAttempt; older ones exist only in `Payment.metadata.refundedOrders`.
  * Both are cumulative per order, so the larger one counts (never the sum).
+ * The attempts are on the PSP scale (`return_amount`, with the installment
+ * fee share), `refundedOrders` on the goods scale; they differ only for an
+ * installment payment, whose refunds all have attempts (installments came
+ * after them), so the larger one is the PSP figure.
  */
 function refundedKurusByKey(
   attempts: readonly RefundCashRow[],
@@ -207,8 +237,9 @@ export async function resolveTransferTotal(
   params: {
     payout: { id: string; merchantOid: string };
     net: number;
+    /** `total` on the PSP scale (see `TransferTotalInput.sourceTotal`). */
     source: { key: string; total: unknown } | null;
-    payment: { id: string; amount: unknown; metadata: unknown } | null;
+    payment: (ChargedAmountSource & { id: string; metadata: unknown }) | null;
   },
 ): Promise<TransferTotalDecision> {
   const { payout, payment, source } = params;
@@ -245,7 +276,7 @@ export async function resolveTransferTotal(
     net: params.net,
     sourceKey: source.key,
     sourceTotal: source.total,
-    paymentAmount: payment.amount,
+    paymentAmount: chargedAmountOf(payment),
     refundedOrders: asPaymentMetadata(payment.metadata).refundedOrders,
     refundAttempts,
     oidTransfers,

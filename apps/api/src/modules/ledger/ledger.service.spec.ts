@@ -177,6 +177,64 @@ describe("LedgerService", () => {
     });
   });
 
+  it("recordCapture books the buyer-paid installment fee on its own account (ADR 0019)", async () => {
+    const svc = new LedgerService({} as never);
+    const tx = makeTx();
+    // Plan 4.4: one order, T 1,000.00 (seller net 880, commission 100,
+    // stopaj 20), 3 installments, F 66.38: the buyer paid C = 1,066.38.
+    await svc.recordCapture(tx, {
+      orderId: "o1",
+      gross: 1000,
+      sellerNet: 880,
+      commission: 100,
+      withholdingTax: 20,
+      installmentFee: 66.38,
+    });
+    const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data as Array<{
+      account: LedgerAccount;
+      direction: LedgerDirection;
+      amount: unknown;
+    }>;
+    const line = (account: LedgerAccount) =>
+      rows.find((r) => r.account === account);
+    expect(line(LedgerAccount.buyer_payment)).toMatchObject({
+      direction: LedgerDirection.credit,
+    });
+    expect(Number(line(LedgerAccount.buyer_payment)?.amount)).toBe(1066.38);
+    expect(line(LedgerAccount.installment_fee)).toMatchObject({
+      direction: LedgerDirection.debit,
+    });
+    expect(Number(line(LedgerAccount.installment_fee)?.amount)).toBe(66.38);
+    // The seller's escrow and the platform's commission never see the fee.
+    expect(Number(line(LedgerAccount.seller_escrow)?.amount)).toBe(880);
+    expect(Number(line(LedgerAccount.platform_commission)?.amount)).toBe(100);
+    const net = rows.reduce(
+      (sum, r) =>
+        sum +
+        (r.direction === LedgerDirection.debit ? 1 : -1) * Number(r.amount),
+      0,
+    );
+    expect(Math.abs(net)).toBeLessThan(0.005);
+  });
+
+  it("recordCapture writes no installment line for a single payment", async () => {
+    const svc = new LedgerService({} as never);
+    const tx = makeTx();
+    await svc.recordCapture(tx, {
+      orderId: "o1",
+      gross: 100,
+      sellerNet: 90,
+      commission: 10,
+      installmentFee: 0,
+    });
+    const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data as Array<{
+      account: LedgerAccount;
+    }>;
+    expect(rows.map((r) => r.account)).not.toContain(
+      LedgerAccount.installment_fee,
+    );
+  });
+
   it("recordCapture stopajı dengeler (gross = sellerNet + commission + stopaj)", async () => {
     const svc = new LedgerService({} as any);
     const tx = makeTx();
@@ -266,6 +324,126 @@ describe("LedgerService", () => {
         .reduce((s: number, r: any) => s + Number(r.amount), 0);
       expect(debit).toBeCloseTo(credit, 2); // dengeli (record() de zorlardı)
       expect(debit).toBe(50);
+    });
+
+    /** The group as account -> [direction, amount], and its signed net. */
+    function refundGroup(tx: { ledgerEntry: { createMany: jest.Mock } }) {
+      const rows: Array<{
+        account: LedgerAccount;
+        direction: LedgerDirection;
+        amount: unknown;
+      }> = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      return {
+        byAccount: Object.fromEntries(
+          rows.map((r) => [r.account, [r.direction, Number(r.amount)]]),
+        ),
+        net: Math.round(
+          rows.reduce(
+            (sum, r) =>
+              sum +
+              (r.direction === LedgerDirection.debit
+                ? Number(r.amount)
+                : -Number(r.amount)),
+            0,
+          ) * 100,
+        ),
+      };
+    }
+
+    it("a full installment refund reverses installment_fee and pays out C (ADR 0019)", async () => {
+      const svc = new LedgerService({} as never);
+      const tx = makeTx();
+      // Plan 4.4: T_o 1,000.00 (commission 100, stopaj 20), F_o 66.38;
+      // PayTR return_amount 1,066.38.
+      await svc.recordRefund(tx, {
+        orderId: "o1",
+        orderTotal: 1000,
+        commission: 100,
+        withholdingTax: 20,
+        refundAmount: 1000,
+        installmentFeeRefund: 66.38,
+      });
+      const { byAccount, net } = refundGroup(tx);
+      expect(byAccount[LedgerAccount.refund]).toEqual([
+        LedgerDirection.debit,
+        1066.38,
+      ]);
+      expect(byAccount[LedgerAccount.installment_fee]).toEqual([
+        LedgerDirection.credit,
+        66.38,
+      ]);
+      // The seller side stays on the goods scale, as for a single payment.
+      expect(byAccount[LedgerAccount.seller_escrow]).toEqual([
+        LedgerDirection.credit,
+        880,
+      ]);
+      expect(byAccount[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.credit,
+        100,
+      ]);
+      expect(net).toBe(0);
+    });
+
+    it("a partial installment refund reverses only its fee share; the seller side is the single-payment split", async () => {
+      const svc = new LedgerService({} as never);
+      const single = makeTx();
+      const installment = makeTx();
+      const goods = {
+        orderId: "o1",
+        orderTotal: 1000,
+        commission: 100,
+        withholdingTax: 20,
+        refundAmount: 400,
+      };
+      await svc.recordRefund(single, goods);
+      await svc.recordRefund(installment, {
+        ...goods,
+        installmentFeeRefund: 26.55,
+      });
+      const a = refundGroup(single);
+      const b = refundGroup(installment);
+      expect(b.byAccount[LedgerAccount.refund]).toEqual([
+        LedgerDirection.debit,
+        426.55,
+      ]);
+      expect(b.byAccount[LedgerAccount.installment_fee]).toEqual([
+        LedgerDirection.credit,
+        26.55,
+      ]);
+      for (const account of [
+        LedgerAccount.seller_escrow,
+        LedgerAccount.platform_commission,
+        LedgerAccount.withholding_tax,
+      ]) {
+        expect(b.byAccount[account]).toEqual(a.byAccount[account]);
+      }
+      expect(a.byAccount[LedgerAccount.installment_fee]).toBeUndefined();
+      expect(b.net).toBe(0);
+    });
+
+    it("a degenerate goods split still books the fee share PayTR gave back", async () => {
+      const svc = new LedgerService({} as never);
+      const tx = makeTx();
+      // Commission + stopaj eat the whole goods refund (sellerPortion <= 0):
+      // the goods part is skipped as before, the 0.66 of vade farkı is not.
+      await svc.recordRefund(tx, {
+        orderId: "o1",
+        refundAttemptId: "a1",
+        orderTotal: 10,
+        commission: 9,
+        withholdingTax: 1,
+        refundAmount: 10,
+        installmentFeeRefund: 0.66,
+      });
+      const { byAccount, net } = refundGroup(tx);
+      expect(byAccount).toEqual({
+        [LedgerAccount.refund]: [LedgerDirection.debit, 0.66],
+        [LedgerAccount.installment_fee]: [LedgerDirection.credit, 0.66],
+      });
+      expect(net).toBe(0);
+      expect(tx.ledgerEntry.createMany.mock.calls[0][0].data[0]).toMatchObject({
+        idempotencyKey: "refund:attempt:a1",
+      });
     });
 
     it("tutar 0 / dejenere split → null (kayıt yok)", async () => {

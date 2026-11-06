@@ -16,6 +16,10 @@ import {
 } from "../helpers/refund-attempt-actor";
 import { REFUND_FAILURE_PROVIDER_NOTHING_LEFT } from "../helpers/refund-provider-failure";
 import {
+  paytrAmountMatches,
+  refundGoodsPartOf,
+} from "../helpers/charged-amount";
+import {
   claimRefundAlarm,
   sweepablePaymentWhere,
 } from "../helpers/refund-sweep-policy";
@@ -164,8 +168,11 @@ export class RefundReconciliationService {
         if (match) {
           if (
             match.amountTl != null &&
-            Math.abs(match.amountTl - amount) >
-              REFUND_RESOLVE_AMOUNT_TOLERANCE_TL
+            !paytrAmountMatches(
+              match.amountTl,
+              attempt.amount,
+              REFUND_RESOLVE_AMOUNT_TOLERANCE_TL,
+            )
           ) {
             this.logger.warn(
               `Refund resolve: attempt ${attempt.id} referansı eşleşti ama tutar tutmuyor ` +
@@ -204,8 +211,11 @@ export class RefundReconciliationService {
             (r) =>
               !r.referenceNo &&
               r.amountTl != null &&
-              Math.abs(r.amountTl - amount) <=
+              paytrAmountMatches(
+                r.amountTl,
+                attempt.amount,
                 REFUND_RESOLVE_AMOUNT_TOLERANCE_TL,
+              ),
           );
           if (ambiguous) {
             // Referanssız aynı-tutarlı iade: bizim referanssız (özellik öncesi)
@@ -330,7 +340,9 @@ export class RefundReconciliationService {
           : null;
         const result = await this.paymentRefund.processRefund(
           attempt.orderId,
-          Number(attempt.amount),
+          // processRefund takes the goods part; the attempt keeps its PSP
+          // amount (goods + installment fee share) and is finished with it.
+          Number(refundGoodsPartOf(attempt)),
           {
             idempotencyKey: attempt.idempotencyKey,
             cancelledBy: refundAttemptCancelActor(

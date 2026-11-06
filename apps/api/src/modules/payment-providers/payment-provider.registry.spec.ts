@@ -18,7 +18,13 @@ class StubPaymentProvider implements IPaymentProvider {
     return this;
   }
   async queryPaymentStatus() {
-    return { ok: false } as any;
+    return { ok: false as const };
+  }
+  async lookupBin() {
+    return { ok: false as const, outcome: "error" as const, errMsg: "stub" };
+  }
+  async getInstallmentRates() {
+    return { ok: false as const, errMsg: "stub" };
   }
   verifyCallback() {
     return true;
@@ -27,7 +33,7 @@ class StubPaymentProvider implements IPaymentProvider {
     return { orderId: "x", isSuccess: true, amount: 0 };
   }
   async createRefund() {
-    return { status: "success" } as any;
+    return { status: "success" as const };
   }
   async createDirectPaymentForm() {
     return {
@@ -67,7 +73,7 @@ class StubPaymentProvider implements IPaymentProvider {
 }
 
 describe("PaymentProviderRegistry (#89)", () => {
-  const config = { get: () => undefined } as any;
+  const config = { get: () => undefined } as never;
   const paytr = new PayTRService(
     new PayTRCredentials(config),
     new PayTRReportService(new PayTRCredentials(config)),

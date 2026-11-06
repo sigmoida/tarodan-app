@@ -46,6 +46,10 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   // hepsi menüde "payments" izniyle görünür.
   finance: ["payments"],
   "refund-attempts": ["payments"],
+  // Finance > Installments (ADR 0019): the finance menu key; every write is
+  // also @Roles(super_admin), so an admin reads and a moderator is refused
+  // by role.
+  installments: ["payments"],
   products: ["products"],
   categories: ["categories"],
   brands: ["brands"],

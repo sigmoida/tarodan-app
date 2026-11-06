@@ -4,10 +4,18 @@ import { PrismaService } from "../../../prisma";
 import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/paytr.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "../payment-common.service";
-import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
+import {
+  PaymentFulfillmentService,
+  providerPaymentDataOf,
+} from "../fulfillment/payment-fulfillment.service";
+import {
+  paytrAmountMatches,
+  paytrChargeExpectationsForPayments,
+} from "../helpers/charged-amount";
 
 /**
  * PSP (PayTR) durum-sorgu tabanlı mutabakat süpürmeleri (cron). Callback kaçırılmış
@@ -86,11 +94,17 @@ export class PspReconciliationService {
 
     let checked = 0;
     let completed = 0;
+    // PSP scale, per oid: the amount each oid was signed for (its charge
+    // attempt), else the legacy `amount`; one query for the whole batch.
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      candidates,
+    );
 
     for (const row of candidates) {
       checked++;
-      const ourAmount = Number(row.amount);
       try {
+        const expectedFor = (oid: string) => expectedOf(row, oid);
         // FLOW-M3: TÜM oid'leri tara (güncel providerConversationId + merchantOidHistory).
         // Capture rotate edilmiş ESKİ bir oid'de olmuş olabilir; yalnız güncel oid'i
         // sormak sahipsiz capture'ı kaçırırdı. İlk çekilmiş + tutar-tutan oid capture'dır.
@@ -104,11 +118,14 @@ export class PspReconciliationService {
         for (const candidateOid of oids) {
           const inquiry = await provider.queryPaymentStatus(candidateOid);
           if (!inquiry.ok) continue;
-          if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
-            // O10: tutar uyuşmazlığı → ALARM (yüksek öncelik), completed YAPMA.
+          const expected = expectedFor(candidateOid);
+          if (
+            !paytrAmountMatches(inquiry.paymentTotalTl, expected, tolerance)
+          ) {
+            // O10: an amount mismatch is an ALARM (high priority); never completed.
             this.logger.error(
-              `ALARM: PayTR reconcile tutar uyuşmazlığı — payment=${row.id} oid=${candidateOid} ` +
-                `paytr=${inquiry.paymentTotalTl} ours=${ourAmount}. Ödeme tamamlanmadı, manuel inceleme gerekir.`,
+              `ALARM: PayTR reconcile amount mismatch payment=${row.id} oid=${candidateOid} ` +
+                `paytr=${inquiry.paymentTotalTl} ours=${expected.toFixed(2)}. Payment not completed, manual review required.`,
             );
             continue;
           }
@@ -155,6 +172,8 @@ export class PspReconciliationService {
           full,
           txnRef,
           capturedOid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
+          // Same payment-method columns as the callback (installment count).
+          providerPaymentDataOf(capturedInquiry),
         );
         if (did) {
           completed++;
@@ -172,7 +191,7 @@ export class PspReconciliationService {
           paymentType: capturedInquiry.paymentType ?? null,
           installmentCount: capturedInquiry.installmentCount ?? null,
           currency: capturedInquiry.currency ?? null,
-          amount: ourAmount,
+          amount: expectedFor(capturedOid).toNumber(),
           totalAmount: capturedInquiry.paymentTotalTl,
           // PSP ücret mutabakatı: PayTR'nin işlem kesintisi denetim satırına yazılır.
           providerFee: capturedInquiry.providerFeeTl ?? null,
@@ -183,9 +202,9 @@ export class PspReconciliationService {
             paymentDate: capturedInquiry.paymentDate ?? null,
           },
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.error(
-          `PayTR reconcile failed payment ${row.id}: ${error?.message}`,
+          `PayTR reconcile failed payment ${row.id}: ${errorMessage(error)}`,
         );
       }
     }
@@ -243,12 +262,17 @@ export class PspReconciliationService {
     let checked = 0;
     let recovered = 0;
     let alarms = 0;
+    // PSP scale, per oid (see `reconcilePendingPaytrPayments`).
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      candidates,
+    );
     for (const row of candidates) {
       const dedupKey = `orphan-checked:${row.id}`;
       if (await this.cache.get<boolean>(dedupKey)) continue;
       checked++;
-      const ourAmount = Number(row.amount);
       try {
+        const expectedFor = (oid: string) => expectedOf(row, oid);
         const oids = this.paymentCommon.collectPaymentOids(row);
         let capturedOid: string | null = null;
         let capturedInquiry: PayTRStatusInquirySuccess | null = null;
@@ -259,7 +283,13 @@ export class PspReconciliationService {
         for (const oid of oids) {
           const inquiry = await provider.queryPaymentStatus(oid);
           if (!inquiry.ok) continue;
-          if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance)
+          if (
+            !paytrAmountMatches(
+              inquiry.paymentTotalTl,
+              expectedFor(oid),
+              tolerance,
+            )
+          )
             continue;
           capturedOid = oid;
           capturedInquiry = inquiry;
@@ -281,7 +311,7 @@ export class PspReconciliationService {
           paymentType: capturedInquiry.paymentType ?? null,
           installmentCount: capturedInquiry.installmentCount ?? null,
           currency: capturedInquiry.currency ?? null,
-          amount: ourAmount,
+          amount: expectedFor(capturedOid).toNumber(),
           totalAmount: capturedInquiry.paymentTotalTl,
           // PSP ücret mutabakatı: PayTR'nin işlem kesintisi denetim satırına yazılır.
           providerFee: capturedInquiry.providerFeeTl ?? null,
@@ -334,6 +364,8 @@ export class PspReconciliationService {
             fresh,
             txnRef,
             capturedOid,
+            // Same payment-method columns as the callback (installment count).
+            providerPaymentDataOf(capturedInquiry),
           );
           if (did) {
             recovered++;
@@ -347,12 +379,12 @@ export class PspReconciliationService {
           alarms++;
           this.logger.error(
             `ORPHAN_CAPTURE_REVIEW: PayTR'da ÇEKİLMİŞ ama sipariş fulfil EDİLEMEZ (iptal/gitmiş) — ` +
-              `payment=${row.id} oid=${capturedOid} tutar=${ourAmount}. MANUEL İADE gerekir.`,
+              `payment=${row.id} oid=${capturedOid} tutar=${expectedFor(capturedOid).toFixed(2)}. MANUEL İADE gerekir.`,
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.error(
-          `detectOrphanCapturedFailedPayments payment ${row.id}: ${error?.message}`,
+          `detectOrphanCapturedFailedPayments payment ${row.id}: ${errorMessage(error)}`,
         );
       }
     }

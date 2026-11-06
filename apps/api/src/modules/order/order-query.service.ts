@@ -16,6 +16,10 @@ import {
 import { paginate } from "../../common/list";
 import { isPublicRatingStatus } from "../../common/helpers/public-rating";
 import type { OrderOwnReview } from "@tarodan/types";
+import {
+  PAYMENT_CHARGE_CARD_INCLUDE,
+  paymentInstallmentFieldsOf,
+} from "../payment/helpers/payment-installment-view";
 
 /** `OrderOwnReview` before serialisation: `createdAt` is still a Date. */
 type Dated<T> = Omit<T, "createdAt"> & { createdAt: Date };
@@ -469,10 +473,12 @@ export class OrderQueryService {
             },
           },
         },
-        payment: true,
+        payment: { include: PAYMENT_CHARGE_CARD_INCLUDE },
         // Ödemeler checkout group üzerinden bağlanır (Payment.checkoutGroupId);
         // order.payment genellikle null olduğundan group payment'ı fallback olarak çek.
-        checkoutGroup: { include: { payment: true } },
+        checkoutGroup: {
+          include: { payment: { include: PAYMENT_CHARGE_CARD_INCLUDE } },
+        },
         // canReactivate hesabı için teklif durumu gerekir ("Ödemeyi tamamla"
         // yalnız teklif hâlâ accepted iken gösterilmeli)
         offer: { select: { status: true } },
@@ -592,12 +598,14 @@ export class OrderQueryService {
     },
   };
 
+  /** The cart's payment for its BUYER (callers never pass it to a seller). */
   private paymentSummary(payment: any) {
     if (!payment) return null;
     return {
       id: payment.id,
       status: payment.status,
       amount: Number(payment.amount),
+      ...paymentInstallmentFieldsOf(payment),
       provider: payment.provider ?? null,
       paidAt: payment.paidAt ?? null,
     };
@@ -1021,6 +1029,9 @@ export class OrderQueryService {
             id: true,
             status: true,
             amount: true,
+            chargedAmount: true,
+            installmentCount: true,
+            ...PAYMENT_CHARGE_CARD_INCLUDE,
             provider: true,
             paidAt: true,
           },

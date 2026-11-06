@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { OrderOrigin, OrderStatus } from "@prisma/client";
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * DIRECT-FORM MESAFELİ SATIŞ KAPISI.
@@ -17,6 +18,8 @@ describe("PaymentInitiationService — direct-form mesafeli satış kapısı", (
     gate: jest.Mock = jest.fn().mockResolvedValue("record"),
   ) => {
     const prisma: any = {
+      // The claim transaction writes the form's charge attempt.
+      paymentChargeAttempt: { create: jest.fn().mockResolvedValue({}) },
       order: { findUnique: jest.fn().mockResolvedValue(order) },
       payment: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -50,6 +53,7 @@ describe("PaymentInitiationService — direct-form mesafeli satış kapısı", (
       {} as never,
       { ensureForPayment: gate } as never,
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     return { service, prisma, gate };
   };

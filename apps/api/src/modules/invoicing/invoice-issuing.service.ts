@@ -8,9 +8,11 @@ import {
 } from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
 import { buildPenaltyBasis } from "./invoice/penalty-basis";
+import { buildInstallmentFeeDocument } from "./invoice/installment-fee-basis";
 import { resolveGuestInvoiceRecipient } from "./invoice/guest-recipient";
 import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
 import { translateMessage } from "../i18n/translate";
+import { errorMessage } from "../../common/helpers/error-message";
 import { InvoiceDocumentService } from "./invoice-document.service";
 import { InvoiceDeliveryService } from "./invoice-delivery.service";
 
@@ -82,15 +84,19 @@ export class InvoiceIssuingService {
     const run = async (step: () => Promise<void>) => {
       try {
         await step();
-      } catch (error: any) {
+      } catch (error: unknown) {
         failures++;
         this.logger.warn(
-          `eLogo teslim faturası hatası ${orderId}: ${error?.message ?? error}`,
+          `eLogo delivery invoice failed for order ${orderId}: ${errorMessage(error)}`,
         );
       }
     };
     if (packageId && packageReady) {
       await run(() => this.issuePackageFeeInvoices(packageId));
+      // The buyer's installment fee document follows the other buyer fee
+      // documents: same package key, same trigger (delivery of the whole
+      // package), sequential because they share the number counter.
+      await run(() => this.issueInstallmentFeeInvoice(packageId));
     }
     await run(() => this.issuePlatformSaleInvoice(orderId));
     if (failures > 0) return;
@@ -105,9 +111,9 @@ export class InvoiceIssuingService {
         where: { id: orderId },
         data: { revenueInvoicedAt: new Date() },
       })
-      .catch((e: any) =>
+      .catch((e: unknown) =>
         this.logger.warn(
-          `revenueInvoicedAt işareti yazılamadı ${orderId}: ${e?.message}`,
+          `revenueInvoicedAt stamp could not be written for order ${orderId}: ${errorMessage(e)}`,
         ),
       );
   }
@@ -273,8 +279,8 @@ export class InvoiceIssuingService {
     for (const step of steps) {
       try {
         await step();
-      } catch (error: any) {
-        failures.push(String(error?.message ?? error));
+      } catch (error: unknown) {
+        failures.push(errorMessage(error));
       }
     }
     if (failures.length > 0) {
@@ -282,6 +288,53 @@ export class InvoiceIssuingService {
         `eLogo paket ücret faturaları eksik (${packageId}): ${failures.join("; ")}`,
       );
     }
+  }
+
+  /**
+   * The buyer's installment fee (vade farkı) document of a package, ADR 0019
+   * D4: one `buyer_installment_fee` per package, VAT INCLUDED at the rate
+   * snapshotted on the captured charge attempt, for what is left of the fee
+   * after finalized refunds (`installment-fee-basis.ts`).
+   *
+   * - No fee, no document: a single payment, a 100 % platform share or
+   *   installments switched off leave `Order.installmentFeeAmount` at 0.
+   * - AS-F2: Tarodan's own goods (`platform_sale`) get this SAME separate
+   *   document, so unlike the six package fee documents there is no
+   *   platform-seller exit here. This is the one branch to change if the
+   *   accountant puts the fee on the product invoice instead.
+   * - The buyer is the payer; a guest's real identity comes from the
+   *   shipping address, like every buyer document.
+   * - Fail closed: a fee without a captured attempt's VAT rate is not cut
+   *   with a guessed rate; the error keeps `revenueInvoicedAt` unset so the
+   *   backfill retries it.
+   */
+  async issueInstallmentFeeInvoice(packageId: string): Promise<void> {
+    const basis = await this.documents.resolveInstallmentFeeBasis(packageId);
+    if (!basis) return;
+    if (basis.vatRatePct === null) {
+      throw new Error(
+        `INSTALLMENT_FEE_VAT_RATE_MISSING package=${packageId}: no captured charge attempt carries the fee`,
+      );
+    }
+    const document = buildInstallmentFeeDocument({
+      orders: basis.orders,
+      paymentFeeFullyRefunded: basis.paymentFeeFullyRefunded,
+      vatRatePct: basis.vatRatePct,
+    });
+    if (!document || !(document.gross > 0)) return;
+
+    await this.delivery.cut(
+      "buyer_installment_fee",
+      packageId,
+      basis.buyerId,
+      document.gross,
+      {
+        lineItems: document.lines,
+        snapshotVatRate: basis.vatRatePct,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
+        guestRecipient: resolveGuestInvoiceRecipient(basis.shippingAddress),
+      },
+    );
   }
 
   /** Paket için verilen türlerden İPTAL EDİLMEMİŞ bir belge var mı? */

@@ -72,6 +72,50 @@ describe("LedgerReconciliationService — PSP kesinti driftleri", () => {
     ).toHaveLength(0);
   });
 
+  it("counts installment_platform_cost with psp_fee: a split deduction is not a drift (ADR 0019)", async () => {
+    // Plan 4.4: a premium 3-installment sale at a 100 % share; PayTR deducts
+    // 80.00, booked as psp_fee 30.00 + installment_platform_cost 50.00.
+    const prisma = makePrisma({
+      ledgerEntries: [
+        {
+          entryGroupId: "g1",
+          direction: "debit",
+          amount: 30,
+          account: "psp_fee",
+          orderId: null,
+        },
+        {
+          entryGroupId: "g1",
+          direction: "debit",
+          amount: 50,
+          account: "installment_platform_cost",
+          orderId: null,
+        },
+        {
+          entryGroupId: "g1",
+          direction: "credit",
+          amount: 80,
+          account: "buyer_payment",
+          orderId: null,
+        },
+      ],
+      stampedLines: [{ fee: 80 }],
+    });
+    const svc = new LedgerReconciliationService(
+      prisma as never,
+      config,
+      {} as never,
+    );
+
+    const report = await svc.reconcile();
+
+    expect(report.pspFeeLedgerTotal).toBe(80);
+    expect(report.unbalancedGroups).toBe(0);
+    expect(
+      report.driftAlarms.filter((a) => a.includes("PSP_FEE")),
+    ).toHaveLength(0);
+  });
+
   it("alarms when the ledger psp_fee total drifts from stamped statement fees", async () => {
     const prisma = makePrisma({
       // Damga 3.35 diyor ama defterde yalnız 2.35 var (satır kaybı / kısmi yazım).

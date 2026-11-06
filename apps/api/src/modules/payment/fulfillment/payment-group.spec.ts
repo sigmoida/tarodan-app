@@ -56,6 +56,8 @@ import {
   PaymentStatus,
   ProductStatus,
 } from "@prisma/client";
+import { InstallmentChargeService } from "../installments/installment-charge.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * Grup ödemesi (CheckoutGroup): tek Payment satırı gruptaki tüm siparişleri kapsar.
@@ -229,6 +231,10 @@ describe("PaymentService group payment (checkout group)", () => {
         },
         MiscReconciliationService,
         PaymentInitiationService,
+        {
+          provide: InstallmentChargeService,
+          useValue: singlePaymentChargeStub(),
+        },
         PaymentCallbackService,
         PaymentFulfillmentService,
         PaymentLifecycleService,

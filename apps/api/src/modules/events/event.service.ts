@@ -93,6 +93,16 @@ export interface OrderPaidPayload {
    * maili/push GİTMEZ; yalnız satıcı maili/push'u + analytics çalışır.
    */
   skipBuyer?: boolean;
+  /**
+   * The installment terms line (count, monthly, fee, total C) when the
+   * payment was split into installments; absent or null for a single
+   * payment (ADR 0019).
+   */
+  installment?: {
+    label: string;
+    summary: string;
+    chargedAmount: number;
+  } | null;
 }
 
 /**
@@ -137,6 +147,16 @@ export interface GroupBuyerOrderPaidPayload {
   buyerSystemEmail?: string;
   /** Temsilci sipariş no — misafir takip linki için kullanılır */
   representativeOrderNumber?: string;
+  /**
+   * The installment terms line (count, monthly, fee, total C) when the
+   * payment was split into installments; absent or null for a single
+   * payment (ADR 0019).
+   */
+  installment?: {
+    label: string;
+    summary: string;
+    chargedAmount: number;
+  } | null;
   /**
    * Temsilci sipariş id — bildirim hedefi için.
    *
@@ -220,8 +240,17 @@ export interface PaymentRefundedPayload {
   sellerId: string;
   sellerEmail: string;
   sellerName: string;
+  /** Goods scale: the order's refunded amount (what the seller sees). */
   refundAmount: number;
+  /** Goods scale: the payment's goods total. */
   totalAmount: number;
+  /**
+   * PSP scale, for the buyer: the cash back to the card, the installment fee
+   * share included (ADR 0019). Absent = `refundAmount` (paid in one).
+   */
+  buyerRefundAmount?: number;
+  /** PSP scale, for the buyer: what the card was charged. Absent = `totalAmount`. */
+  buyerTotalAmount?: number;
   provider: string;
   // The provider's own id is not always known yet: a refund is recorded
   // locally first and reconciled with the provider afterwards.
@@ -399,6 +428,7 @@ export class EventService {
             shippingAddress: payload.shippingAddress,
             isGuestOrder: payload.isGuestOrder ?? false,
             buyerSystemEmail: payload.buyerSystemEmail ?? "",
+            installment: payload.installment ?? null,
           },
         },
         {
@@ -542,6 +572,7 @@ export class EventService {
           buyerSystemEmail: payload.buyerSystemEmail ?? "",
           // Misafir takip linki temsilci sipariş no üzerinden çözülür
           orderNumber: payload.representativeOrderNumber ?? "",
+          installment: payload.installment ?? null,
         },
       },
       {
@@ -867,8 +898,8 @@ export class EventService {
         templateData: {
           orderNumber: payload.orderNumber,
           buyerName: payload.buyerName,
-          refundAmount: payload.refundAmount,
-          totalAmount: payload.totalAmount,
+          refundAmount: payload.buyerRefundAmount ?? payload.refundAmount,
+          totalAmount: payload.buyerTotalAmount ?? payload.totalAmount,
           provider: payload.provider,
           orderId: payload.orderId,
         },
@@ -909,7 +940,9 @@ export class EventService {
         userId: payload.buyerId,
         ...notificationEventCopy("paymentRefundedBuyer", {
           orderNumber: payload.orderNumber,
-          amount: payload.refundAmount.toFixed(2),
+          amount: (payload.buyerRefundAmount ?? payload.refundAmount).toFixed(
+            2,
+          ),
         }),
         data: {
           type: "payment_refunded",

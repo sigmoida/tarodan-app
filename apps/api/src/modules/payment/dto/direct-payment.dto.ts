@@ -1,5 +1,68 @@
-import { IsString, IsOptional, IsBoolean, IsUUID } from "class-validator";
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+  IsInt,
+  Matches,
+  Max,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  INSTALLMENT_COUNT_MAX,
+  type DirectFormInstallmentSelection,
+} from "@tarodan/types";
+import { JsonNumber, RawObject } from "../../../common/transforms";
+import {
+  IsTlAmount,
+  TL_AMOUNT_COLUMN_MAX,
+} from "../../../common/validators/tl-amount";
+
+/**
+ * `direct-form` -> `installment` (ADR 0019). The shape is validated here, so
+ * the PayTR client's own count and card checks stay programming guards: a
+ * count outside 1..12, a BIN that is not 6-8 digits or a total that is not a
+ * TL amount is a 400 before anything is priced. Whether the count is offered
+ * for this card, payment and buyer is the server's call
+ * (`InstallmentChargeService`).
+ */
+export class DirectFormInstallmentDto implements DirectFormInstallmentSelection {
+  @ApiProperty({
+    description: "1 = single payment, 2..12 installments",
+    minimum: 1,
+    maximum: INSTALLMENT_COUNT_MAX,
+  })
+  @JsonNumber()
+  @IsInt()
+  @Min(1)
+  @Max(INSTALLMENT_COUNT_MAX)
+  count!: number;
+
+  @ApiPropertyOptional({
+    description:
+      "First 6 to 8 digits of a new card (digits only, never more). Required for a count above 1 without savedCardId; refused with it.",
+    example: "45467112",
+  })
+  @IsOptional()
+  @RawObject()
+  @IsString()
+  @Matches(/^\d{6,8}$/)
+  bin?: string;
+
+  @ApiProperty({
+    description:
+      "The option's totalAmount (C, TL) the client showed. A different server total is 409 server.payment.installmentPricingChanged.",
+    example: 1066.38,
+  })
+  @JsonNumber()
+  @IsTlAmount()
+  @Min(0.01)
+  @Max(TL_AMOUNT_COLUMN_MAX)
+  expectedTotal!: number;
+}
 
 export class DirectPaymentDto {
   @ApiPropertyOptional({
@@ -56,4 +119,14 @@ export class DirectPaymentDto {
   @IsOptional()
   @IsBoolean()
   distanceSalesAccepted?: boolean;
+
+  @ApiPropertyOptional({
+    type: DirectFormInstallmentDto,
+    description:
+      "The installment chosen from POST /payments/installment-options. Absent = single payment (old clients). 400 server.payment.installmentNotOffered, 409 installmentPricingChanged or installmentUnavailable.",
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DirectFormInstallmentDto)
+  installment?: DirectFormInstallmentDto;
 }

@@ -139,7 +139,14 @@ function makePrisma(seed: any = {}) {
         return {
           sellerId: order.sellerId,
           buyerId: order.buyerId,
-          orders: [{ id: where.id, ...order }],
+          // Single payments: no installment fee (schema default 0).
+          orders: [
+            {
+              id: where.id,
+              installmentFeeAmount: new Prisma.Decimal(0),
+              ...order,
+            },
+          ],
         };
       }),
     },
@@ -184,9 +191,13 @@ function makePrisma(seed: any = {}) {
       ),
     },
     refundAttempt: {
-      findUnique: jest.fn(
-        async ({ where }: any) => seed.refundAttempts?.[where.id] ?? null,
-      ),
+      findUnique: jest.fn(async ({ where }: any) => {
+        const attempt = seed.refundAttempts?.[where.id];
+        // The schema default: a single payment gives no fee back.
+        return attempt
+          ? { installmentFeeAmount: new Prisma.Decimal(0), ...attempt }
+          : null;
+      }),
     },
     address: {
       findFirst: jest.fn(

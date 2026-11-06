@@ -2,6 +2,7 @@ import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { CancellationActor, PaymentStatus } from "@prisma/client";
 import { NotFoundException } from "@nestjs/common";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * SEC-H1: bypass-complete üç katmanlı kilit — production'da SERT ret (PAYMENT_BYPASS
@@ -48,6 +49,7 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
         { record: jest.fn() } as any, // providerEvents
         { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
         { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+        singlePaymentChargeStub() as never,
       );
       return { service, processSuccessfulPayment, prisma, configService };
     };

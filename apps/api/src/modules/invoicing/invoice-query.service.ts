@@ -26,6 +26,7 @@ const INVOICE_DISPLAY_ORDER: readonly string[] = [
   "buyer_commission",
   "buyer_service_fee",
   "buyer_shipping",
+  "buyer_installment_fee",
   "seller_commission",
   "seller_platform_fee",
   "seller_shipping",

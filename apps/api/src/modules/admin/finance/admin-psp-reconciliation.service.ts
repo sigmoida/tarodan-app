@@ -37,6 +37,10 @@ import type {
   PspLineFilter,
   PspStatementLinesQueryDto,
 } from "./dto/psp-reconciliation.dto";
+import {
+  chargedAmountOf,
+  paytrChargeExpectationsForPayments,
+} from "../../payment/helpers/charged-amount";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** `YYYY-MM-DD` gününün kendisi ve ±1 komşusu (oid kayması toleransı). */
@@ -150,6 +154,7 @@ export class AdminPspReconciliationService {
           select: {
             id: true,
             amount: true,
+            chargedAmount: true,
             paidAt: true,
             paytrMerchant: true,
             providerConversationId: true,
@@ -279,7 +284,9 @@ export class AdminPspReconciliationService {
       const day = trCalendarDate(payment.paidAt);
       const card = cardOf(day);
       card.ours.salesCount++;
-      card.ours.salesTotal += Number(payment.amount);
+      // PSP scale: what PayTR charged (an installment fee included), the
+      // figure the statement's sales total is compared with.
+      card.ours.salesTotal += Number(chargedAmountOf(payment));
       const oids = paymentOids(payment);
       if (
         coveredFor(day, payment.paytrMerchant) &&
@@ -509,6 +516,7 @@ export class AdminPspReconciliationService {
             select: {
               id: true,
               amount: true,
+              chargedAmount: true,
               order: { select: { orderNumber: true } },
               checkoutGroup: { select: { groupNumber: true } },
               tradeCashPayment: {
@@ -530,6 +538,12 @@ export class AdminPspReconciliationService {
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
+    // What PayTR had to charge for each line's oid (its charge attempt's C,
+    // PSP scale, ADR 0019): one query for the page.
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      payments,
+    );
 
     return {
       data: rows.map((row) => {
@@ -544,7 +558,12 @@ export class AdminPspReconciliationService {
           payment: payment
             ? {
                 id: payment.id,
+                // Goods scale (T): the order totals.
                 amount: payment.amount,
+                // PSP scale: what PayTR had to charge for this line's oid
+                // (its attempt's C, else the payment's charged amount), the
+                // figure a sale line is matched against.
+                chargedAmount: expectedOf(payment, row.merchantOid),
                 orderNumber: payment.order?.orderNumber ?? null,
                 groupNumber: payment.checkoutGroup?.groupNumber ?? null,
                 tradeNumber:
