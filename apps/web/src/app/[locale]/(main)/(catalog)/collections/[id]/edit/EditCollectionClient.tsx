@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useEditCollection } from "./_hooks/useEditCollection";
 import { useCategoryOptions } from "./_hooks/useCategoryOptions";
 import CollectionForm from "./_sections/CollectionForm";
+import CollectionItemsList from "./_sections/CollectionItemsList";
 import DeleteCollectionModal from "./_sections/DeleteCollectionModal";
 
 export default function EditCollectionClient() {
@@ -31,6 +32,9 @@ export default function EditCollectionClient() {
     showDeleteModal,
     setShowDeleteModal,
     handleDelete,
+    items,
+    requestRemove,
+    removingIds,
   } = useEditCollection();
 
   if (authLoading) return <AuthLoadingScreen />;
@@ -78,6 +82,14 @@ export default function EditCollectionClient() {
         onCancel={() => router.back()}
         onDelete={() => setShowDeleteModal(true)}
       />
+
+      <div className="mt-6">
+        <CollectionItemsList
+          items={items}
+          onRemove={requestRemove}
+          removingIds={removingIds}
+        />
+      </div>
 
       <DeleteCollectionModal
         show={showDeleteModal}

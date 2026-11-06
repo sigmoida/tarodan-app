@@ -38,9 +38,13 @@ import {
  * render use a guest viewer (the cart action), then an own listing switches
  * to the boost action without a hydration mismatch. The boost switch
  * (`GET /products/boost/offers`) is asked only when a card is the viewer's
- * own; `own` also drives the boost end date.
+ * own; `own` also drives the boost end date. `enabled: false` (a card that
+ * has no action) skips that request and returns no action.
  */
-export function useProductCardAction(listing: ProductCardListing): {
+export function useProductCardAction(
+  listing: ProductCardListing,
+  { enabled = true }: { enabled?: boolean } = {},
+): {
   action: ProductCardAction;
   own: boolean;
 } {
@@ -51,13 +55,15 @@ export function useProductCardAction(listing: ProductCardListing): {
     viewerId != null &&
     listing.sellerId != null &&
     listing.sellerId === String(viewerId);
-  const boostEnabled = useBoostEnabled({ enabled: own });
+  const boostEnabled = useBoostEnabled({ enabled: enabled && own });
 
   return {
-    action: productCardAction(listing, {
-      userId: viewerId != null ? String(viewerId) : null,
-      canBoost: own && boostEnabled,
-    }),
+    action: enabled
+      ? productCardAction(listing, {
+          userId: viewerId != null ? String(viewerId) : null,
+          canBoost: own && boostEnabled,
+        })
+      : { kind: "none" },
     own,
   };
 }
@@ -159,24 +165,29 @@ function ProductCardActionButton({
  * price itself is not, so a click on it still opens the listing. An own
  * boosted listing also shows when its boost ends. `withAction={false}` keeps
  * the row and drops the action (non-navigating cards, cards with their own
- * footer action).
+ * footer action). `forSale={false}` (the not-for-sale card) also drops the
+ * boost end date and asks nothing about the action.
  */
 export default function ProductCardPriceRow({
   listing,
   layout,
   withAction = true,
+  forSale = true,
   children,
 }: {
   listing: ProductCardListing;
   layout: "grid" | "list";
   withAction?: boolean;
+  forSale?: boolean;
   children: ReactNode;
 }) {
   const t = useTranslations();
   const locale = useLocale();
-  const { action, own } = useProductCardAction(listing);
+  const { action, own } = useProductCardAction(listing, {
+    enabled: forSale && withAction,
+  });
   const endsAt =
-    own && listing.isBoosted && listing.boostedUntil
+    forSale && own && listing.isBoosted && listing.boostedUntil
       ? formatDayMonth(listing.boostedUntil, locale)
       : "";
   const endDate = endsAt ? (

@@ -54,6 +54,7 @@ export default function HomeProductCard({
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
   const listing = toProductCardListing(product);
+  const badges = selectProductCardBadges(product);
 
   return (
     <div
@@ -79,7 +80,7 @@ export default function HomeProductCard({
             </span>
           </div>
         )}
-        <ProductCardBadges product={product} labels={badgeLabels} />
+        <ProductCardBadges badges={badges} labels={badgeLabels} />
       </div>
 
       <div className="flex flex-1 flex-col p-2.5">
@@ -87,10 +88,7 @@ export default function HomeProductCard({
           <ProductCardTitleLink
             href={listingPath(product)}
             title={product.title}
-            badgeSummary={describeProductBadges(
-              selectProductCardBadges(product),
-              badgeLabels,
-            )}
+            badgeSummary={describeProductBadges(badges, badgeLabels)}
           />
         </h3>
         <div className="mt-auto">

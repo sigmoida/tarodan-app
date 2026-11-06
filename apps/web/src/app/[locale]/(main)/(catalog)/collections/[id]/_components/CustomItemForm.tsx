@@ -41,7 +41,7 @@ export default function CustomItemForm({
   const { collection, invalidateCollection } = useCollectionDetail();
   const filters = useCollectionFilters(true);
 
-  const form = useZodForm(customItemSchema, {
+  const form = useZodForm(customItemSchema(t), {
     defaultValues: EMPTY_CUSTOM_ITEM,
   });
   const brand = form.watch("brand");
@@ -54,8 +54,9 @@ export default function CustomItemForm({
   const add = useWebMutation(
     (values: CustomItemValues) =>
       collectionsApi.addItem(collection!.id, {
-        customTitle: values.title.trim(),
-        customDescription: values.description?.trim() || undefined,
+        // The schema already trimmed the title and the description.
+        customTitle: values.title,
+        customDescription: values.description || undefined,
         customBrand: values.brand?.trim() || undefined,
         customModel: values.model?.trim() || undefined,
         customYear: values.year ? Number(values.year) : undefined,
@@ -65,7 +66,8 @@ export default function CustomItemForm({
         customImageUrl: values.imageUrl || undefined,
       }),
     {
-      successMessage: t("collection.productsAddedToCollection"),
+      // One item: the sentence, not the batch toast's count suffix.
+      successMessage: t("product.addedToCollection"),
       errorMessage: t("collection.productsAddFailed"),
       onSuccess: async () => {
         await invalidateCollection();
@@ -143,11 +145,11 @@ export default function CustomItemForm({
       <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
         <FormInput
           name="year"
-          type="number"
+          // Text, not `number`: a number input reports text it cannot
+          // parse as "", which would drop the year without an error.
+          inputMode="numeric"
           label={t("product.releaseYear")}
           placeholder="2026"
-          min={1900}
-          max={2100}
         />
         <FormSelect
           name="scale"

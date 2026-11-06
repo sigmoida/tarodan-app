@@ -5,16 +5,16 @@ import {
   RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { ProductBadge } from "@tarodan/ui/product-badge";
-import {
-  selectProductCardBadges,
-  type ProductBadgeLabels,
+import type {
+  ProductBadgeLabels,
+  ProductCardBadge,
 } from "@/lib/productCardBadges";
-import type { Product } from "@/types/product";
 
 /**
  * The vertical badge stack at the TOP LEFT of a grid card's image (at most
- * two; the selection and order are `selectProductCardBadges`). Server- and
- * client-safe: no hooks, the copy comes from the caller. Its width leaves room
+ * two; the caller passes the selection from `selectProductCardBadges`, the
+ * same list its title link reads). Server- and client-safe: no hooks, the
+ * copy comes from the caller. Its width leaves room
  * for the favourite heart at the top right; long campaign names truncate.
  *
  * Visual only: every badge is `aria-hidden`, and the card's title link reads
@@ -24,13 +24,12 @@ import type { Product } from "@/types/product";
  * to the link.
  */
 export default function ProductCardBadges({
-  product,
+  badges,
   labels,
 }: {
-  product: Product;
+  badges: ProductCardBadge[];
   labels: ProductBadgeLabels;
 }) {
-  const badges = selectProductCardBadges(product);
   if (badges.length === 0) return null;
 
   const cls = "max-w-full text-sm px-1.5 py-0.5";

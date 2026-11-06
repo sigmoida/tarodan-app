@@ -362,3 +362,131 @@ describe("ProductCard rozet düzeni", () => {
     expect(container.textContent).not.toContain("product.sponsored");
   });
 });
+
+describe.each(["grid", "list"] as const)(
+  "ProductCard not-for-sale variant (%s)",
+  (layout) => {
+    const discounted: Product = {
+      ...product,
+      oldPrice: 400,
+      price: 250,
+      discountPercent: 38,
+      tradeAvailable: true,
+    };
+    const actionButtons = () =>
+      Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.getAttribute("aria-label") !== "product.favorite",
+      );
+
+    it("without noPriceLabel: the price row shows the price and the action", () => {
+      act(() =>
+        root.render(<ProductCard product={discounted} layout={layout} />),
+      );
+      expect(container.textContent).toContain("TL");
+      expect(container.textContent).toContain("%38");
+      expect(actionButtons().length).toBeGreaterThan(0);
+    });
+
+    it("noPriceLabel replaces old price, price and discount; no action", () => {
+      act(() =>
+        root.render(
+          <ProductCard
+            product={discounted}
+            layout={layout}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      const text = container.textContent ?? "";
+      expect(text).toContain("Satışta değil");
+      expect(text).not.toContain("TL");
+      expect(text).not.toContain("250");
+      expect(text).not.toContain("400");
+      expect(text).not.toContain("%38");
+      expect(text).not.toContain("product.discount");
+      expect(actionButtons()).toHaveLength(0);
+      // The label is plain readable text, not hidden from screen readers.
+      const label = Array.from(container.querySelectorAll("p")).find(
+        (p) => p.textContent === "Satışta değil",
+      )!;
+      expect(label.className).toContain("text-muted");
+      expect(label.closest("[aria-hidden]")).toBeNull();
+    });
+
+    it("non-navigating not-for-sale card: no link, no heart, no button, no click tracking", () => {
+      act(() =>
+        root.render(
+          <ProductCard
+            product={product}
+            layout={layout}
+            href={null}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      expect(container.querySelector("a")).toBeNull();
+      expect(container.querySelector("button")).toBeNull();
+      expect(container.textContent).toContain(product.title);
+      expect(container.textContent).toContain("Satışta değil");
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  },
+);
+
+describe.each(["grid", "list"] as const)(
+  "ProductCard not-for-sale listing state (%s)",
+  (layout) => {
+    it("draws no listing badge and no out-of-stock state", () => {
+      act(() =>
+        root.render(
+          <ProductCard
+            product={{
+              ...product,
+              status: "sold",
+              oldPrice: 400,
+              discountPercent: 38,
+              isBoosted: true,
+              tradeAvailable: true,
+              feeCampaigns: ["Komisyonsuz"],
+            }}
+            layout={layout}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      const text = container.textContent ?? "";
+      expect(
+        container.querySelector('[data-testid="product-card-badges"]'),
+      ).toBeNull();
+      expect(container.querySelector(".absolute.top-1.left-1")).toBeNull();
+      expect(text).not.toContain("product.boostedBadge");
+      expect(text).not.toContain("faq.trade");
+      expect(text).not.toContain("Komisyonsuz");
+      expect(container.querySelector(".opacity-50")).toBeNull();
+      expect(container.querySelector("a .sr-only")).toBeNull();
+    });
+
+    it("own boosted listing: no boost action and no boost end date", () => {
+      const own: Product = {
+        ...product,
+        seller: { id: "me" },
+        isBoosted: true,
+        boostedUntil: "2099-01-01T00:00:00Z",
+      };
+      act(() => root.render(<ProductCard product={own} layout={layout} />));
+      expect(container.textContent).toContain("product.boostEndsAt");
+
+      act(() =>
+        root.render(
+          <ProductCard
+            product={own}
+            layout={layout}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      expect(container.textContent).not.toContain("product.boostEndsAt");
+      expect(container.querySelector("button")).toBeNull();
+    });
+  },
+);

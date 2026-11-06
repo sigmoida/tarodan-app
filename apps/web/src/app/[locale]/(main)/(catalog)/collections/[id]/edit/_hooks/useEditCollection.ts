@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,8 @@ import { useWebMutation } from "@/hooks/useWebMutation";
 import { queryKeys } from "@/lib/query/keys";
 import { useTranslations } from "next-intl";
 import type { Collection } from "../_lib/types";
+import { orderCollectionItems } from "../../_lib/types";
+import { useRemoveCollectionItem } from "../../_hooks/useRemoveCollectionItem";
 import { isUUID } from "../_lib/constants";
 import {
   collectionEditSchema,
@@ -66,7 +68,9 @@ export function useEditCollection() {
 
   const error = !collectionIdOrSlug
     ? t("collection.invalidLink")
-    : collectionQuery.isError
+    : // Only a failed first load: a failed refetch keeps the data and the form,
+      // so a refresh after an item removal cannot take away unsaved edits.
+      collectionQuery.isLoadingError
       ? (collectionQuery.error as any)?.response?.data?.message ||
         t("collection.loadFailed")
       : collection && user && collection.userId !== user.id
@@ -121,7 +125,18 @@ export function useEditCollection() {
     },
   });
 
+  const { requestRemove, removingIds } = useRemoveCollectionItem(
+    collection?.id,
+  );
+  const items = useMemo(
+    () => orderCollectionItems(collection?.items),
+    [collection?.items],
+  );
+
   return {
+    items,
+    requestRemove,
+    removingIds,
     router,
     authLoading,
     isAuthenticated,

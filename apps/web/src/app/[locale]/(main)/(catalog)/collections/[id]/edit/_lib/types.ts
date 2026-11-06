@@ -1,5 +1,9 @@
+import type { CollectionItem } from "../../_lib/types";
+
 export interface Collection {
   id: string;
+  /** Every item the API returns to the owner, hidden and deleted listings too. */
+  items?: CollectionItem[];
   userId: string;
   userName: string;
   name: string;

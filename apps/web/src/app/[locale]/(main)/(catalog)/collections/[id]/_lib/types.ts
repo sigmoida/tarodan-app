@@ -56,10 +56,20 @@ export const isUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 /**
+ * A custom item (`isCustom`, which the API always sets) is not a listing: it
+ * has no price and is not for sale. Its card shows `collection.notForSale` in
+ * the price row (`ProductCard`'s `noPriceLabel`), never a price; mobile keys
+ * the same rule on the same field.
+ */
+export const isNotForSale = (item: CollectionItem): boolean => item.isCustom;
+
+/**
  * Map a collection item — real listing OR custom entry — to the `Product` shape
  * the shared `ProductCard` consumes, so both render through one component.
  * `status` is intentionally left off: SOLD is shown via the card overlay badge,
- * not the out-of-stock treatment.
+ * not the out-of-stock treatment. `price` is only a placeholder for a custom
+ * item (the card shape needs a number): render items through `itemCardProps`,
+ * which sets `noPriceLabel`, so that price is never shown.
  */
 export const itemToProduct = (item: CollectionItem): Product => ({
   id: item.productId ?? item.id,
@@ -79,6 +89,21 @@ export const itemToProduct = (item: CollectionItem): Product => ({
 });
 
 /**
+ * The `ProductCard` props of a collection item: the one place that decides
+ * its card. A custom item is non-navigating (no listing) and not for sale
+ * (`noPriceLabel`, so its placeholder price is never shown); a listing item
+ * links to its listing and shows its price.
+ */
+export const itemCardProps = (
+  item: CollectionItem,
+  notForSaleLabel: string,
+): { product: Product; href: null | undefined; noPriceLabel?: string } => ({
+  product: itemToProduct(item),
+  href: item.productId ? undefined : null,
+  noPriceLabel: isNotForSale(item) ? notForSaleLabel : undefined,
+});
+
+/**
  * Kartın sol-üst `overlayStart` yuvasına konacak durum rozeti var mı (özel
  * öğe / satıldı). Yoksa yuva HİÇ verilmez — verilirse kartın kendi rozet
  * yığını (indirim, takas, sponsorlu…) çizilmez.
@@ -86,27 +111,46 @@ export const itemToProduct = (item: CollectionItem): Product => ({
 export const hasItemBadges = (item: CollectionItem): boolean =>
   item.isCustom || item.productStatus === "sold";
 
+/** Listing statuses a collection keeps showing; any other is hidden or deleted. */
+const SHOWN_LISTING_STATUSES = ["active", "sold", "reserved", "inactive"];
+
+/**
+ * Every item in display order, hidden and deleted listings too: featured items
+ * float to the top, then `sortOrder`. The owner's edit list uses it, so an item
+ * the detail page hides stays removable somewhere.
+ */
+export const orderCollectionItems = (
+  items: Collection["items"],
+): CollectionItem[] =>
+  items
+    ? [...items].sort((a, b) => {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        return a.sortOrder - b.sortOrder;
+      })
+    : [];
+
 /**
  * Visible + ordered items. Hidden/deleted listings are dropped, but sold/reserved
  * ones stay (shown with a SOLD badge) so a collection never looks empty after a
- * product sells. Featured items float to the top, then `sortOrder`.
+ * product sells.
  */
 export const sortCollectionItems = (
   items: Collection["items"],
 ): CollectionItem[] =>
-  items
-    ? [...items]
-        .filter(
-          (item) =>
-            item.isCustom ||
-            !item.productStatus ||
-            ["active", "sold", "reserved", "inactive"].includes(
-              item.productStatus,
-            ),
-        )
-        .sort((a, b) => {
-          if (a.isFeatured && !b.isFeatured) return -1;
-          if (!a.isFeatured && b.isFeatured) return 1;
-          return a.sortOrder - b.sortOrder;
-        })
-    : [];
+  orderCollectionItems(items).filter(
+    (item) =>
+      item.isCustom ||
+      !item.productStatus ||
+      SHOWN_LISTING_STATUSES.includes(item.productStatus),
+  );
+
+/** The title an item row shows; a listing without a usable title gets the fallback. */
+export const itemDisplayTitle = (
+  item: CollectionItem,
+  fallback: string,
+): string =>
+  (item.isCustom
+    ? item.customTitle || item.productTitle
+    : item.productTitle
+  )?.trim() || fallback;
