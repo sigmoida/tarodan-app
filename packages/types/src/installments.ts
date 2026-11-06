@@ -504,3 +504,61 @@ export interface AdminInstallmentPreviewResponse {
   reason?: "unavailable" | "card_not_eligible";
   rows: AdminInstallmentPreviewRow[];
 }
+
+// ── Admin payment detail (`GET /admin/payments/:id` -> `installment`) ───────
+
+/** One signed PayTR form (merchant_oid) of a payment, read-only. */
+export interface AdminPaymentChargeAttempt {
+  id: string;
+  merchantOid: string;
+  /** 1 = single payment. */
+  installmentCount: number;
+  /** C: the signed amount. */
+  chargedAmount: number;
+  /** F of the attempt; 0 when single. */
+  installmentFeeAmount: number;
+  /** When PayTR's charge of this oid was captured; null = never captured. */
+  capturedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Pricing evidence of the captured charge attempt: the snapshot taken at
+ * signing, never today's rules or rates. Never carries the BIN or the saved
+ * card.
+ */
+export interface AdminPaymentInstallmentPricing {
+  merchantOid: string;
+  buyerSegment: InstallmentSegment;
+  /** The winning rule version; null = the default (buyer pays all). */
+  rule: AdminInstallmentRuleRef | null;
+  /** Platform share of the installment cost, 0-100. */
+  platformSharePct: number;
+  /** P: the expected platform installment cost under that share. */
+  platformCostAmount: number;
+  cardFamily: string | null;
+  cardBank: string | null;
+  cardType: "credit" | "debit" | null;
+  businessCard: boolean | null;
+}
+
+/**
+ * The installment block of the admin payment detail (plan 6.4). Count, fee
+ * and charged amount come from the payment (written at capture, so a pending
+ * payment reads as a single payment of `goodsAmount`); `pricing` from its
+ * captured attempt.
+ */
+export interface AdminPaymentInstallment {
+  /** 1 = single payment. */
+  installmentCount: number;
+  /** T: the goods-scale amount (`Payment.amount`). */
+  goodsAmount: number;
+  /** F: the installment fee the buyer paid; 0 when single. */
+  installmentFeeAmount: number;
+  /** C = T + F: what PayTR charged. */
+  chargedAmount: number;
+  /** null: a legacy payment or one not captured through an attempt. */
+  pricing: AdminPaymentInstallmentPricing | null;
+  /** Every signed form of the payment, newest first. */
+  chargeAttempts: AdminPaymentChargeAttempt[];
+}
