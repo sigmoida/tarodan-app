@@ -30,6 +30,14 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
           .fn()
           .mockResolvedValue(existingCapture ? { id: "le-1" } : null),
       },
+      // The captured payment row, read for the buyer e-mail.
+      payment: {
+        findUnique: jest.fn().mockResolvedValue({
+          amount: new Prisma.Decimal("100.00"),
+          chargedAmount: new Prisma.Decimal("100.00"),
+          installmentCount: 1,
+        }),
+      },
       order: {
         findUnique: jest.fn().mockResolvedValue({
           status: OrderStatus.preparing,
@@ -96,6 +104,34 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
       sellerNet: 88,
       installmentFee: 39.83,
     });
+  });
+
+  it("hands the buyer e-mail the installment terms of the captured payment", async () => {
+    const { svc, prisma, eventService } = make(false);
+    prisma.payment.findUnique.mockResolvedValue({
+      amount: new Prisma.Decimal("100.00"),
+      chargedAmount: new Prisma.Decimal("106.64"),
+      installmentCount: 4,
+    });
+
+    await svc.finalizePaidOrder(order, payment, {});
+
+    expect(eventService.emitOrderPaid.mock.calls[0][0].installment).toEqual({
+      label: "Taksit",
+      summary: "4 taksit: aylık 26,66 TL, vade farkı 6,64 TL, toplam 106,64 TL",
+      chargedAmount: 106.64,
+    });
+  });
+
+  it("writes no installment line for a single payment, nor for a cart order (one cart e-mail)", async () => {
+    const { svc, eventService, prisma } = make(false);
+    await svc.finalizePaidOrder(order, payment, {});
+    expect(eventService.emitOrderPaid.mock.calls[0][0].installment).toBeNull();
+
+    prisma.payment.findUnique.mockClear();
+    await svc.finalizePaidOrder(order, payment, { skipBuyer: true });
+    expect(eventService.emitOrderPaid.mock.calls[1][0].installment).toBeNull();
+    expect(prisma.payment.findUnique).not.toHaveBeenCalled();
   });
 
   it("capture VARSA: recordCapture ATLANIR (çift ledger yok) — order.paid+kargo yine koşar", async () => {

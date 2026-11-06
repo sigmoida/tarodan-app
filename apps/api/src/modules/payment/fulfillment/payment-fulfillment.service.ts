@@ -62,6 +62,7 @@ import {
   INSTALLMENT_FEE_SPLIT_ORDER_BY,
   allocateInstallmentFee,
 } from "../installments/installment-pricing";
+import { installmentMailLineOf } from "../helpers/installment-mail-line";
 
 /**
  * The outcome of a capture claim (`claimPaymentCompleted`): the charge
@@ -1217,7 +1218,13 @@ export class PaymentFulfillmentService {
           (sum, s) => sum + s.shippingCost,
           0,
         );
+        // The captured row: the payment object passed in predates the capture.
+        const captured = await this.prisma.payment.findUnique({
+          where: { id: payment.id },
+          select: { amount: true, chargedAmount: true, installmentCount: true },
+        });
         await this.eventService.emitGroupBuyerOrderPaid({
+          installment: captured ? installmentMailLineOf(captured) : null,
           checkoutGroupId: payment.checkoutGroupId,
           groupNumber: group?.groupNumber || payment.checkoutGroupId,
           buyerId: firstOrder.buyerId,

@@ -590,7 +590,8 @@ export function renderEmailTemplate(
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
           ${detailRow("Ürün", qtyLabel(data?.productTitle, data?.quantity))}
-          ${detailRow("Ödenen Tutar", formatEmailPrice(data?.totalAmount || 0) + " TL", true)}
+          ${detailRow("Ödenen Tutar", formatEmailPrice(data?.installment?.chargedAmount ?? (data?.totalAmount || 0)) + " TL", true)}
+          ${data?.installment ? detailRow(data.installment.label, data.installment.summary) : ""}
           ${detailRow("İşlem No", data?.transactionId || "")}
           ${detailRow("Ödeme Yöntemi", data?.paymentMethod || "Kredi Kartı")}
         </table>
@@ -634,6 +635,7 @@ export function renderEmailTemplate(
             )
             .join("")}
           ${detailRow("Toplam Tutar", formatEmailPrice(data?.groupTotal || 0) + " TL", true)}
+          ${data?.installment ? detailRow(data.installment.label, data.installment.summary) : ""}
           ${detailRow("İşlem No", data?.transactionId || "")}
           ${detailRow("Ödeme Yöntemi", data?.paymentMethod || "Kredi Kartı")}
         </table>

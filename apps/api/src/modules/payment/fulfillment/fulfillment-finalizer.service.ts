@@ -5,6 +5,7 @@ import { EventService } from "../../events";
 import { LedgerService } from "../../ledger/ledger.service";
 import { OrderShipmentProvisioner } from "../../surat-cargo/sync/order-shipment-provisioner.service";
 import { orderInstallmentFeeOf } from "../helpers/charged-amount";
+import { installmentMailLineOf } from "../helpers/installment-mail-line";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -156,6 +157,9 @@ export class FulfillmentFinalizer {
         buyerSystemEmail: order.buyer.email || "",
         // Sepet: alıcı onayı grup başına TEK kez (emitGroupBuyerOrderPaid) → burada atla.
         skipBuyer: opts.skipBuyer,
+        installment: opts.skipBuyer
+          ? null
+          : await this.installmentMailLine(payment.id),
       });
     } catch (error) {
       this.logger.error(`Failed to emit order.paid event: ${error}`);
@@ -170,6 +174,18 @@ export class FulfillmentFinalizer {
       );
       throw error;
     }
+  }
+
+  /**
+   * The buyer e-mail's installment line, from the captured payment row (the
+   * object the caller passed predates the capture).
+   */
+  private async installmentMailLine(paymentId: string) {
+    const captured = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { amount: true, chargedAmount: true, installmentCount: true },
+    });
+    return captured ? installmentMailLineOf(captured) : null;
   }
 
   /**
