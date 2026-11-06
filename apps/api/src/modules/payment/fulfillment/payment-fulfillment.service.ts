@@ -4,6 +4,7 @@ import { PrismaService } from "../../../prisma";
 import { CacheService } from "../../cache/cache.service";
 import {
   CancellationActor,
+  type Payment,
   Prisma,
   PaymentStatus,
   OrderStatus,
@@ -188,22 +189,26 @@ export class PaymentFulfillmentService {
    */
   private async claimPaymentCompleted(
     tx: Prisma.TransactionClient,
-    payment: any,
+    payment: Pick<
+      Payment,
+      "id" | "amount" | "status" | "metadata" | "providerPaymentId"
+    >,
     opts: {
       transactionId?: string;
       capturedMerchantOid?: string;
       providerData?: ProviderPaymentData;
     },
   ): Promise<CapturedCharge | null> {
-    const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat(
-      {
-        action: "payment.completed",
-        timestamp: new Date().toISOString(),
-        oldStatus: payment.status,
-        newStatus: PaymentStatus.completed,
-        transactionId: opts.transactionId || payment.providerPaymentId,
-      },
-    );
+    const metadata = (payment.metadata ?? {}) as Prisma.JsonObject;
+    const auditHistory = (
+      Array.isArray(metadata.auditHistory) ? metadata.auditHistory : []
+    ).concat({
+      action: "payment.completed",
+      timestamp: new Date().toISOString(),
+      oldStatus: payment.status,
+      newStatus: PaymentStatus.completed,
+      transactionId: opts.transactionId || payment.providerPaymentId,
+    });
     const { columns: providerColumns, metaPatch } = this.buildProviderPatch(
       opts.providerData,
     );
@@ -253,10 +258,10 @@ export class PaymentFulfillmentService {
             }
           : {}),
         metadata: {
-          ...((payment.metadata as any) || {}),
+          ...metadata,
           auditHistory,
           ...(metaPatch || {}),
-        } as object,
+        } as Prisma.InputJsonObject,
       },
     });
     if (claimed.count === 0) return null;

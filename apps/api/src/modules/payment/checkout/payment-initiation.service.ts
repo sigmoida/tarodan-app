@@ -19,6 +19,7 @@ import {
   SavedCardStatus,
   PaytrMerchant,
   Prisma,
+  type Payment,
 } from "@prisma/client";
 import { PayTRBuyer } from "../../payment-providers/paytr/paytr.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
@@ -501,7 +502,7 @@ export class PaymentInitiationService {
   private async buildDirectPaymentForm(
     dto: DirectPaymentDto,
     ctx: {
-      payment: any;
+      payment: Payment;
       buyer: PayTRBuyer;
       basketItems: DirectBasketItem[];
       merchantOid: string;
@@ -686,7 +687,7 @@ export class PaymentInitiationService {
     req?: Request,
     capabilityAuthorized = false,
   ): Promise<{
-    payment: any;
+    payment: Payment;
     buyer: PayTRBuyer;
     basketItems: DirectBasketItem[];
     merchantOid: string;
@@ -774,7 +775,7 @@ export class PaymentInitiationService {
       }
     }
 
-    let payment: any;
+    let payment: Payment;
     // Pazaryeri varsayılan; yalnız üyelik siparişi üyelik mağazasına gider.
     let paytrMerchant: PaytrMerchant = PaytrMerchant.marketplace;
     let buyer: PayTRBuyer;
@@ -1195,7 +1196,7 @@ export class PaymentInitiationService {
 
     // merchant_oid + Y8 deseni: eski oid'li callback de eşleşsin diye geçmişini koru.
     const merchantOid = buildPaytrMerchantOid(baseOid);
-    const prevMeta = (payment.metadata as any) || {};
+    const prevMeta = (payment.metadata ?? {}) as Prisma.JsonObject;
     const oidHistory = nextMerchantOidHistory(
       prevMeta,
       payment.providerConversationId,
