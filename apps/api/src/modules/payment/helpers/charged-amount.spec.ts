@@ -7,6 +7,7 @@ import {
   orderInstallmentFeeOf,
   paytrAmountMatches,
   paytrChargeExpectationsOf,
+  paytrChargeExpectationsForPayments,
   paytrChargeCovers,
   paytrKurusMatches,
   refundGoodsPartOf,
@@ -187,6 +188,44 @@ describe("expected PayTR charge by oid", () => {
     expect(paymentChargeAttempt.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { paymentId: "pay-1" } }),
     );
+  });
+
+  it("maps a whole sweep batch with one query, each attempt only for its own payment", async () => {
+    const other = { id: "pay-2", amount: d("500.00"), chargedAmount: null };
+    const findMany = jest.fn(async (_args: unknown) => [
+      { paymentId: "pay-1", ...attempts[0] },
+      { paymentId: "pay-1", ...attempts[1] },
+      // The same oid string under another payment never leaks across.
+      { paymentId: "pay-2", merchantOid: "ORD1B", chargedAmount: d("533.20") },
+    ]);
+    const db = {
+      paymentChargeAttempt: { findFirst: jest.fn(), findMany },
+    } as unknown as ChargeAttemptReader;
+
+    const expectedOf = await paytrChargeExpectationsForPayments(db, [
+      pending,
+      other,
+    ]);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { paymentId: { in: ["pay-1", "pay-2"] } },
+      }),
+    );
+    expect(expectedOf(pending, "ORD1A").toFixed(2)).toBe("1066.38");
+    expect(expectedOf(pending, "ORD1B").toFixed(2)).toBe("1000.00");
+    expect(expectedOf(other, "ORD1B").toFixed(2)).toBe("533.20");
+    expect(expectedOf(other, "ORD1A").toFixed(2)).toBe("500.00");
+  });
+
+  it("asks nothing for an empty batch", async () => {
+    const findMany = jest.fn();
+    const db = {
+      paymentChargeAttempt: { findFirst: jest.fn(), findMany },
+    } as unknown as ChargeAttemptReader;
+    await paytrChargeExpectationsForPayments(db, []);
+    expect(findMany).not.toHaveBeenCalled();
   });
 });
 

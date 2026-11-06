@@ -87,7 +87,9 @@ interface AttemptRow {
   paymentId: string;
   orderId: string;
   idempotencyKey: string;
-  amount: number;
+  /** PSP scale; a single payment's has no fee share. */
+  amount: Prisma.Decimal;
+  installmentFeeAmount: Prisma.Decimal;
   status: RefundAttemptStatus;
   providerRefundId: string | null;
   providerResponse: Prisma.JsonValue | null;
@@ -140,6 +142,9 @@ function makeWorld(quantity: number) {
       orderId: ORDER_ID,
       checkoutGroupId: null,
       amount: new Prisma.Decimal(PAYMENT_AMOUNT),
+      // Paid in one: no installment fee, charged amount = amount.
+      installmentFeeAmount: new Prisma.Decimal(0),
+      chargedAmount: null,
       provider: "paytr",
       paytrMerchant: "marketplace",
       status: PaymentStatus.completed as PaymentStatus,
@@ -267,7 +272,11 @@ function makeWorld(quantity: number) {
         ),
       ),
       findUnique: jest.fn(() =>
-        Promise.resolve({ metadata: state.payment.metadata }),
+        Promise.resolve({
+          metadata: state.payment.metadata,
+          amount: state.payment.amount,
+          installmentFeeAmount: state.payment.installmentFeeAmount,
+        }),
       ),
       update: jest.fn(({ data }: { data: Record<string, unknown> }) => {
         if (data.status) state.payment.status = data.status as PaymentStatus;
@@ -360,7 +369,10 @@ function makeWorld(quantity: number) {
           paymentId: data.paymentId as string,
           orderId: data.orderId as string,
           idempotencyKey: data.idempotencyKey as string,
-          amount: Number(data.amount),
+          amount: new Prisma.Decimal(data.amount as Prisma.Decimal.Value),
+          installmentFeeAmount: new Prisma.Decimal(
+            (data.installmentFeeAmount as Prisma.Decimal.Value) ?? 0,
+          ),
           status: RefundAttemptStatus.prepared,
           providerRefundId: null,
           providerResponse: null,

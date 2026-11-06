@@ -31,6 +31,10 @@ import {
 } from "./revenue-split.service";
 import { splitGrossByVat, type VatRates } from "./helpers/revenue-split.helper";
 import {
+  loadInstallmentSummary,
+  type InstallmentSummary,
+} from "./helpers/installment-summary";
+import {
   balancedAmount,
   round2,
   type ComparisonRow,
@@ -45,6 +49,19 @@ export interface FinanceReconciliation {
   sections: ReconciliationSection[];
   comparison: ComparisonSection;
   diagnostics: ReconciliationDiagnostics;
+  /**
+   * The vade farkı income and the segment-rule installment cost by count and
+   * buyer segment (ADR 0019); S3 shows their totals.
+   */
+  installments: InstallmentSummary;
+}
+
+/** PayTR's deductions booked in the ledger, by account. */
+interface PspDeductionsBooked {
+  /** `psp_fee`: what any sale costs. */
+  pspFee: number;
+  /** `installment_platform_cost`: what segment rules made the platform absorb. */
+  installmentPlatformCost: number;
 }
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
@@ -72,8 +89,9 @@ export class FinanceReconciliationService {
 
   async build(): Promise<FinanceReconciliation> {
     const syncEnabled = paytrReportSyncEnabled(this.config);
-    // S3 ve PayTR karşılaştırması aynı psp_fee toplamını okur — tek sorgu.
+    // S3 and the PayTR comparison read the same deduction totals: one query.
     const pspFeeBooked = this.pspFeeBooked();
+    const installmentsPromise = loadInstallmentSummary(this.prisma);
     const s1Promise = this.revenueSplit.compute();
     const [
       s1,
@@ -82,19 +100,22 @@ export class FinanceReconciliationService {
       platformNet,
       buyerRefunds,
       comparison,
+      installments,
     ] = await Promise.all([
       s1Promise,
       this.sellerShareSection(),
       this.tradeCounterpartSection(),
-      s1Promise.then((split) =>
+      Promise.all([s1Promise, installmentsPromise]).then(([split, summary]) =>
         this.platformNetSection(
           split.platformFeesNet,
           split.rates,
           pspFeeBooked,
+          summary,
         ),
       ),
       this.buyerRefundsSection(),
       this.pspComparison(syncEnabled, pspFeeBooked),
+      installmentsPromise,
     ]);
     return {
       syncEnabled,
@@ -107,6 +128,7 @@ export class FinanceReconciliationService {
       ],
       comparison,
       diagnostics: s1.diagnostics,
+      installments,
     };
   }
 
@@ -299,24 +321,36 @@ export class FinanceReconciliationService {
     };
   }
 
-  /** Deftere işlenmiş PayTR kesintisi (psp_fee borç toplamı). */
-  private async pspFeeBooked(): Promise<number> {
-    const agg = await this.prisma.ledgerEntry.aggregate({
+  /**
+   * PayTR's deductions booked in the ledger (debit totals): `psp_fee` and the
+   * `installment_platform_cost` a segment-rule sale splits off it.
+   */
+  private async pspFeeBooked(): Promise<PspDeductionsBooked> {
+    const rows = await this.prisma.ledgerEntry.groupBy({
+      by: ["account"],
       where: {
         ...LIVE_LEDGER_ENTRY,
-        account: LedgerAccount.psp_fee,
+        account: {
+          in: [LedgerAccount.psp_fee, LedgerAccount.installment_platform_cost],
+        },
         direction: LedgerDirection.debit,
       },
       _sum: { amount: true },
     });
-    return num(agg._sum.amount);
+    const of = (account: LedgerAccount) =>
+      num(rows.find((r) => r.account === account)?._sum.amount);
+    return {
+      pspFee: of(LedgerAccount.psp_fee),
+      installmentPlatformCost: of(LedgerAccount.installment_platform_cost),
+    };
   }
 
   /** S3 — Platform ücret geliri → Tarodan hak edişi (şelale). */
   private async platformNetSection(
     platformFeesNet: number,
     rates: VatRates,
-    pspFeeBooked: Promise<number>,
+    pspFeeBooked: Promise<PspDeductionsBooked>,
+    installments: InstallmentSummary,
   ): Promise<ReconciliationSection> {
     const [
       refundedFees,
@@ -408,9 +442,24 @@ export class FinanceReconciliationService {
         amount: round2(-num(absorbed._sum.netAmount)),
         href: "/finance/payments/refund-reconciliation",
       },
+      // The vade farkı the buyers paid and kept (refunds give its share back),
+      // without its VAT ("Vade farkı geliri", ADR 0019).
+      {
+        key: "installmentFeeIncome",
+        amount: round2(installments.totals.feeIncomeNet),
+        count: installments.totals.payments,
+      },
       {
         key: "pspFee",
-        amount: round2(-pspFee),
+        amount: round2(-pspFee.pspFee),
+        syncDependent: true,
+        href: "/finance/psp",
+      },
+      // The installment cost segment rules made the platform absorb, booked
+      // from PayTR's deductions ("Taksit kampanya maliyeti").
+      {
+        key: "installmentPlatformCost",
+        amount: round2(-pspFee.installmentPlatformCost),
         syncDependent: true,
         href: "/finance/psp",
       },
@@ -443,7 +492,7 @@ export class FinanceReconciliationService {
             in: [RefundAttemptStatus.succeeded, RefundAttemptStatus.finalized],
           },
         },
-        _sum: { amount: true },
+        _sum: { amount: true, installmentFeeAmount: true },
         _count: { id: true },
       }),
       this.prisma.refundRequest.aggregate({
@@ -479,6 +528,12 @@ export class FinanceReconciliationService {
         key: "returnShippingCharged",
         amount: round2(-num(requests._sum.returnShippingChargeToBuyer)),
       },
+      // The vade farkı given back with the refunds (D7): PayTR's
+      // return_amount carries it on top of the goods part.
+      {
+        key: "installmentFee",
+        amount: round2(num(attempts._sum.installmentFeeAmount)),
+      },
     ];
     const total = round2(num(attempts._sum.amount));
     const unclassified = round2(total - sum(known));
@@ -505,7 +560,7 @@ export class FinanceReconciliationService {
    */
   private async pspComparison(
     syncEnabled: boolean,
-    pspFeeBooked: Promise<number>,
+    pspFeeBooked: Promise<PspDeductionsBooked>,
   ): Promise<ComparisonSection> {
     const first = await this.prisma.paytrStatementLine.findFirst({
       orderBy: { transactionDate: "asc" },
@@ -550,7 +605,9 @@ export class FinanceReconciliationService {
           status: { in: paid },
           ...(from ? { paidAt: { gte: from } } : {}),
         },
-        _sum: { amount: true },
+        // PSP scale: C = amount + installmentFeeAmount (the DB CHECK keeps
+        // chargedAmount equal to that sum), what the statement shows.
+        _sum: { amount: true, installmentFeeAmount: true },
       }),
       this.prisma.membershipPayment.aggregate({
         where: {
@@ -628,9 +685,12 @@ export class FinanceReconciliationService {
     };
 
     const ourSales =
-      num(ourPayments._sum.amount) + num(ourRenewals._sum.amount);
+      num(ourPayments._sum.amount) +
+      num(ourPayments._sum.installmentFeeAmount) +
+      num(ourRenewals._sum.amount);
     const ourRefundTotal = num(ourRefunds._sum.amount);
-    const ourFee = ourPspFee;
+    // PayTR's deduction is booked on two accounts; the statement has one fee.
+    const ourFee = ourPspFee.pspFee + ourPspFee.installmentPlatformCost;
     const awaiting = num(payoutsAwaiting._sum.submittedAmount);
     const rows: ComparisonRow[] = [
       row("sales", ourSales, num(theirSales._sum.amount)),

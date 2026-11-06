@@ -14,7 +14,7 @@ import {
 } from "../fulfillment/payment-fulfillment.service";
 import {
   paytrAmountMatches,
-  paytrChargeExpectationsOf,
+  paytrChargeExpectationsForPayments,
 } from "../helpers/charged-amount";
 
 /**
@@ -94,13 +94,17 @@ export class PspReconciliationService {
 
     let checked = 0;
     let completed = 0;
+    // PSP scale, per oid: the amount each oid was signed for (its charge
+    // attempt), else the legacy `amount`; one query for the whole batch.
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      candidates,
+    );
 
     for (const row of candidates) {
       checked++;
       try {
-        // PSP scale, per oid: the amount each oid was signed for (its charge
-        // attempt), else the legacy `amount`.
-        const expectedFor = await paytrChargeExpectationsOf(this.prisma, row);
+        const expectedFor = (oid: string) => expectedOf(row, oid);
         // FLOW-M3: TÜM oid'leri tara (güncel providerConversationId + merchantOidHistory).
         // Capture rotate edilmiş ESKİ bir oid'de olmuş olabilir; yalnız güncel oid'i
         // sormak sahipsiz capture'ı kaçırırdı. İlk çekilmiş + tutar-tutan oid capture'dır.
@@ -258,13 +262,17 @@ export class PspReconciliationService {
     let checked = 0;
     let recovered = 0;
     let alarms = 0;
+    // PSP scale, per oid (see `reconcilePendingPaytrPayments`).
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      candidates,
+    );
     for (const row of candidates) {
       const dedupKey = `orphan-checked:${row.id}`;
       if (await this.cache.get<boolean>(dedupKey)) continue;
       checked++;
       try {
-        // PSP scale, per oid (see `reconcilePendingPaytrPayments`).
-        const expectedFor = await paytrChargeExpectationsOf(this.prisma, row);
+        const expectedFor = (oid: string) => expectedOf(row, oid);
         const oids = this.paymentCommon.collectPaymentOids(row);
         let capturedOid: string | null = null;
         let capturedInquiry: PayTRStatusInquirySuccess | null = null;

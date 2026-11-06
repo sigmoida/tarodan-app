@@ -39,7 +39,7 @@ import type {
 } from "./dto/psp-reconciliation.dto";
 import {
   chargedAmountOf,
-  expectedPaytrChargeOf,
+  paytrChargeExpectationsForPayments,
 } from "../../payment/helpers/charged-amount";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -509,16 +509,7 @@ export class AdminPspReconciliationService {
     const membershipIds = [
       ...new Set(rows.map((r) => r.membershipPaymentId).filter(Boolean)),
     ] as string[];
-    // Sale lines: the attempt each oid signed, so the list shows the amount
-    // the matcher compares the line with (`expectedPaytrChargeOf`).
-    const saleOids = [
-      ...new Set(
-        rows
-          .filter((r) => r.paymentId && r.type === PaytrStatementLineType.sale)
-          .map((r) => r.merchantOid),
-      ),
-    ];
-    const [payments, memberships, saleAttempts] = await Promise.all([
+    const [payments, memberships] = await Promise.all([
       paymentIds.length
         ? this.prisma.payment.findMany({
             where: { id: { in: paymentIds } },
@@ -544,26 +535,15 @@ export class AdminPspReconciliationService {
             },
           })
         : [],
-      saleOids.length
-        ? this.prisma.paymentChargeAttempt.findMany({
-            where: {
-              merchantOid: { in: saleOids },
-              paymentId: { in: paymentIds },
-            },
-            select: { merchantOid: true, paymentId: true, chargedAmount: true },
-          })
-        : [],
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
-    // merchant_oid is unique; an oid's attempt of ANOTHER payment never counts.
-    const saleAttemptByOid = new Map(
-      saleAttempts.map((a) => [a.merchantOid, a]),
-    );
-    const saleAttemptOf = (paymentId: string, oid: string) => {
-      const attempt = saleAttemptByOid.get(oid);
-      return attempt?.paymentId === paymentId ? attempt : null;
-    };
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
+    // What PayTR had to charge for each line's oid (its charge attempt's C,
+    // PSP scale, ADR 0019): one query for the page.
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      payments,
+    );
 
     return {
       data: rows.map((row) => {
@@ -578,14 +558,15 @@ export class AdminPspReconciliationService {
           payment: payment
             ? {
                 id: payment.id,
+                // Goods scale (T): the order totals.
                 amount: payment.amount,
-                // C signed for this sale line's oid; null on refund lines.
+                // PSP scale: what PayTR had to charge for this sale line's
+                // oid (its attempt's C, else the payment's charged amount),
+                // the figure the matcher compares the line with. Null on
+                // refund lines: those match a refund attempt, not a charge.
                 chargedAmount:
                   row.type === PaytrStatementLineType.sale
-                    ? expectedPaytrChargeOf(
-                        payment,
-                        saleAttemptOf(payment.id, row.merchantOid),
-                      )
+                    ? expectedOf(payment, row.merchantOid)
                     : null,
                 orderNumber: payment.order?.orderNumber ?? null,
                 groupNumber: payment.checkoutGroup?.groupNumber ?? null,

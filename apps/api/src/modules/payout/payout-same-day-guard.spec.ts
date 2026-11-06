@@ -1,4 +1,4 @@
-import { OrderStatus, PayoutStatus } from "@prisma/client";
+import { OrderStatus, PayoutStatus, Prisma } from "@prisma/client";
 import { PayoutService } from "./payout.service";
 
 /**
@@ -37,7 +37,8 @@ describe("PayoutService.processPendingPayouts same-day guard", () => {
         findUnique: jest.fn().mockResolvedValue({
           id: "o1",
           status: OrderStatus.completed,
-          totalAmount: 100,
+          totalAmount: new Prisma.Decimal(100),
+          installmentFeeAmount: new Prisma.Decimal(0),
         }),
         update: jest.fn().mockResolvedValue({}),
       },

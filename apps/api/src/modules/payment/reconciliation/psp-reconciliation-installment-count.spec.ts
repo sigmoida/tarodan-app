@@ -41,7 +41,12 @@ describe("PspReconciliationService.reconcilePendingPaytrPayments: provider data"
       // Forms signed before charge attempts: every oid falls back to `amount`.
       paymentChargeAttempt: {
         findFirst: jest.fn().mockResolvedValue(null),
-        findMany: jest.fn().mockResolvedValue(attempts),
+        // The sweep reads the attempts of the whole batch at once.
+        findMany: jest
+          .fn()
+          .mockResolvedValue(
+            attempts.map((a) => ({ paymentId: "pay-1", ...a })),
+          ),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       payment: {

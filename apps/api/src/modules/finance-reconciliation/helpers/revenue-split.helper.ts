@@ -41,9 +41,17 @@ export interface VirtualSplit {
 }
 
 export interface RevenueSplitInputs {
-  /** Σ Payment.amount (completed|refunded) + Σ MembershipPayment.amount (yenileme). */
+  /**
+   * Σ what PayTR charged (completed|refunded payments: amount + installment
+   * fee) + Σ MembershipPayment.amount (renewals).
+   */
   collectedTotal: number;
   collectedCount: number;
+  /**
+   * Σ Payment.installmentFeeAmount: the vade farkı the buyers paid, VAT
+   * included (ADR 0019). Platform service revenue; the seller never sees it.
+   */
+  installmentFee: number;
   physical: PhysicalSplit;
   trade: TradeSplit;
   virtualOrders: VirtualSplit;
@@ -75,6 +83,8 @@ export function splitGrossByVat(
  *   ⇒ hold + (commission − pfd) + (bST + sST) + (bShip + sShip) + wh − deficit = total
  * Takas: total = amount + tradeFee + shipping (v1: amount + commission + commissionTax).
  * Sanal: tamamı platform net + KDV.
+ * Installment payments: the vade farkı F the buyer paid on top of the order
+ * totals is its own line (VAT included); S3 carries it without its VAT.
  */
 export function assembleRevenueSplit(
   inputs: RevenueSplitInputs,
@@ -135,6 +145,7 @@ export function assembleRevenueSplit(
     { key: "shipping", amount: shipping },
     { key: "withholding", amount: withholding },
     { key: "shippingDeficit", amount: shippingDeficit },
+    { key: "installmentFee", amount: round2(inputs.installmentFee) },
   ];
   const total = round2(inputs.collectedTotal);
   const difference = round2(

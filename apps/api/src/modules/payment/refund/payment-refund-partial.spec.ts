@@ -3,6 +3,7 @@ import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import {
   CancellationActor,
   PaymentStatus,
+  Prisma,
   RefundAttemptStatus,
   PaymentHoldStatus,
 } from "@prisma/client";
@@ -49,7 +50,9 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       id: "attempt-1",
       paymentId: "pay-1",
       orderId: ORDER_ID,
-      amount: opts.existingAttempt?.amount ?? 0,
+      // A single payment: the PSP amount is the goods amount, no fee share.
+      amount: new Prisma.Decimal(opts.existingAttempt?.amount ?? 0),
+      installmentFeeAmount: new Prisma.Decimal(0),
       idempotencyKey:
         opts.existingAttempt?.idempotencyKey ?? "partial-refund-1",
       status: opts.existingAttempt?.status ?? RefundAttemptStatus.prepared,
@@ -103,9 +106,13 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         }),
       },
       payment: {
-        findUnique: jest
-          .fn()
-          .mockImplementation(() => Promise.resolve({ metadata: currentMeta })),
+        findUnique: jest.fn().mockImplementation(() =>
+          Promise.resolve({
+            metadata: currentMeta,
+            amount: new Prisma.Decimal(opts.paymentAmount),
+            installmentFeeAmount: new Prisma.Decimal(0),
+          }),
+        ),
         update: jest.fn().mockImplementation((arg: any) => {
           captured.paymentUpdate = arg;
           if (arg?.data?.metadata) currentMeta = arg.data.metadata;

@@ -17,12 +17,18 @@ import {
 } from "../../account-lane/live-lane.where";
 import { LedgerService } from "../../ledger/ledger.service";
 import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { paymentOids } from "../helpers/payment-oids";
 import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
 import {
+  chargedAmountOf,
   expectedPaytrChargeFor,
   paytrAmountMatches,
 } from "../helpers/charged-amount";
+import {
+  checkStatementCard,
+  splitStatementFee,
+} from "../helpers/statement-fee-split";
 
 /** Tutar eşlemesi toleransı (kuruş yuvarlamaları). Gün kartı farkı da bunu kullanır. */
 export const MATCH_TOLERANCE_TL = 0.05;
@@ -222,6 +228,10 @@ export class PaytrReportMatchingService {
     merchantOid: string;
     type: PaytrStatementLineType;
     amount: unknown;
+    installment?: number | null;
+    cardBrand?: string | null;
+    maskedPan?: string | null;
+    feeRate?: Prisma.Decimal.Value | null;
   }): Promise<"matched" | "mismatched" | "unmatched"> {
     const now = new Date();
     const stamp = { lastMatchAttemptAt: now };
@@ -267,9 +277,11 @@ export class PaytrReportMatchingService {
       });
       if (!ok) {
         this.logger.error(
-          `PAYTR_STATEMENT_MISMATCH: satış satırı ${line.id} oid=${line.merchantOid} ` +
-            `PayTR=${line.amount} bizde=${counterpart.amount} — tutarlar uyuşmuyor (manuel inceleme)`,
+          `PAYTR_STATEMENT_MISMATCH: sale line ${line.id} oid=${line.merchantOid} ` +
+            `PayTR=${line.amount} ours=${counterpart.amount} — the amounts differ (manual review)`,
         );
+      } else if (counterpart.kind === "payment") {
+        await this.checkInstallmentCard(line, counterpart.id);
       }
       return ok ? "matched" : "mismatched";
     }
@@ -428,6 +440,7 @@ export class PaytrReportMatchingService {
           select: {
             id: true,
             amount: true,
+            chargedAmount: true,
             providerConversationId: true,
             metadata: true,
           },
@@ -448,11 +461,12 @@ export class PaytrReportMatchingService {
         const oids = paymentOids(payment);
         if (oids.length === 0 || oids.some((o) => paytrOids.has(o))) continue;
         missing++;
+        // The charged amount (PSP scale): what the statement would show.
         this.logger.error(
-          `PAYTR_MISSING_TRANSACTION (manuel inceleme gerekir): payment ${payment.id} ` +
-            `oid=${oids[0]} tutar=${payment.amount} bizde tamamlanmış görünüyor ama ` +
-            `${dayStart.toISOString().slice(0, 10)} işlem dökümünde YOK — para PayTR'ye ` +
-            `düşmemiş olabilir.`,
+          `PAYTR_MISSING_TRANSACTION (manual review required): payment ${payment.id} ` +
+            `oid=${oids[0]} amount=${chargedAmountOf(payment).toFixed(2)} is completed on our side but ` +
+            `missing from the ${dayStart.toISOString().slice(0, 10)} statement; the money may not ` +
+            `have reached PayTR.`,
         );
       }
       for (const renewal of renewals) {
@@ -469,11 +483,93 @@ export class PaytrReportMatchingService {
   }
 
   /**
-   * Faz 5: eşleşmiş satış satırlarının PayTR kesintisini (kesinti_tutari)
-   * deftere psp_fee gideri olarak yazar (sipariş ödemeleri ve üyelik yenilemeleri).
-   *
-   * Dengeli grup: debit psp_fee / credit buyer_payment. İdempotens: satır
-   * `ledgerRecordedAt` ile damgalanır; ledger hatasında damga yazılmaz.
+   * A matched installment sale against the charge attempt of its oid (plan
+   * 5.6): another card family or BIN than the one priced (the client
+   * declares the BIN; PayTR signs only the count and amount) is an alarm,
+   * `INSTALLMENT_CARD_MISMATCH`, since the fee may be under-recovered; a
+   * deduction rate far from the priced one is a warning,
+   * `INSTALLMENT_RATE_DRIFT`. The money is collected and the count is right:
+   * nothing is changed. No card digits are logged. Best effort: the line is
+   * already matched, so a failure here is a warning and never stops the run.
+   * A line PayTR reports as a single payment is not looked up.
+   */
+  private async checkInstallmentCard(
+    line: {
+      id: string;
+      merchantOid: string;
+      installment?: number | null;
+      cardBrand?: string | null;
+      maskedPan?: string | null;
+      feeRate?: Prisma.Decimal.Value | null;
+    },
+    paymentId: string,
+  ): Promise<void> {
+    if (line.installment != null && line.installment <= 1) return;
+    try {
+      await this.compareInstallmentCard(line, paymentId);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Installment card check failed for sale line ${line.id} (payment ${paymentId}): ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  private async compareInstallmentCard(
+    line: {
+      id: string;
+      merchantOid: string;
+      cardBrand?: string | null;
+      maskedPan?: string | null;
+      feeRate?: Prisma.Decimal.Value | null;
+    },
+    paymentId: string,
+  ): Promise<void> {
+    const attempt = await this.prisma.paymentChargeAttempt.findFirst({
+      where: { merchantOid: line.merchantOid, paymentId },
+      select: {
+        id: true,
+        installmentCount: true,
+        cardFamily: true,
+        bin6: true,
+        installmentRatePct: true,
+      },
+    });
+    if (!attempt) return;
+    const check = checkStatementCard(
+      {
+        cardBrand: line.cardBrand ?? null,
+        maskedPan: line.maskedPan ?? null,
+        feeRatePct: line.feeRate ?? null,
+      },
+      attempt,
+    );
+    if (check.cardMismatch.length > 0) {
+      this.logger.error(
+        `INSTALLMENT_CARD_MISMATCH: sale line ${line.id} oid=${line.merchantOid} payment ${paymentId} ` +
+          `attempt ${attempt.id} (${attempt.installmentCount} installments, priced for ${attempt.cardFamily ?? "?"}): ` +
+          `PayTR charged another card (${check.cardMismatch.join(", ")} differs); ` +
+          `the installment fee may be under-recovered, no automatic action (manual review)`,
+      );
+    }
+    if (check.rateDriftPoints) {
+      this.logger.warn(
+        `INSTALLMENT_RATE_DRIFT: sale line ${line.id} oid=${line.merchantOid} payment ${paymentId} ` +
+          `deduction rate ${String(line.feeRate)} % vs priced ${String(attempt.installmentRatePct)} % ` +
+          `(${check.rateDriftPoints.toFixed(2)} points)`,
+      );
+    }
+  }
+
+  /**
+   * Books the PayTR deduction (`kesinti_tutari`) of matched sale lines
+   * (order payments and membership renewals). Balanced group: credit
+   * `buyer_payment` D; debit `psp_fee`, and for an oid whose charge attempt
+   * expected a platform installment cost P (a segment rule share), debit
+   * `installment_platform_cost` min(D, P) with `psp_fee` the rest
+   * (`splitStatementFee`, AS-P6). The cost is booked when PayTR deducts it,
+   * never reversed by a refund (AS-P4). Idempotent: the line is stamped with
+   * `ledgerRecordedAt` and the group keyed by the line; a ledger failure
+   * leaves no stamp.
    */
   async accruePspFees(): Promise<{ recorded: number; failed: number }> {
     if (!this.ledger) return { recorded: 0, failed: 0 };
@@ -489,22 +585,54 @@ export class PaytrReportMatchingService {
       take: MATCH_PAGE,
     });
 
+    // The expected platform cost of each line's oid, one query for the page.
+    const paymentLines = lines.filter((line) => line.paymentId);
+    const attempts = paymentLines.length
+      ? await this.prisma.paymentChargeAttempt.findMany({
+          where: {
+            merchantOid: { in: paymentLines.map((line) => line.merchantOid) },
+          },
+          select: {
+            merchantOid: true,
+            paymentId: true,
+            platformCostAmount: true,
+          },
+        })
+      : [];
+    const costByPaymentOid = new Map(
+      attempts.map((a) => [
+        `${a.paymentId}\u0000${a.merchantOid}`,
+        a.platformCostAmount,
+      ]),
+    );
+    const expectedCostOf = (line: (typeof lines)[number]) =>
+      costByPaymentOid.get(`${line.paymentId}\u0000${line.merchantOid}`) ??
+      null;
+
     let recorded = 0;
     let failed = 0;
     for (const line of lines) {
       const fee = Number(line.fee);
       if (!(fee > 0)) continue;
+      const split = splitStatementFee(fee, expectedCostOf(line));
+      const debits = [
+        { account: LedgerAccount.psp_fee, amount: split.pspFee },
+        {
+          account: LedgerAccount.installment_platform_cost,
+          amount: split.installmentPlatformCost,
+        },
+      ].filter((entry) => entry.amount.gt(0));
       try {
         await this.ledger.record(this.prisma, {
           eventType: LedgerEventType.psp_fee_accrued,
           currency: line.currency,
           idempotencyKey: `psp-fee:statement-line:${line.id}`,
           entries: [
-            {
-              account: LedgerAccount.psp_fee,
+            ...debits.map((entry) => ({
+              account: entry.account,
               direction: LedgerDirection.debit,
-              amount: fee,
-            },
+              amount: entry.amount.toNumber(),
+            })),
             {
               account: LedgerAccount.buyer_payment,
               direction: LedgerDirection.credit,
@@ -517,6 +645,12 @@ export class PaytrReportMatchingService {
             merchantOid: line.merchantOid,
             membershipPaymentId: line.membershipPaymentId ?? null,
             transactionDate: line.transactionDate.toISOString().slice(0, 10),
+            ...(split.installmentPlatformCost.gt(0)
+              ? {
+                  installmentPlatformCost:
+                    split.installmentPlatformCost.toFixed(2),
+                }
+              : {}),
           },
         });
         await this.prisma.paytrStatementLine.update({
@@ -524,10 +658,10 @@ export class PaytrReportMatchingService {
           data: { ledgerRecordedAt: new Date() },
         });
         recorded++;
-      } catch (error: any) {
+      } catch (error: unknown) {
         failed++;
         this.logger.warn(
-          `psp_fee ledger kaydı başarısız (satır ${line.id}): ${error?.message}`,
+          `psp_fee ledger write failed (line ${line.id}): ${errorMessage(error)}`,
         );
       }
     }
