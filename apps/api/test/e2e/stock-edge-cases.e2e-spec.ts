@@ -18,6 +18,7 @@ import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { randomUUID } from "crypto";
+import { buyNow as buyNowFlow, latestPaymentOfOrder } from "../factories/flows";
 
 /**
  * Kapsamlı stok edge-case'leri: eşzamanlı alımlar, iptal/iade sonrası stok
@@ -42,10 +43,7 @@ describe("Stock edge cases — comprehensive (E2E)", () => {
   });
 
   const buyNow = (buyer: any, productId: string, addrId: string) =>
-    request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId, shippingAddressId: addrId });
+    buyNowFlow(ctx, buyer, productId, addrId);
 
   /** initiate + successful PayTR callback → order paid, stock decremented. */
   async function completePayment(buyer: any, orderId: string) {
@@ -55,10 +53,7 @@ describe("Stock edge cases — comprehensive (E2E)", () => {
       .send({ orderId, provider: "paytr" })
       .expect(201);
     const prisma = getPrisma();
-    const payment = await prisma.payment.findFirst({
-      where: { orderId },
-      orderBy: { createdAt: "desc" },
-    });
+    const payment = await latestPaymentOfOrder(orderId);
     const cb = signCallback({
       merchantOid: payment!.providerConversationId!,
       status: "success",
@@ -125,6 +120,10 @@ describe("Stock edge cases — comprehensive (E2E)", () => {
       const codes = results.map((r) => r.status).sort();
       expect(codes.filter((c) => c === 201)).toHaveLength(3);
       expect(codes.filter((c) => c === 400)).toHaveLength(2);
+      // Both losers were refused by the stock lock, not by pin validation.
+      for (const res of results.filter((r) => r.status === 400)) {
+        expect(res.body.i18nKey).toBe("server.order.productOutOfStock");
+      }
 
       const p = await prisma.product.findUnique({ where: { id: product.id } });
       expect(p?.reservedQuantity).toBe(3); // never over-reserves

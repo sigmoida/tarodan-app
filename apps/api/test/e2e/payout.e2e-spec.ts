@@ -22,10 +22,15 @@ import {
 } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
-import { signCallback } from "../mocks/paytr.mock";
-import { buyAndPay } from "../factories/flows";
+import { buyAndPay, payTradeBothSides } from "../factories/flows";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { PayoutService } from "../../src/modules/payout/payout.service";
+
+/** PayTR's "more than the remaining amount" answer: the only retried rejection. */
+const RETRYABLE_TRANSFER_REJECTION = {
+  err_no: "010",
+  err_msg: "Transfer tutari kalan tutardan fazla olamaz",
+};
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -112,30 +117,9 @@ describe("Payout Flow (E2E)", () => {
       });
 
       // Buy + pay
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
-
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/initiate")
-        .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
-        .expect(201);
-
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/callback/paytr")
-        .send(
-          signCallback({
-            merchantOid: payment!.providerConversationId!,
-            status: "success",
-            totalAmount: Math.round(Number(payment!.amount) * 100),
-          }),
-        );
+      const buyRes = {
+        body: await buyAndPay(ctx, buyer, product.id, addr.id),
+      };
 
       // Hold exists
       const hold = await prisma.paymentHold.findFirst({
@@ -173,6 +157,12 @@ describe("Payout Flow (E2E)", () => {
       expect(payout?.transferName).toBe("Mehmet Yılmaz");
       expect(Number(payout?.netAmount)).toBeGreaterThan(0);
 
+      // PayTR refuses a transfer on the payment day; since a338888d6 the
+      // payout waits for the next day. Count the payment as paid two days ago.
+      await prisma.payment.update({
+        where: { id: hold!.paymentId },
+        data: { paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+      });
       // Process the payout — calls mock PayTR
       const result = await payoutService.processPendingPayouts();
       expect(result.processed).toBeGreaterThanOrEqual(1);
@@ -210,28 +200,9 @@ describe("Payout Flow (E2E)", () => {
       const prisma = getPrisma();
 
       // Buy + pay + callback
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/initiate")
-        .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
-        .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/callback/paytr")
-        .send(
-          signCallback({
-            merchantOid: payment!.providerConversationId!,
-            status: "success",
-            totalAmount: Math.round(Number(payment!.amount) * 100),
-          }),
-        );
+      const buyRes = {
+        body: await buyAndPay(ctx, buyer, product.id, addr.id),
+      };
 
       // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
       await prisma.order.update({
@@ -288,28 +259,9 @@ describe("Payout Flow (E2E)", () => {
       });
 
       // Buy + pay
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/initiate")
-        .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
-        .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/callback/paytr")
-        .send(
-          signCallback({
-            merchantOid: payment!.providerConversationId!,
-            status: "success",
-            totalAmount: Math.round(Number(payment!.amount) * 100),
-          }),
-        );
+      const buyRes = {
+        body: await buyAndPay(ctx, buyer, product.id, addr.id),
+      };
 
       // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
       await prisma.order.update({
@@ -329,8 +281,15 @@ describe("Payout Flow (E2E)", () => {
       const payoutService = ctx.app.get(PayoutService);
       await payoutService.createPayoutsForReleasedHolds();
 
-      // Make PayTR fail
-      ctx.paytr.nextTransferFails = true;
+      // PayTR refuses a transfer on the payment day; since a338888d6 the
+      // payout waits for the next day. Count the payment as paid two days ago.
+      await prisma.payment.update({
+        where: { id: hold!.paymentId },
+        data: { paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+      });
+      // Make PayTR fail with the one rejection that is retried (err_no 010,
+      // feff505a9); any other rejection is final at once.
+      ctx.paytr.nextTransferFails = RETRYABLE_TRANSFER_REJECTION;
 
       // Attempt 1: fails → retry_pending
       let result = await payoutService.processPendingPayouts();
@@ -351,7 +310,7 @@ describe("Payout Flow (E2E)", () => {
       await payoutService.processRetryPayouts();
 
       // Attempt 2: fails again
-      ctx.paytr.nextTransferFails = true;
+      ctx.paytr.nextTransferFails = RETRYABLE_TRANSFER_REJECTION;
       result = await payoutService.processPendingPayouts();
       payout = await prisma.payoutTransfer.findFirst({
         where: { paymentHoldId: hold!.id },
@@ -366,7 +325,7 @@ describe("Payout Flow (E2E)", () => {
       await payoutService.processRetryPayouts();
 
       // Attempt 3: permanent failure
-      ctx.paytr.nextTransferFails = true;
+      ctx.paytr.nextTransferFails = RETRYABLE_TRANSFER_REJECTION;
       result = await payoutService.processPendingPayouts();
       payout = await prisma.payoutTransfer.findFirst({
         where: { paymentHoldId: hold!.id },
@@ -446,27 +405,9 @@ describe("Payout Flow (E2E)", () => {
         .send({})
         .expect(201);
 
-      const cp = await prisma.tradeCashPayment.findFirst({
-        where: { tradeId },
-      });
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/initiate-trade-cash")
-        .set(authHeader(initiator))
-        .send({ tradeId })
-        .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { tradeCashPaymentId: cp!.id },
-      });
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/callback/paytr")
-        .send(
-          signCallback({
-            merchantOid: payment!.providerConversationId!,
-            status: "success",
-            totalAmount: Math.round(Number(payment!.amount) * 100),
-          }),
-        )
-        .expect(200);
+      // v2 (5ee405ea6): both parties pay before the warehouse step; the
+      // initiator's row carries the cash difference owed to the receiver.
+      await payTradeBothSides(ctx, tradeId, [initiator, receiver]);
 
       // Walk trade to completion. Inbound shipments auto-created
       // post-cash-payment; poll for the fire-and-forget dispatch.
@@ -508,7 +449,7 @@ describe("Payout Flow (E2E)", () => {
 
       // Trade completed, holdReleaseAt set
       const cpAfter = await prisma.tradeCashPayment.findFirst({
-        where: { tradeId },
+        where: { tradeId, payerId: initiator.id },
       });
       expect(cpAfter?.holdReleaseAt).toBeTruthy();
 
@@ -532,6 +473,12 @@ describe("Payout Flow (E2E)", () => {
       expect(payout?.transferIban).toBe("TR780001000999988887777666");
       expect(payout?.status).toBe(PayoutStatus.pending);
 
+      // PayTR refuses a transfer on the payment day; since a338888d6 the
+      // payout waits for the next day. Count the payment as paid two days ago.
+      await prisma.tradeCashPayment.update({
+        where: { id: cpAfter!.id },
+        data: { paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+      });
       // Process payout
       const processResult = await payoutService.processPendingPayouts();
       expect(processResult.processed).toBeGreaterThanOrEqual(1);

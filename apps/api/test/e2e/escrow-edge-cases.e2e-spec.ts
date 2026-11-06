@@ -27,6 +27,7 @@ import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { PayoutService } from "../../src/modules/payout/payout.service";
 import { TradeSchedulerService } from "../../src/modules/trade/jobs/trade-scheduler.service";
+import { buyNow, latestPaymentOfOrder } from "../factories/flows";
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -233,19 +234,13 @@ describe("Escrow Edge Cases (E2E)", () => {
       });
 
       // Buy + pay
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/callback/paytr")
         .send(
@@ -314,19 +309,13 @@ describe("Escrow Edge Cases (E2E)", () => {
       });
 
       // Buy + pay
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/callback/paytr")
         .send(
@@ -520,19 +509,13 @@ describe("Escrow Edge Cases (E2E)", () => {
       const prisma = getPrisma();
 
       // Buy + pay
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/callback/paytr")
         .send(
@@ -597,19 +580,13 @@ describe("Escrow Edge Cases (E2E)", () => {
       const prisma = getPrisma();
 
       // Buy + pay (auto-creates Surat shipment in pending state)
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/callback/paytr")
         .send(
@@ -656,11 +633,7 @@ describe("Escrow Edge Cases (E2E)", () => {
       const addr = await createAddress({ userId: buyer.id });
       const prisma = getPrisma();
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
@@ -682,9 +655,7 @@ describe("Escrow Edge Cases (E2E)", () => {
       // into the past — otherwise cancelExpiredPayments only fails the Payment
       // row and leaves the order (and its shipment) alive so the buyer can
       // re-initiate.
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await prisma.payment.update({
         where: { id: payment!.id },
         data: { createdAt: new Date(Date.now() - 60 * 60 * 1000) }, // 1 hour ago
@@ -759,19 +730,13 @@ describe("Escrow Edge Cases (E2E)", () => {
       const addr = await createAddress({ userId: buyer.id });
       const prisma = getPrisma();
 
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: buyRes.body.orderId },
-      });
+      const payment = await latestPaymentOfOrder(buyRes.body.orderId);
       await request(ctx.app.getHttpServer())
         .post("/api/payments/callback/paytr")
         .send(
@@ -1111,11 +1076,7 @@ describe("Escrow Edge Cases (E2E)", () => {
       const prisma = getPrisma();
 
       // Create order
-      const buyRes = await request(ctx.app.getHttpServer())
-        .post("/api/orders/buy")
-        .set(authHeader(buyer))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(201);
+      const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
 
       // Create a pending shipment WITHOUT tracking number
       await prisma.shipment.create({

@@ -13,6 +13,7 @@ import { createAddress } from "../factories/address.factory";
 import { createOfferRow } from "../factories/offer.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { ProductLockService } from "../../src/modules/product/lock/product-lock.service";
+import { buyNow, latestPaymentOfOrder } from "../factories/flows";
 
 describe("Stock Cascade (E2E)", () => {
   let ctx: E2ETestApp;
@@ -72,19 +73,15 @@ describe("Stock Cascade (E2E)", () => {
     });
 
     // fastBuyer races and completes Buy Now end-to-end.
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(fastBuyer))
-      .send({ productId: product.id, shippingAddressId: fastAddr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, fastBuyer, product.id, fastAddr.id).expect(
+      201,
+    );
     await request(ctx.app.getHttpServer())
       .post("/api/payments/initiate")
       .set(authHeader(fastBuyer))
       .send({ orderId: buyRes.body.orderId, provider: "paytr" })
       .expect(201);
-    const fastPayment = await prisma.payment.findFirst({
-      where: { orderId: buyRes.body.orderId },
-    });
+    const fastPayment = await latestPaymentOfOrder(buyRes.body.orderId);
     await request(ctx.app.getHttpServer())
       .post("/api/payments/callback/paytr")
       .send(

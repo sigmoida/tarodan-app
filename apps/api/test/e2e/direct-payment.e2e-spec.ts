@@ -11,6 +11,7 @@ import {
 import { createUser, authHeader } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
+import { buyNow, guestCheckout } from "../factories/flows";
 
 /**
  * PayTR Direct API kart ödemesi — TEK ödeme yolu (iframe kaldırıldı; misafir + üye).
@@ -65,11 +66,9 @@ describe("Direct API card payment (tek yol, E2E)", () => {
       quantity: 1,
     });
     const addr = await createAddress({ userId: buyer.id });
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: addr.id })
-      .expect(201);
+    // buyNow sends the current order-create contract (quote pricing hash,
+    // tariff and commission-rule pins); a bare body is rejected with 400.
+    const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
     return { buyer, orderId: buyRes.body.orderId as string };
   }
 
@@ -147,27 +146,38 @@ describe("Direct API card payment (tek yol, E2E)", () => {
   });
 
   it("misafir, misafir siparişini yeni kartla ödeyebilir (auth gerekmez)", async () => {
-    const { orderId } = await makeBuyerWithOrder();
-    // Siparişi misafir siparişi olarak işaretle (guest checkout marker).
-    const prisma = getPrisma();
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
-    await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        shippingAddress: {
-          ...(order!.shippingAddress as any),
-          isGuestOrder: true,
-        },
-      },
+    // A real guest purchase: OTP-verified guest cart checkout (a guest order is
+    // always a checkout group). Since ba84bcdcb (fix(payment): secure public
+    // payment access) a guest reaches direct-form only with the payment
+    // capability that initiate-guest issues, bound to that payment id; web
+    // sends it as x-payment-capability.
+    setCardStorageFlag(true);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 300,
+      quantity: 1,
     });
+    const checkoutGroupId = await guestCheckout(ctx, {
+      productId: product.id,
+      email: `guest-${Date.now()}@guest.local`,
+    });
+    const intent = await request(ctx.app.getHttpServer())
+      .post("/api/payments/initiate-guest")
+      .send({ checkoutGroupId, provider: "paytr" })
+      .expect(201);
 
     const res = await request(ctx.app.getHttpServer())
       .post("/api/payments/direct-form")
-      .send({ orderId }) // auth header YOK
+      .set("x-payment-capability", intent.body.paymentAccessToken)
+      .send({ checkoutGroupId, paymentId: intent.body.paymentId }) // auth header YOK
       .expect(201);
 
-    expect(res.body.paymentId).toBeTruthy();
+    expect(res.body.paymentId).toBe(intent.body.paymentId);
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
+    // A guest never gets store_card, even when card storage is on.
+    expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
   });
 
   it("çift-çekim koruması: önceki deneme PayTR'da ödendiyse ikinci direct-form YENİ çekim yapmaz", async () => {

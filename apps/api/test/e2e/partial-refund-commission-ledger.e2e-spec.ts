@@ -10,6 +10,8 @@ import { PrismaService } from "../../src/prisma";
 import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
 import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
 import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
+import { PaymentProviderEventService } from "../../src/modules/payment/payment-provider-event.service";
+import { paymentProviderRegistryFor } from "../mocks/paytr.mock";
 import { InvoicingService } from "../../src/modules/invoicing/invoicing.service";
 import { InvoiceDocumentService } from "../../src/modules/invoicing/invoice-document.service";
 import { InvoiceDeliveryService } from "../../src/modules/invoicing/invoice-delivery.service";
@@ -179,7 +181,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
     const refundSvc = new PaymentRefundService(
       prisma,
       { get: () => undefined } as any, // config (PAYMENT_BYPASS undefined → PayTR yolu)
-      { createRefund } as any,
+      paymentProviderRegistryFor({ createRefund }), // paymentProviders
       { emitPaymentRefunded: async () => {} } as any,
       {
         createInAppNotification: async () => {},
@@ -193,28 +195,47 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
         issuePlatformSaleInvoice: async () => {},
       } as any,
       { cancelSuratShipmentIfExists: async () => {} } as any,
-      {} as any, // providerEvents
+      new PaymentProviderEventService(prisma), // providerEvents
       {} as any, // holdRelease
-      new PaymentRefundAttemptService(prisma as any), // attempts
+      new PaymentRefundAttemptService(prisma), // attempts
       {} as any, // tradeRefunds
       {} as any, // boostTimeline (not a boost order)
     );
 
-    // 100 üzerinden 50 kısmi iade → portion 0.5
+    // 100 üzerinden 50 kısmi iade → portion 0.5. A partial refund carries the
+    // caller's idempotency key (required since 14adf18e3, durable refund
+    // reconciliation; only a full refund derives its own).
     await refundSvc.processRefund(orderId, 50, {
       cancelledBy: CancellationActor.platform,
+      idempotencyKey: `partial-refund-${orderId}`,
     });
 
     expect(createRefund).toHaveBeenCalledTimes(1);
+    expect(createRefund.mock.calls[0][1]).toBe(50); // TL sent to PayTR
     const l = await prisma.commissionLedger.findUnique({ where: { orderId } });
     expect(Number(l!.refundedSellerCommission)).toBeCloseTo(5, 2); // 10 * 0.5
     expect(Number(l!.sellerCommission)).toBe(10); // original korundu
   });
 
-  it("elogo NET komisyon faturalar: kısmi iade sonrası original değil net kesilir", async () => {
+  it("e-fatura NET komisyon faturalar: kısmi iade sonrası original değil net kesilir", async () => {
     const { orderId, sellerId } = await makeOrderWithLedger({
       sellerCommission: 10,
       buyerFee: 4,
+    });
+    // Commission is invoiced per seller package since 7a49f3caf (fix(api):
+    // invoice commission and service fees per seller package): the order
+    // belongs to a package and the invoice is cut for the package.
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { buyerId: true, orderNumber: true },
+    });
+    const pkg = await prisma.orderPackage.create({
+      data: {
+        packageNumber: `PKG-${order.orderNumber}`,
+        sellerId,
+        buyerId: order.buyerId,
+        orders: { connect: { id: orderId } },
+      },
     });
     // Kısmi iade uygula → refundedSellerCommission = 3
     await prisma.commissionLedger.update({
@@ -245,10 +266,16 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       .spyOn(delivery as any, "cut")
       .mockResolvedValue(undefined);
 
-    await invoicing.issueCommissionInvoice(orderId);
+    await invoicing.issueCommissionInvoice(pkg.id);
 
     expect(cutSpy).toHaveBeenCalledTimes(1);
     // net = 10 - 3 = 7 (original 10 DEĞİL)
-    expect(cutSpy).toHaveBeenCalledWith("commission", orderId, sellerId, 7);
+    expect(cutSpy).toHaveBeenCalledWith(
+      "commission",
+      pkg.id,
+      sellerId,
+      7,
+      expect.anything(),
+    );
   });
 });

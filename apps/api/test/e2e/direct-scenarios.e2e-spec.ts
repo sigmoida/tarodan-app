@@ -11,6 +11,7 @@ import { createUser, authHeader } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
+import { buyNow } from "../factories/flows";
 
 /**
  * Direct API SENARYO testleri (mock PayTR, GERÇEK akış) — Adım 2 kapsamı:
@@ -84,11 +85,7 @@ describe("Direct API scenarios (E2E)", () => {
     });
     const addr = await createAddress({ userId: buyer.id });
 
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: addr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
     const orderId = buyRes.body.orderId as string;
 
     // Direct API ile öde (yeni kart) — mock createDirectPaymentForm success döner, payment pending kalır.
