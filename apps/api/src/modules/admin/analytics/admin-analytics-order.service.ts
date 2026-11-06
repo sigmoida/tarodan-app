@@ -24,6 +24,8 @@ import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../../order/order.service";
 import { PaymentService } from "../../payment/payment.service";
 import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
+import { paymentInstallmentFieldsOf } from "../../payment/helpers/payment-installment-view";
+import { orderInstallmentFeeOf } from "../../payment/helpers/charged-amount";
 import { NotificationService } from "../../notification/notification.service";
 import { sellerNetAmountOf } from "../../order/helpers/order-net.helper";
 import { storedProductBaseOf } from "../../order/helpers/order-charged-base.helper";
@@ -296,6 +298,9 @@ export class AdminAnalyticsOrderService {
           id: rawPayment.id,
           status: rawPayment.status,
           amount: Number(rawPayment.amount),
+          // Installment count, fee and charged amount C (ADR 0019); the card
+          // and the pricing evidence are on the payment detail.
+          ...paymentInstallmentFieldsOf(rawPayment),
           provider: rawPayment.provider ?? null,
           providerPaymentId: rawPayment.providerPaymentId ?? null,
           // PayTR panelindeki "sipariş no" (güncel + önceki denemeler).
@@ -399,6 +404,9 @@ export class AdminAnalyticsOrderService {
         // Tahsil anındaki oran — ekran kalem bazında KDV'yi bununla türetir.
         serviceVatRate: num(o.serviceVatRate),
         totalAmount: num(o.totalAmount),
+        // The order's share of the payment's installment fee (PSP scale only;
+        // commission, hold and seller net stay on totalAmount).
+        installmentFeeAmount: num(orderInstallmentFeeOf(o)),
         // Bilgilendirici net; kesin ödeme tutarı escrow.amount'tır. Formül ORTAK
         // helper'dan gelir — bu hesap eskiden burada elle yazılıyordu ve kargo
         // payını düşmediği için sipariş yanıtındaki netten sapıyordu.

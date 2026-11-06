@@ -37,7 +37,10 @@ import type {
   PspLineFilter,
   PspStatementLinesQueryDto,
 } from "./dto/psp-reconciliation.dto";
-import { chargedAmountOf } from "../../payment/helpers/charged-amount";
+import {
+  chargedAmountOf,
+  expectedPaytrChargeOf,
+} from "../../payment/helpers/charged-amount";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** `YYYY-MM-DD` gününün kendisi ve ±1 komşusu (oid kayması toleransı). */
@@ -506,13 +509,23 @@ export class AdminPspReconciliationService {
     const membershipIds = [
       ...new Set(rows.map((r) => r.membershipPaymentId).filter(Boolean)),
     ] as string[];
-    const [payments, memberships] = await Promise.all([
+    // Sale lines: the attempt each oid signed, so the list shows the amount
+    // the matcher compares the line with (`expectedPaytrChargeOf`).
+    const saleOids = [
+      ...new Set(
+        rows
+          .filter((r) => r.paymentId && r.type === PaytrStatementLineType.sale)
+          .map((r) => r.merchantOid),
+      ),
+    ];
+    const [payments, memberships, saleAttempts] = await Promise.all([
       paymentIds.length
         ? this.prisma.payment.findMany({
             where: { id: { in: paymentIds } },
             select: {
               id: true,
               amount: true,
+              chargedAmount: true,
               order: { select: { orderNumber: true } },
               checkoutGroup: { select: { groupNumber: true } },
               tradeCashPayment: {
@@ -531,8 +544,20 @@ export class AdminPspReconciliationService {
             },
           })
         : [],
+      saleOids.length
+        ? this.prisma.paymentChargeAttempt.findMany({
+            where: { merchantOid: { in: saleOids } },
+            select: { merchantOid: true, paymentId: true, chargedAmount: true },
+          })
+        : [],
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
+    // Keyed by payment too: an oid's attempt of ANOTHER payment never counts.
+    const saleAttemptKey = (paymentId: string, oid: string) =>
+      `${paymentId}:${oid}`;
+    const saleAttemptByKey = new Map(
+      saleAttempts.map((a) => [saleAttemptKey(a.paymentId, a.merchantOid), a]),
+    );
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
 
     return {
@@ -549,6 +574,16 @@ export class AdminPspReconciliationService {
             ? {
                 id: payment.id,
                 amount: payment.amount,
+                // C signed for this sale line's oid; null on refund lines.
+                chargedAmount:
+                  row.type === PaytrStatementLineType.sale
+                    ? expectedPaytrChargeOf(
+                        payment,
+                        saleAttemptByKey.get(
+                          saleAttemptKey(payment.id, row.merchantOid),
+                        ) ?? null,
+                      )
+                    : null,
                 orderNumber: payment.order?.orderNumber ?? null,
                 groupNumber: payment.checkoutGroup?.groupNumber ?? null,
                 tradeNumber:

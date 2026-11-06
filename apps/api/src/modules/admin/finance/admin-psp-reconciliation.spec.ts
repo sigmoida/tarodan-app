@@ -36,6 +36,8 @@ function makePrisma(opts: {
   lineCount?: number;
   /** getMissingPayments: dökümü gelmiş mağazalar (varsayılan: lineCount>0 ise pazaryeri). */
   coveredMerchants?: PaytrMerchant[];
+  /** getStatementLines: charge attempts of the sale lines' oids. */
+  chargeAttempts?: any[];
 }) {
   return {
     paytrStatementLine: {
@@ -86,6 +88,9 @@ function makePrisma(opts: {
     },
     refundAttempt: {
       findMany: jest.fn().mockResolvedValue(opts.refunds ?? []),
+    },
+    paymentChargeAttempt: {
+      findMany: jest.fn().mockResolvedValue(opts.chargeAttempts ?? []),
     },
     paytrSettlement: {
       findMany: jest.fn().mockResolvedValue(opts.settlements ?? []),
@@ -554,6 +559,59 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
       payment: expect.objectContaining({ orderNumber: "ORD-10001" }),
       membershipPayment: null,
     });
+  });
+
+  it("shows next to a sale line the amount its oid signed, never another payment's attempt", async () => {
+    const line = (id: string, oid: string, type: PaytrStatementLineType) => ({
+      id,
+      merchantOid: oid,
+      type,
+      amount: 1062.4,
+      matchStatus: PaytrMatchStatus.matched,
+      paymentId: "pay-1",
+      membershipPaymentId: null,
+      transactionDate: DAY,
+    });
+    const prisma = makePrisma({
+      linesList: [
+        line("l-inst", "OID-INST", PaytrStatementLineType.sale),
+        line("l-legacy", "OID-LEGACY", PaytrStatementLineType.sale),
+        line("l-foreign", "OID-FOREIGN", PaytrStatementLineType.sale),
+        line("l-refund", "OID-INST", PaytrStatementLineType.refund),
+      ],
+      linesCount: 4,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: 1000,
+          chargedAmount: 1062.4,
+          order: { orderNumber: "ORD-10001" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+      chargeAttempts: [
+        // A superseded 2-count form of the same payment.
+        { merchantOid: "OID-INST", paymentId: "pay-1", chargedAmount: 1040.5 },
+        { merchantOid: "OID-FOREIGN", paymentId: "pay-2", chargedAmount: 7 },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({});
+    const charged = Object.fromEntries(
+      (result.data as any[]).map((l) => [l.id, l.payment?.chargedAmount]),
+    );
+
+    expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledWith({
+      where: { merchantOid: { in: ["OID-INST", "OID-LEGACY", "OID-FOREIGN"] } },
+      select: { merchantOid: true, paymentId: true, chargedAmount: true },
+    });
+    // The oid's own attempt; without one the payment's charged amount.
+    expect(charged["l-inst"]).toBe(1040.5);
+    expect(charged["l-legacy"]).toBe(1062.4);
+    expect(charged["l-foreign"]).toBe(1062.4);
+    expect(charged["l-refund"]).toBeNull();
   });
 
   it("filters by an explicit status and can include resolved rows", async () => {

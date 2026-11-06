@@ -1,4 +1,5 @@
 import { NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { AdminAnalyticsOrderService } from "../analytics/admin-analytics-order.service";
 
 /**
@@ -301,6 +302,81 @@ describe("AdminAnalyticsOrderService.getOrderGroupFile", () => {
       paytrOidHistory: ["ORDAAAAAAAAAAT000002", "ORDAAAAAAAAAAT000001"],
     });
     expect(file.payment).not.toHaveProperty("metadata");
+  });
+
+  it("carries the installment count, fee and charged amount, and each order's fee share", async () => {
+    const D = (value: string) => new Prisma.Decimal(value);
+    const { svc, prisma } = makeService();
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o9",
+      checkoutGroupId: null,
+    });
+    prisma.order.findMany.mockResolvedValue([
+      baseOrder("o9", {
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        totalAmount: D("245.00"),
+        installmentFeeAmount: D("15.30"),
+        payment: {
+          id: "pay-9",
+          status: "completed",
+          amount: D("245.00"),
+          chargedAmount: D("260.30"),
+          installmentFeeAmount: D("15.30"),
+          installmentCount: 3,
+          provider: "paytr",
+          providerPaymentId: null,
+          paidAt: new Date("2026-07-01"),
+          refundAttempts: [],
+        },
+      }),
+    ]);
+
+    const file = await svc.getOrderGroupFile("o9");
+
+    expect(file.payment).toMatchObject({
+      amount: 245,
+      installmentCount: 3,
+      installmentFeeAmount: 15.3,
+      chargedAmount: 260.3,
+    });
+    expect(file.packages[0].orders[0].finance.installmentFeeAmount).toBe(15.3);
+  });
+
+  it("reads a legacy payment as a single payment charged its amount, with no order fee share", async () => {
+    const { svc, prisma } = makeService();
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o9",
+      checkoutGroupId: null,
+    });
+    prisma.order.findMany.mockResolvedValue([
+      baseOrder("o9", {
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        payment: {
+          id: "pay-9",
+          status: "completed",
+          amount: 245,
+          chargedAmount: null,
+          installmentCount: 1,
+          provider: "paytr",
+          providerPaymentId: null,
+          paidAt: new Date("2026-07-01"),
+          refundAttempts: [],
+        },
+      }),
+    ]);
+
+    const file = await svc.getOrderGroupFile("o9");
+
+    expect(file.payment).toMatchObject({
+      installmentCount: 1,
+      installmentFeeAmount: 0,
+      chargedAmount: 245,
+    });
+    expect(file.packages[0].orders[0].finance.installmentFeeAmount).toBe(0);
   });
 
   it("hazırlık son tarihini ve tek seferlik uzatmanın kaydını taşır", async () => {
