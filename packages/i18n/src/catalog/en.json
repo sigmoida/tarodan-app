@@ -12451,7 +12451,8 @@
       "itemNotFound": "Collection item not found",
       "likeOwn": "You cannot like your own collection",
       "authRequired": "Authentication is required",
-      "imageUploadFailed": "Image upload failed"
+      "imageUploadFailed": "Image upload failed",
+      "invalidImageUrl": "The image is invalid. Please upload it again."
     },
     "messaging": {
       "blocked": "You cannot message this user",

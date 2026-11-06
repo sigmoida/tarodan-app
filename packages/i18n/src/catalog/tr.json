@@ -12451,7 +12451,8 @@
       "itemNotFound": "Koleksiyon öğesi bulunamadı",
       "likeOwn": "Kendi koleksiyonunuzu beğenemezsiniz",
       "authRequired": "Kullanıcı kimlik doğrulaması gerekli",
-      "imageUploadFailed": "Resim yükleme başarısız"
+      "imageUploadFailed": "Resim yükleme başarısız",
+      "invalidImageUrl": "Görsel geçersiz. Lütfen görseli yeniden yükleyin."
     },
     "messaging": {
       "blocked": "Bu kullanıcıyla mesajlaşamazsınız",

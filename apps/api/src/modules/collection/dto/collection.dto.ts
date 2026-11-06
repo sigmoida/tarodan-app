@@ -112,6 +112,13 @@ export class AddCollectionItemDto {
   @MaxLength(50)
   customMaterial?: string;
 
+  /**
+   * The URL `POST /media/upload?folder=collections` returned to this user.
+   * The service accepts only our own public storage URL in the caller's
+   * collections folder (400 `server.collection.invalidImageUrl` otherwise);
+   * that check needs the storage base and the user id, so it is not a
+   * decorator. Ignored when a multipart `image` is sent.
+   */
   @IsOptional()
   @IsString()
   customImageUrl?: string;

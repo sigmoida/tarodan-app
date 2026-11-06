@@ -173,6 +173,17 @@ function createStorageStub(): Partial<StorageService> {
     hasPublicAssetBaseUrl() {
       return true;
     },
+    // Every stubbed upload lands at `test/file.bin`, so every upload folder is
+    // `test/` and only the stub's own public URLs resolve back to a key.
+    ownPublicAssetKey(url: string) {
+      const root = "https://test-cdn.invalid/";
+      return url.startsWith(root) && !/[?#]/.test(url)
+        ? url.slice(root.length)
+        : null;
+    },
+    objectKeyPrefix() {
+      return "test/";
+    },
     async getPresignedUploadUrl(_args: any) {
       return {
         uploadUrl: "https://test-presigned.invalid",

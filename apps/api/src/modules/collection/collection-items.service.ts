@@ -14,12 +14,14 @@ import {
 } from "./dto";
 import { CollectionCommonService } from "./collection-common.service";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { StorageService } from "../storage/storage.service";
+import { resolveUploadTarget } from "../media/helpers/upload-target";
 import { i18nMessage } from "../i18n";
 
 /**
- * CollectionItemsService — koleksiyon öğesi işlemleri: addItemToCollection,
- * removeItemFromCollection, reorderItems. Öğe→DTO eşlemesi için common'a delege
- * eder (this.common.mapItemToDto).
+ * CollectionItemsService: collection item operations (addItemToCollection,
+ * removeItemFromCollection, reorderItems). Item-to-DTO mapping is delegated to
+ * the common service (this.common.mapItemToDto).
  */
 @Injectable()
 export class CollectionItemsService {
@@ -28,6 +30,7 @@ export class CollectionItemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly common: CollectionCommonService,
+    private readonly storage: StorageService,
   ) {}
 
   // ==========================================================================
@@ -136,6 +139,12 @@ export class CollectionItemsService {
       );
     }
 
+    // Checked before any write: a refused image stores nothing.
+    const customImageUrl = this.ownCollectionImageUrl(
+      imageUrl ?? dto.customImageUrl,
+      userId,
+    );
+
     // Get max sort order
     const maxSort = await this.prisma.collectionItem.aggregate({
       where: { collectionId },
@@ -154,7 +163,7 @@ export class CollectionItemsService {
         customScale: dto.customScale,
         customManufacturer: dto.customManufacturer,
         customMaterial: dto.customMaterial,
-        customImageUrl: imageUrl || dto.customImageUrl,
+        customImageUrl,
         sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         isFeatured: dto.isFeatured ?? false,
       },
@@ -230,5 +239,37 @@ export class CollectionItemsService {
         }),
       ),
     );
+  }
+
+  /**
+   * The image URL to store on a custom item, or null for none. Only an image
+   * the owner uploaded for collections is accepted: a URL on our own public
+   * storage (`StorageService.ownPublicAssetKey`) whose key sits in the folder
+   * `POST /media/upload?folder=collections` writes for this user (the
+   * multipart `image` path writes there too). Anything else would be shown to
+   * every viewer unmoderated and fetched by the cover generator, so it is
+   * refused with 400. The canonical URL is rebuilt from the key.
+   */
+  private ownCollectionImageUrl(
+    url: string | undefined,
+    userId: string,
+  ): string | null {
+    if (url === undefined || url.trim() === "") return null;
+
+    const target = resolveUploadTarget("collections", userId);
+    const ownFolder = this.storage.objectKeyPrefix(
+      target.bucket,
+      target.folder,
+    );
+    const key = this.storage.ownPublicAssetKey(url);
+    if (!key || !key.startsWith(ownFolder)) {
+      this.logger.warn(
+        `Refused customImageUrl for a collection item of user id=${userId}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.collection.invalidImageUrl"),
+      );
+    }
+    return this.storage.getPublicAssetUrl(key);
   }
 }

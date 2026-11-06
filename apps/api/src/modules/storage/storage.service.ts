@@ -77,7 +77,19 @@ export type StorageBucketType =
   | "messages"
   | "reviews"
   | "brands";
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+/** Largest object we store, and so the largest one we read back for processing. */
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+/** Longest URL accepted as a reference to one of our own stored objects. */
+const MAX_OWN_ASSET_URL_LENGTH = 2048;
+
+/**
+ * An object key in the layout `uploadFile` writes, with nothing a URL parser or
+ * a client could reinterpret: ASCII letters, digits, `_`, `-` and `.`, no
+ * leading slash, no empty, `.` or `..` segment, no percent-encoding, query,
+ * fragment, backslash, `@` or `:`.
+ */
+const SAFE_OBJECT_KEY = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*)+$/;
 
 /**
  * Bucket görünürlük politikası — TEK KAYNAK. S3 bucket-policy ile birebir uyumlu olmalı.
@@ -118,6 +130,31 @@ export function isPublicStorageKey(key: string): boolean {
   return /^[a-z0-9][a-z0-9_-]*\/(?:products|collections|avatars|reviews|brands)\//i.test(
     normalized,
   );
+}
+
+/**
+ * A public object key that is also safe to rebuild into a URL and to fetch:
+ * see `SAFE_OBJECT_KEY`. Stricter than `isPublicStorageKey`, which also accepts
+ * a leading slash and any characters after the bucket root.
+ */
+export function isSafePublicObjectKey(key: string): boolean {
+  return SAFE_OBJECT_KEY.test(key) && isPublicStorageKey(key);
+}
+
+/** Same scheme, host and port: a second check after the prefix match. */
+function sameHost(url: string, root: string): boolean {
+  try {
+    const a = new URL(url);
+    const b = new URL(root);
+    return (
+      a.origin === b.origin &&
+      (a.protocol === "https:" || a.protocol === "http:") &&
+      a.username === "" &&
+      a.password === ""
+    );
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()
@@ -302,11 +339,7 @@ export class StorageService implements OnModuleInit {
     const uniqueId = crypto.randomBytes(16).toString("hex");
     const filename = options.filename || `${uniqueId}${ext}`;
 
-    // Klasör yapısı: {env}/{bucketType}/{folder}/{filename}
-    // Örnek: dev/products/product-images/abc123.jpg
-    const bucketFolder = this.bucketFolders[options.bucket];
-    const customFolder = options.folder ? `${options.folder}/` : "";
-    const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
+    const key = `${this.objectKeyPrefix(options.bucket, options.folder)}${filename}`;
 
     try {
       const contentType =
@@ -390,10 +423,8 @@ export class StorageService implements OnModuleInit {
       );
     }
 
-    const bucketFolder = this.bucketFolders[options.bucket];
-    const customFolder = options.folder ? `${options.folder}/` : "";
     const filename = options.filename || crypto.randomBytes(16).toString("hex");
-    const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
+    const key = `${this.objectKeyPrefix(options.bucket, options.folder)}${filename}`;
 
     try {
       await this.client().send(
@@ -634,6 +665,65 @@ export class StorageService implements OnModuleInit {
     if (!base || !url.startsWith(`${base}/`)) return null;
     const key = url.slice(base.length + 1).split(/[?#]/)[0];
     return isPublicStorageKey(key) ? key : null;
+  }
+
+  /**
+   * Strict inverse of `getPublicAssetUrl` for a URL a client hands back to be
+   * stored or that the server is about to fetch. Returns the object key only
+   * when the URL is exactly one of our own public roots (`ownPublicRoots`)
+   * followed by a safe public object key (`isSafePublicObjectKey`): no other
+   * host, scheme, port, credentials, query, fragment, encoding or dot segment.
+   * Null when the public base is not configured, since the caller then has no
+   * canonical URL to store or fetch.
+   *
+   * Callers store or fetch `getPublicAssetUrl(key)`, never the input string.
+   */
+  ownPublicAssetKey(url: string): string | null {
+    if (!this.hasPublicAssetBaseUrl()) return null;
+    if (typeof url !== "string" || url.length > MAX_OWN_ASSET_URL_LENGTH) {
+      return null;
+    }
+    for (const root of this.ownPublicRoots()) {
+      if (!url.startsWith(`${root}/`)) continue;
+      const key = url.slice(root.length + 1);
+      return isSafePublicObjectKey(key) && sameHost(url, root) ? key : null;
+    }
+    return null;
+  }
+
+  /**
+   * Where an upload to `bucket` and `folder` lands: `<env>/<bucket root>/<folder>/`
+   * (`<env>/<bucket root>/` without a folder). The one place the key layout is
+   * defined; `uploadFile` builds its keys from it.
+   */
+  objectKeyPrefix(bucket: StorageBucketType, folder?: string): string {
+    const customFolder = folder ? `${folder}/` : "";
+    return `${this.envPrefix}/${this.bucketFolders[bucket]}/${customFolder}`;
+  }
+
+  /**
+   * URL roots that serve our public objects, without a trailing slash: the
+   * configured public base (`S3_PUBLIC_BASE_URL`, what `getPublicAssetUrl`
+   * builds) and the bucket's own S3 address in the form the client is
+   * configured for: path-style under a custom `S3_ENDPOINT` (MinIO), otherwise
+   * the AWS virtual-hosted and path-style forms. Stored URLs written while the
+   * public base named the bucket directly keep resolving if it later points at
+   * a CDN.
+   */
+  private ownPublicRoots(): string[] {
+    const trimRoot = (value: string) => value.trim().replace(/\/+$/, "");
+    const roots = [trimRoot(this.publicBaseUrl())];
+    const endpoint = this.configService.get<string>("S3_ENDPOINT");
+    if (endpoint) {
+      roots.push(`${trimRoot(endpoint)}/${this.baseBucket}`);
+    } else {
+      const region = this.configService.get<string>("AWS_REGION", "eu-west-1");
+      roots.push(
+        `https://${this.baseBucket}.s3.${region}.amazonaws.com`,
+        `https://s3.${region}.amazonaws.com/${this.baseBucket}`,
+      );
+    }
+    return [...new Set(roots.filter((root) => root !== ""))];
   }
 
   /**
