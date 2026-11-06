@@ -102,6 +102,21 @@ describe("checkStatementCard (plan 5.6: card switch after quoting)", () => {
         attempt(),
       ).rateDriftPoints,
     ).toBeNull();
+    // Exactly 0.5 points (either way) is within the tolerance.
+    for (const rate of ["8.50", "7.50"]) {
+      expect(
+        checkStatementCard(
+          { cardBrand: null, maskedPan: null, feeRatePct: d(rate) },
+          attempt(),
+        ).rateDriftPoints,
+      ).toBeNull();
+    }
+    expect(
+      checkStatementCard(
+        { cardBrand: null, maskedPan: null, feeRatePct: d("7.49") },
+        attempt(),
+      ).rateDriftPoints?.toFixed(2),
+    ).toBe("0.51");
     expect(
       checkStatementCard(
         { cardBrand: null, maskedPan: null, feeRatePct: d("8.75") },
