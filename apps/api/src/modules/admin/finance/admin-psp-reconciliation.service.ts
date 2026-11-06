@@ -538,11 +538,17 @@ export class AdminPspReconciliationService {
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
-    // What PayTR had to charge for each line's oid (its charge attempt's C,
-    // PSP scale, ADR 0019): one query for the page.
+    // What PayTR had to charge for each sale line's oid (its charge
+    // attempt's C, PSP scale, ADR 0019): one query for the payments of the
+    // page's sale lines, none when the page has no sale line.
+    const salePaymentIds = new Set(
+      rows
+        .filter((r) => r.type === PaytrStatementLineType.sale)
+        .map((r) => r.paymentId),
+    );
     const expectedOf = await paytrChargeExpectationsForPayments(
       this.prisma,
-      payments,
+      payments.filter((p) => salePaymentIds.has(p.id)),
     );
 
     return {

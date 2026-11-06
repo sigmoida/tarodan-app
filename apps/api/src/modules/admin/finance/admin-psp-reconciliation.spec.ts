@@ -712,6 +712,43 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
     });
   });
 
+  it("reads no charge attempts for a page of refund lines", async () => {
+    const prisma = makePrisma({
+      linesList: [
+        {
+          id: "l-refund",
+          merchantOid: "OID-1",
+          type: PaytrStatementLineType.refund,
+          amount: 421.74,
+          matchStatus: PaytrMatchStatus.matched,
+          paymentId: "pay-1",
+          membershipPaymentId: null,
+          transactionDate: DAY,
+        },
+      ],
+      linesCount: 1,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: new Prisma.Decimal("1000.00"),
+          chargedAmount: new Prisma.Decimal("1054.35"),
+          order: { orderNumber: "ORD-1" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({});
+
+    expect(prisma.paymentChargeAttempt.findMany).not.toHaveBeenCalled();
+    expect(
+      (result.data as Array<{ payment: { chargedAmount: unknown } }>)[0].payment
+        .chargedAmount,
+    ).toBeNull();
+  });
+
   it("filters by an explicit status and can include resolved rows", async () => {
     const prisma = makePrisma({ linesList: [], linesCount: 0 });
     const { service } = makeService(prisma);
