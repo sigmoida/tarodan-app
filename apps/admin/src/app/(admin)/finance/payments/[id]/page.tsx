@@ -32,6 +32,11 @@ import { type PaymentDetail } from "./types";
 import { RefundPaymentModal } from "./_modals/RefundPaymentModal";
 import { ForceCancelPaymentModal } from "./_modals/ForceCancelPaymentModal";
 import { TradePaymentSection } from "./_components/TradePaymentSection";
+import {
+  ChargeAttemptsSection,
+  PaymentInstallmentField,
+  PaymentInstallmentSection,
+} from "./_components/PaymentInstallmentSection";
 import { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -106,6 +111,12 @@ export default function PaymentDetailPage() {
                       {p.id}
                     </Field>
                     <Field label={t("common.amount")}>{fmtTry(p.amount)}</Field>
+                    {p.installment && (
+                      <PaymentInstallmentField
+                        installment={p.installment}
+                        paidAt={p.paidAt}
+                      />
+                    )}
                     {(p.refundedTotal ?? 0) > 0 && (
                       <Field label={t("admin.finance.payments.refundedTotal")}>
                         <span className="text-danger-600">
@@ -154,6 +165,18 @@ export default function PaymentDetailPage() {
                     </Alert>
                   )}
                 </SectionCard>
+
+                {p.installment && (
+                  <>
+                    <PaymentInstallmentSection
+                      installment={p.installment}
+                      paidAt={p.paidAt}
+                    />
+                    <ChargeAttemptsSection
+                      attempts={p.installment.chargeAttempts}
+                    />
+                  </>
+                )}
 
                 {p.trade ? (
                   <TradePaymentSection trade={p.trade} />
@@ -366,6 +389,7 @@ export default function PaymentDetailPage() {
             <RefundPaymentModal
               paymentId={p.id}
               amount={p.amount}
+              installment={p.installment}
               trade={
                 p.trade
                   ? {

@@ -265,6 +265,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
           "/finance/payments",
           "/finance/payments/:id",
           "/finance/payments/statistics",
+          "/finance/installments",
         ],
       },
       {

@@ -32,6 +32,8 @@ export interface FormModalProps<T extends FieldValues> {
   /** When set, `form.reset(resetValues)` runs on each open (false→true) edge. */
   resetValues?: T;
   submitLabel?: string;
+  /** Disable the submit button (e.g. the record changed under the form). */
+  submitDisabled?: boolean;
   cancelLabel?: string;
   closeLabel?: string;
   size?: ModalProps["size"];
@@ -65,6 +67,7 @@ export function FormModal<T extends FieldValues>({
   isSubmitting,
   resetValues,
   submitLabel = "Kaydet",
+  submitDisabled,
   cancelLabel = "İptal",
   closeLabel = "Kapat",
   size = "lg",
@@ -115,6 +118,7 @@ export function FormModal<T extends FieldValues>({
           cancelLabel={cancelLabel}
           confirmLabel={submitLabel}
           isLoading={pending}
+          disabled={submitDisabled}
           destructive={destructive}
         />
       }

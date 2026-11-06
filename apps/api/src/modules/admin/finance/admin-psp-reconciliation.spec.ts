@@ -646,6 +646,109 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
     );
   });
 
+  it("shows next to a sale line the amount its oid signed, never another payment's attempt; null on refund lines", async () => {
+    const line = (id: string, oid: string, type: PaytrStatementLineType) => ({
+      id,
+      merchantOid: oid,
+      type,
+      amount: 1062.4,
+      matchStatus: PaytrMatchStatus.matched,
+      paymentId: "pay-1",
+      membershipPaymentId: null,
+      transactionDate: DAY,
+    });
+    const prisma = makePrisma({
+      linesList: [
+        line("l-inst", "OID-INST", PaytrStatementLineType.sale),
+        line("l-legacy", "OID-LEGACY", PaytrStatementLineType.sale),
+        line("l-foreign", "OID-FOREIGN", PaytrStatementLineType.sale),
+        line("l-refund", "OID-INST", PaytrStatementLineType.refund),
+      ],
+      linesCount: 4,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: new Prisma.Decimal("1000.00"),
+          chargedAmount: new Prisma.Decimal("1062.40"),
+          order: { orderNumber: "ORD-10001" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+      attempts: [
+        // A superseded 2-count form of the same payment.
+        {
+          paymentId: "pay-1",
+          merchantOid: "OID-INST",
+          chargedAmount: new Prisma.Decimal("1040.50"),
+        },
+        // The same oid text signed by ANOTHER payment: never this line's C.
+        {
+          paymentId: "pay-2",
+          merchantOid: "OID-FOREIGN",
+          chargedAmount: new Prisma.Decimal("7.00"),
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({});
+    const charged = Object.fromEntries(
+      (
+        result.data as Array<{
+          id: string;
+          payment: { chargedAmount: Prisma.Decimal | null } | null;
+        }>
+      ).map((l) => [l.id, l.payment?.chargedAmount?.toFixed(2) ?? null]),
+    );
+
+    // The oid's own attempt; without one the payment's charged amount.
+    expect(charged).toEqual({
+      "l-inst": "1040.50",
+      "l-legacy": "1062.40",
+      "l-foreign": "1062.40",
+      // Refund lines match a refund attempt, not a charge.
+      "l-refund": null,
+    });
+  });
+
+  it("reads no charge attempts for a page of refund lines", async () => {
+    const prisma = makePrisma({
+      linesList: [
+        {
+          id: "l-refund",
+          merchantOid: "OID-1",
+          type: PaytrStatementLineType.refund,
+          amount: 421.74,
+          matchStatus: PaytrMatchStatus.matched,
+          paymentId: "pay-1",
+          membershipPaymentId: null,
+          transactionDate: DAY,
+        },
+      ],
+      linesCount: 1,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: new Prisma.Decimal("1000.00"),
+          chargedAmount: new Prisma.Decimal("1054.35"),
+          order: { orderNumber: "ORD-1" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({});
+
+    expect(prisma.paymentChargeAttempt.findMany).not.toHaveBeenCalled();
+    expect(
+      (result.data as Array<{ payment: { chargedAmount: unknown } }>)[0].payment
+        .chargedAmount,
+    ).toBeNull();
+  });
+
   it("filters by an explicit status and can include resolved rows", async () => {
     const prisma = makePrisma({ linesList: [], linesCount: 0 });
     const { service } = makeService(prisma);

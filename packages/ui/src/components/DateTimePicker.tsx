@@ -24,6 +24,11 @@ export interface DateTimePickerProps {
   locale?: string;
   /** Time slotted in when a date is picked before any time was chosen. */
   defaultTime?: string;
+  /** The calendar's "today" and "clear" buttons (the app passes its copy). */
+  todayLabel?: string;
+  clearLabel?: string;
+  /** Accessible name of the time field (the app passes its copy); defaults to `label`. */
+  timeLabel?: string;
   "aria-label"?: string;
 }
 
@@ -45,6 +50,9 @@ export function DateTimePicker({
   inputSize = "md",
   locale,
   defaultTime = "09:00",
+  todayLabel,
+  clearLabel,
+  timeLabel,
   ...aria
 }: DateTimePickerProps) {
   const [datePart, timePart = ""] = value.split("T");
@@ -59,7 +67,11 @@ export function DateTimePicker({
 
   return (
     <div className={cn("w-full", className)}>
-      {label && <Label className="mb-1.5 block">{label}</Label>}
+      {label && (
+        <Label htmlFor={id} className="mb-1.5 block">
+          {label}
+        </Label>
+      )}
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <DatePicker
           value={datePart || undefined}
@@ -69,6 +81,8 @@ export function DateTimePicker({
           id={id}
           inputSize={inputSize}
           locale={locale}
+          todayLabel={todayLabel}
+          clearLabel={clearLabel}
           {...aria}
         />
         <Input
@@ -78,9 +92,8 @@ export function DateTimePicker({
           disabled={disabled || !datePart}
           inputSize={inputSize}
           className="w-28"
-          aria-label={
-            aria["aria-label"] ? `${aria["aria-label"]} (saat)` : undefined
-          }
+          // Without its own name the time field is named by the picker's label.
+          aria-label={timeLabel ?? label}
         />
       </div>
       {error ? (

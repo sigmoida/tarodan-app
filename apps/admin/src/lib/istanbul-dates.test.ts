@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   endOfIstanbulDayIso,
   istanbulDateOf,
+  istanbulDateTimeIso,
+  istanbulDateTimeOf,
   startOfIstanbulDayIso,
 } from "./istanbul-dates";
 
@@ -35,5 +37,39 @@ describe("ad dates — Istanbul calendar", () => {
     expect(istanbulDateOf(null)).toBe("");
     expect(istanbulDateOf(undefined)).toBe("");
     expect(istanbulDateOf("not-a-date")).toBe("");
+  });
+});
+
+describe("date-time picker values — Istanbul wall clock", () => {
+  it("reads a stored instant as the Istanbul minute", () => {
+    expect(istanbulDateTimeOf("2026-11-14T21:00:00.000Z")).toBe(
+      "2026-11-15T00:00",
+    );
+    expect(istanbulDateTimeOf("2026-11-15T09:30:59.999Z")).toBe(
+      "2026-11-15T12:30",
+    );
+  });
+
+  it("writes a picker value with the Istanbul offset", () => {
+    expect(istanbulDateTimeIso("2026-11-15T00:00")).toBe(
+      "2026-11-15T00:00:00.000+03:00",
+    );
+    expect(
+      new Date(istanbulDateTimeIso("2026-11-15T00:00")).toISOString(),
+    ).toBe("2026-11-14T21:00:00.000Z");
+  });
+
+  it("round-trips picker value -> iso -> picker value", () => {
+    const iso = istanbulDateTimeIso("2026-03-15T23:45");
+    expect(istanbulDateTimeOf(new Date(iso).toISOString())).toBe(
+      "2026-03-15T23:45",
+    );
+  });
+
+  it("returns empty for missing or malformed input", () => {
+    expect(istanbulDateTimeOf(null)).toBe("");
+    expect(istanbulDateTimeOf("not-a-date")).toBe("");
+    expect(istanbulDateTimeIso("")).toBe("");
+    expect(istanbulDateTimeIso("2026-03-15")).toBe("");
   });
 });

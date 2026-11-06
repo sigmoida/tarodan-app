@@ -75,6 +75,12 @@ export interface PspStatementLine {
   payment: {
     id: string;
     amount: string | number;
+    /**
+     * PSP scale: what we signed for this sale line's oid (its charge
+     * attempt, else the payment's charged amount), the amount the matcher
+     * compares the line with. null on refund lines; absent on an older API.
+     */
+    chargedAmount?: string | number | null;
     orderNumber: string | null;
     groupNumber: string | null;
     tradeNumber: string | null;
