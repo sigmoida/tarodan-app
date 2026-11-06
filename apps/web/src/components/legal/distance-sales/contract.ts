@@ -1,6 +1,7 @@
 /** @format */
 
-import type { LegalPart } from "@/components/legal/LegalDocument";
+import type { LegalBlock, LegalPart } from "@/components/legal/LegalDocument";
+import type { ConsentVersionContext } from "@tarodan/types";
 import type { Translate } from "@/types/i18n";
 import { PLATFORM_ENTITY_FIELDS } from "@/lib/legal/platform-entity";
 
@@ -18,6 +19,21 @@ import { PLATFORM_ENTITY_FIELDS } from "@/lib/legal/platform-entity";
  * ekranında ve sipariş onay e-postasında yer alır.
  */
 
+/**
+ * What the text depends on. The installment clauses (tarodan-ops plan
+ * 2026-11-03-installment-payments, AS-L1) are in the text only while
+ * installments are on; with the switch off the text is exactly the one before
+ * them, so the consent recorded against it (`currentConsentVersion` of
+ * `@tarodan/types`, the API stamps it) matches what the buyer read.
+ */
+export type DistanceSalesTextOptions = ConsentVersionContext;
+
+/** The blocks of an installment clause, or nothing while installments are off. */
+const whenInstallments = <T>(
+  options: DistanceSalesTextOptions,
+  ...blocks: T[]
+): T[] => (options.installmentsEnabled ? blocks : []);
+
 const BUYER_FIELDS = (t: Translate) => [
   { label: t("legal.distanceSales.adSoyadUnvan") },
   { label: t("legal.distanceSales.teslimatAdresi") },
@@ -33,7 +49,10 @@ const SELLER_FIELDS = (t: Translate) => [
 ];
 
 /** A) ÖN BİLGİLENDİRME FORMU */
-const PRE_INFORMATION = (t: Translate): LegalPart => ({
+const PRE_INFORMATION = (
+  t: Translate,
+  options: DistanceSalesTextOptions,
+): LegalPart => ({
   title: t("legal.distanceSales.aOnBilgilendirmeFormuMesafeliSozlesme"),
   intro: t("legal.distanceSales.isbuOnBilgilendirmeFormuHttpsTarodan"),
   sections: [
@@ -125,7 +144,9 @@ const PRE_INFORMATION = (t: Translate): LegalPart => ({
               ),
             },
             { label: t("legal.distanceSales.varsaIndirimKuponKampanya") },
-            { label: t("legal.distanceSales.installmentTermsField") },
+            ...whenInstallments(options, {
+              label: t("legal.distanceSales.installmentTermsField"),
+            }),
             { label: t("legal.distanceSales.odenecekToplamTutar") },
           ],
         },
@@ -162,10 +183,10 @@ const PRE_INFORMATION = (t: Translate): LegalPart => ({
             "legal.distanceSales.saticiMevzuattaOngorulenAzamiSurelerSakli",
           ),
         },
-        {
+        ...whenInstallments<LegalBlock>(options, {
           type: "p",
           text: t("legal.distanceSales.installmentPaymentTerms"),
-        },
+        }),
         {
           type: "p",
           text: t(
@@ -277,7 +298,10 @@ const PRE_INFORMATION = (t: Translate): LegalPart => ({
 });
 
 /** B) MESAFELİ SATIŞ SÖZLEŞMESİ */
-const SALES_CONTRACT = (t: Translate): LegalPart => ({
+const SALES_CONTRACT = (
+  t: Translate,
+  options: DistanceSalesTextOptions,
+): LegalPart => ({
   title: t("legal.distanceSales.bMesafeliSatisSozlesmesi"),
   sections: [
     {
@@ -363,10 +387,10 @@ const SALES_CONTRACT = (t: Translate): LegalPart => ({
           type: "p",
           text: t("legal.distanceSales.teslimAnindaKargoPaketiHasarliysaAlici"),
         },
-        {
+        ...whenInstallments<LegalBlock>(options, {
           type: "p",
           text: t("legal.distanceSales.installmentRefundTerms"),
-        },
+        }),
       ],
     },
     {
@@ -570,7 +594,7 @@ const SALES_CONTRACT = (t: Translate): LegalPart => ({
   ],
 });
 
-export const distanceSalesParts = (t: Translate): LegalPart[] => [
-  PRE_INFORMATION(t),
-  SALES_CONTRACT(t),
-];
+export const distanceSalesParts = (
+  t: Translate,
+  options: DistanceSalesTextOptions,
+): LegalPart[] => [PRE_INFORMATION(t, options), SALES_CONTRACT(t, options)];
