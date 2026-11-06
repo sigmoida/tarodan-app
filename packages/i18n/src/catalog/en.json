@@ -7197,7 +7197,36 @@
         },
         "cartInfo": "Cart Details",
         "refundedTotal": "Refunded",
-        "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request."
+        "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request.",
+        "installment": {
+          "title": "Installments",
+          "single": "Single payment",
+          "notCaptured": "Not captured",
+          "goodsAmount": "Amount before installment fee",
+          "chargedAmount": "Charged to the card",
+          "card": "Card",
+          "cardTypes": {
+            "credit": "Credit card",
+            "debit": "Debit card"
+          },
+          "businessCard": "Business card",
+          "platformCost": "Expected platform cost",
+          "noPricing": "This payment has no pricing record: the user group, rule, platform share and card cannot be shown.",
+          "attempts": {
+            "title": "Charge attempts",
+            "description": "Every PayTR form signed for this payment, newest first. Only the captured attempt is applied to the payment.",
+            "columns": {
+              "oid": "PayTR order no",
+              "count": "Installments",
+              "charged": "Charged amount",
+              "fee": "Installment fee",
+              "status": "Status",
+              "createdAt": "Created"
+            },
+            "captured": "Captured",
+            "notCaptured": "Not captured"
+          }
+        }
       },
       "psp": {
         "title": "PayTR Reconciliation",
@@ -7265,7 +7294,8 @@
           "resolved": "Line marked as resolved",
           "resolveTitle": "Resolve statement line",
           "resolveDescription": "{oid} · {amount} — the line leaves the work list and no longer counts on the day card. Note why (recorded in the audit log).",
-          "resolveNotePlaceholder": "e.g. Verified in the PayTR panel; test transaction."
+          "resolveNotePlaceholder": "e.g. Verified in the PayTR panel; test transaction.",
+          "chargedAmount": "Our charged amount"
         },
         "settlements": {
           "empty": "No settlement records yet.",
@@ -8011,7 +8041,8 @@
           "commissionRule": "Commission rule",
           "commissionRuleUnnamed": "Unnamed rule",
           "preparingDeadline": "Ship by",
-          "preparingExtended": "Deadline extended once ({date}); original deadline {original}"
+          "preparingExtended": "Deadline extended once ({date}); original deadline {original}",
+          "installmentFeeShare": "Installment fee share"
         },
         "buckets": {
           "all": "All",

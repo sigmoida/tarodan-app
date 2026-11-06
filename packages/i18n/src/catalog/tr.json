@@ -7197,7 +7197,36 @@
         },
         "cartInfo": "Sepet Bilgileri",
         "refundedTotal": "İade edilen",
-        "manualRefundGroupHint": "Sepet ödemesinde iade sipariş bazında yapılır — ilgili siparişin iade talebini kullanın."
+        "manualRefundGroupHint": "Sepet ödemesinde iade sipariş bazında yapılır — ilgili siparişin iade talebini kullanın.",
+        "installment": {
+          "title": "Taksit",
+          "single": "Tek çekim",
+          "notCaptured": "Tahsil edilmedi",
+          "goodsAmount": "Vade farkı hariç tutar",
+          "chargedAmount": "Karttan çekilen",
+          "card": "Kart",
+          "cardTypes": {
+            "credit": "Kredi kartı",
+            "debit": "Banka kartı"
+          },
+          "businessCard": "Ticari kart",
+          "platformCost": "Beklenen platform maliyeti",
+          "noPricing": "Bu ödemenin fiyatlama kaydı yok: kullanıcı grubu, kural, platform payı ve kart bilgisi gösterilemiyor.",
+          "attempts": {
+            "title": "Çekim denemeleri",
+            "description": "Bu ödeme için imzalanan her PayTR formu, en yenisi başta. Yalnız tahsil edilen deneme ödemeye işlenir.",
+            "columns": {
+              "oid": "PayTR sipariş no",
+              "count": "Taksit",
+              "charged": "Çekim tutarı",
+              "fee": "Vade farkı",
+              "status": "Durum",
+              "createdAt": "Oluşturma"
+            },
+            "captured": "Tahsil edildi",
+            "notCaptured": "Tahsil edilmedi"
+          }
+        }
       },
       "psp": {
         "title": "PayTR Mutabakat",
@@ -7265,7 +7294,8 @@
           "resolved": "Satır çözüldü olarak işaretlendi",
           "resolveTitle": "Satırı çözüldü olarak kapat",
           "resolveDescription": "{oid} · {amount} — satır iş listesinden düşer ve gün kartında sayılmaz. Neden çözüldüğünü yazın (denetim kaydına geçer).",
-          "resolveNotePlaceholder": "Örn. PayTR panelinden teyit edildi; test işlemi."
+          "resolveNotePlaceholder": "Örn. PayTR panelinden teyit edildi; test işlemi.",
+          "chargedAmount": "Bizde çekilen"
         },
         "settlements": {
           "empty": "Henüz hakediş kaydı yok.",
@@ -8011,7 +8041,8 @@
           "commissionRule": "Komisyon kuralı",
           "commissionRuleUnnamed": "Adsız kural",
           "preparingDeadline": "Kargoya verme son tarihi",
-          "preparingExtended": "Süre bir kez uzatıldı ({date}); ilk son tarih {original}"
+          "preparingExtended": "Süre bir kez uzatıldı ({date}); ilk son tarih {original}",
+          "installmentFeeShare": "Vade farkı payı"
         },
         "buckets": {
           "all": "Tümü",
