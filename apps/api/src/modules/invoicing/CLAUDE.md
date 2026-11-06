@@ -14,9 +14,13 @@ admin export.
 ## Principles
 
 - Issue only the platform's own documents (commission, service fee, shipping
-  share, membership, boost, penalty, refund). The issuer is always the platform.
+  share, installment fee, membership, boost, penalty, refund). The issuer is
+  always the platform.
 - Amounts come from recorded snapshots (`CommissionLedger`, `MembershipPayment`,
-  `ProductBoost`, `Order.feeDiscountBreakdown`), never recomputed from rules.
+  `ProductBoost`, `Order.feeDiscountBreakdown`, `Order.installmentFeeAmount`
+  with its charge attempt's `feeVatRatePct`), never recomputed from rules. A
+  `charge_snapshot` type is cut only with the charge's rate passed in
+  (`resolveCutVatRate`).
 - Totals are computed in one place: `invoice/fiscal-document-totals.ts`.
   Package-fee VAT bases (`invoice/package-fee-components.ts`) must stay identical
   to the checkout tax helpers (`order-service-tax.helper.ts`), or collected and
@@ -86,7 +90,9 @@ needs a deploy note.
 
 ## Tests
 
-`invoice-issuing-package-fees`, `invoice-issuing-penalty`, `invoice-test-lane`,
+`invoice-issuing-package-fees`, `invoice-issuing-penalty`,
+`invoice-issuing-installment-fee`, `invoice-reversal-installment-fee`,
+`invoice/installment-fee-basis`, `invoice-test-lane`,
 `invoice-delivery.provider-port`, `invoice/package-fee-basis`,
 `invoice/penalty-basis`, `helpers/invoice-retry-budget`,
 `provider/e-invoice-provider.contract`.

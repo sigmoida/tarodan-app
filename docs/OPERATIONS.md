@@ -689,6 +689,34 @@ kampanya maliyeti").
 
   A fully refunded order has `fee_refunded = installment_fee_amount`.
 
+**Installment fee documents (`buyer_installment_fee`, task A6).** One
+VAT-included document per package, "Taksit vade farkı", cut at delivery with
+the other buyer fee documents (also for Tarodan's own goods) for the fee left
+after finalized refunds; each later refund attempt gets a return invoice for
+its own fee share (or the e-Arşiv is cancelled when a refund within 8 days
+takes all of it). Nothing to run by hand; the `elogo-retry-pending` cron and
+the delivered-orders backfill retry as for every document.
+
+- `INSTALLMENT_FEE_VAT_RATE_MISSING package=<id>` (warn, the backfill retries
+  it): a package carries a fee but no captured charge attempt does. Not
+  expected (a DB guard ties the fee to its attempt); hand it to a developer,
+  never cut the document by hand.
+- `INSTALLMENT_FEE_RETURN_CAPPED invoice=<number> attempt=<id>` (warn): a
+  refund's fee share was more than the document still carried beyond its
+  current amount, so the return is smaller. Expected when the document was cut
+  after the refund or when refund events ran out of order; check that the
+  document's returns sum to its total once the order is fully refunded:
+
+  ```sql
+  SELECT f.invoice_number, f.total, f.status,
+         COALESCE(SUM(r.total) FILTER (WHERE r.status <> 'cancelled'), 0) AS returned
+  FROM elogo_invoices f
+  LEFT JOIN elogo_invoices r
+    ON r.type = 'return_invoice' AND r.billing_reference = f.invoice_number
+  WHERE f.type = 'buyer_installment_fee' AND f.source_id = '<package id>'
+  GROUP BY f.id;
+  ```
+
 **A payment left pending by `CHARGE_ATTEMPT_BASE_MISMATCH ... left pending`.**
 The payment's amount moved after the form was signed and PayTR collected the
 attempt's `C`, which is below the new amount: the payment is not completed

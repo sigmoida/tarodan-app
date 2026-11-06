@@ -15,6 +15,22 @@ import { Prisma } from "@prisma/client";
  */
 export const INSTALLMENT_FEE_VAT_RATE_PCT = new Prisma.Decimal(20);
 
+/*
+ * The invoicing assumptions of the fee document (`buyer_installment_fee`,
+ * task A6) live where the code that applies them is, one place each:
+ *
+ * - AS-F1 rate: the constant above, read by the invoice from the attempt.
+ * - Line text "Taksit vade farkı" (and its return line): `LINE_DESCRIPTION`
+ *   in `invoicing/invoice/invoice-line-description.ts`.
+ * - AS-F2 (platform_sale gets the same separate document): the missing
+ *   platform-seller exit in `InvoiceIssuingService.issueInstallmentFeeInvoice`.
+ *   Putting the fee on the product invoice instead is a code change there
+ *   and in the platform_sale lines and reversal, not a switch.
+ * - AS-F3 (reversed by each refund's own fee share):
+ *   `installmentFeeReturnOf` in `invoicing/invoice/installment-fee-basis.ts`.
+ * - AS-F4 (PayTR's monthly invoice booked by hand): nothing in code.
+ */
+
 /**
  * AS-P1: a PayTR rate (`oranlar[family][count]` and the single rate) is the
  * merchant deduction in PERCENT of the charged amount. A ratio answer would

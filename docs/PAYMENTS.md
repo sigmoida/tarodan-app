@@ -1179,6 +1179,11 @@ Diğer türler: `platform_sale` (Tarodan kendi ürününü satarken, alıcıya k
 kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /
 `trade_shipping` / `trade_commission` (§8), `return_invoice`.
 
+**Installment fee** (`buyer_installment_fee`): the vade farkı a buyer paid on
+an installment charge, one VAT-included document per package at the charge's
+snapshotted VAT rate, also for `platform_sale` packages, reversed by each
+refund's own fee share. Rules: §11 "Invoicing (task A6)".
+
 ### Satıcı hakediş dökümü
 
 Kesilen komisyon faturasının DAYANAĞI: hangi siparişlerden doğduğu ve o
@@ -1392,6 +1397,34 @@ and buyer segment (payments, fee collected / refunded / net income, expected
 
 - **Chargebacks**: no flow exists; PayTR debits the full `C`. Manual steps in
   OPERATIONS.md.
-- **Invoicing** of the vade farkı (`buyer_installment_fee`, D4) and its
-  reversal on refund (AS-F3, basis `RefundAttempt.installmentFeeAmount`):
-  task A6.
+- PayTR's monthly invoice of its installment deduction (AS-F4): booked by
+  the accountant outside the system.
+
+### Invoicing (task A6)
+
+The buyer-paid vade farkı is platform service revenue invoiced to the buyer
+as its own document, `buyer_installment_fee` (D4; §8b):
+
+- **One per package** (`sourceId = orderPackage.id`), like the other buyer fee
+  documents: Σ `Order.installmentFeeAmount` of the package, minus the fee
+  shares of its finalized refunds; a package whose payment's whole `F` went
+  back carries nothing. No fee (single payment, a 100 % platform share,
+  installments off), no document.
+- **VAT included** (AS-F1) at the captured attempt's `feeVatRatePct`, split
+  out of the fee: net rounded half up, VAT the rest (66.38 = 55.32 + 11.06).
+  The rate never comes from a setting: the cut refuses this type without the
+  snapshot (`InvoiceDocumentService.resolveCutVatRate`).
+- **Trigger**: delivery of the whole package, after the six package fee
+  documents; the delivered-orders backfill waits for it as well.
+- **`platform_sale`** (Tarodan's own goods) gets the same separate document
+  (AS-F2); the product invoice is unchanged.
+- **Reversal** (AS-F3): each finalized refund attempt reverses its own
+  `RefundAttempt.installmentFeeAmount`, never the goods ratio, capped at what
+  the document carries beyond its current amount (safe for replays,
+  out-of-order events and a document cut after the refund). The return that
+  closes the document takes the exact rest of net and VAT. A full reversal of
+  an e-Arşiv within 8 days cancels it; an unsent document is repriced. Once
+  the payment's whole fee went back, every package of the payment is
+  reconciled (the closing refund can carry another package's shortfall).
+- Amounts: `invoicing/invoice/installment-fee-basis.ts` (pure, pinned by its
+  spec); reads: `InvoiceDocumentService.resolveInstallmentFeeBasis`.
