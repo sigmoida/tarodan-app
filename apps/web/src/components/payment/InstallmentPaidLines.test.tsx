@@ -19,12 +19,11 @@ import InstallmentPaidLines from "./InstallmentPaidLines";
 let container: HTMLDivElement;
 let root: Root;
 
-function rows(payment: PaymentInstallmentFields | null, countOnly = false) {
+function rows(payment: PaymentInstallmentFields | null) {
   act(() =>
     root.render(
       <InstallmentPaidLines
         payment={payment}
-        countOnly={countOnly}
         renderRow={(row) => (
           <p data-key={row.key}>
             {row.label}={row.value}
@@ -68,17 +67,6 @@ describe("InstallmentPaidLines (result, My payments, order payment block)", () =
         chargedAmount: 1000,
       })[1],
     ).toBe("fee:payment.summary.installmentFee=payment.installments.noFee");
-  });
-
-  it("countOnly keeps the count alone", () => {
-    expect(
-      rows(
-        { installmentCount: 6, installmentFeeAmount: 10, chargedAmount: 110 },
-        true,
-      ),
-    ).toEqual([
-      'count:payment.summary.installments=payment.installments.count{"count":6}',
-    ]);
   });
 
   it("single payment, older API or the seller's view: nothing", () => {
