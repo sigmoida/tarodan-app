@@ -104,6 +104,10 @@ function makePrisma(over: { ledgers?: Record<string, any> } = {}) {
       findMany: jest.fn(async ({ where }: any) =>
         invoices.filter((i) => matches(i, where)),
       ),
+      count: jest.fn(
+        async ({ where }: { where: unknown }) =>
+          invoices.filter((i) => matches(i, where)).length,
+      ),
       create: jest.fn(async ({ data }: any) => {
         const rec = {
           id: `inv-${++idCounter}`,
@@ -236,6 +240,27 @@ function sentPackageInvoice(type: "commission" | "service_fee", total: number) {
   };
 }
 
+/**
+ * The package's ledgers once a refund applied: the refund transaction writes
+ * the refunded fees before its invoice event runs, and the reversal never
+ * takes a document below what the ledger says it should carry.
+ */
+const ledgersAfterRefund = (refunded: {
+  o1?: { seller?: number; buyer?: number };
+  o2?: { seller?: number; buyer?: number };
+}) =>
+  Object.fromEntries(
+    (["o1", "o2"] as const).map((id) => [
+      id,
+      {
+        sellerCommission: 60,
+        refundedSellerCommission: refunded[id]?.seller ?? 0,
+        buyerFee: 25,
+        refundedBuyerFee: refunded[id]?.buyer ?? 0,
+      },
+    ]),
+  );
+
 const refundAdjustment = (over: Record<string, unknown> = {}) => ({
   orderId: "o1",
   refundAttemptId: "ra1",
@@ -246,7 +271,9 @@ const refundAdjustment = (over: Record<string, unknown> = {}) => ({
 
 describe("paket anahtarlı fatura tüketicileri", () => {
   it("iade, PAKET anahtarlı komisyon faturasını tersler", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { seller: 60 } }),
+    });
     // 120 matrah + 24 KDV; o1'in payı 60 → yarısı iade edilir.
     prisma.invoices.push(sentPackageInvoice("commission", 144));
     const elogo = makeElogo();
@@ -290,7 +317,9 @@ describe("paket anahtarlı fatura tüketicileri", () => {
   });
 
   it("iade, PAKET anahtarlı hizmet bedeli faturasını tersler", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { buyer: 25 } }),
+    });
     // 50 matrah + 10 KDV = 60; o1'in payı 25 → yarısı iade edilir.
     prisma.invoices.push(sentPackageInvoice("service_fee", 60));
     const elogo = makeElogo();
@@ -332,7 +361,9 @@ describe("paket anahtarlı fatura tüketicileri", () => {
   });
 
   it("paketin TAMAMI iade edilirse e-Arşiv iptal edilir", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { seller: 60 }, o2: { seller: 60 } }),
+    });
     prisma.invoices.push(sentPackageInvoice("commission", 144));
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
@@ -374,7 +405,9 @@ describe("paket anahtarlı fatura tüketicileri", () => {
   });
 
   it("SİPARİŞ anahtarlı eski faturalar da terslenmeye devam eder", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { seller: 60 } }),
+    });
     const legacy = sentPackageInvoice("commission", 144);
     legacy.sourceId = "o1"; // paket anahtarına geçilmeden önce kesilmiş kayıt
     prisma.invoices.push(legacy);
@@ -590,7 +623,9 @@ describe("iade faturası alıcı snapshot'ı", () => {
   });
 
   it("alıcı e-postası ve adresi iade faturasına kopyalanır", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { buyer: 25 } }),
+    });
     prisma.invoices.push(guestInvoice());
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
@@ -630,7 +665,9 @@ describe("iade faturası alıcı snapshot'ı", () => {
   });
 
   it("iade faturasının UBL'i snapshot adresini kullanır (sistem kaydını değil)", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { buyer: 25 } }),
+    });
     prisma.invoices.push(guestInvoice());
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
@@ -669,7 +706,9 @@ describe("iade faturası alıcı snapshot'ı", () => {
   });
 
   it("orijinal faturada snapshot yoksa iade faturası da boş bırakır", async () => {
-    const prisma = makePrisma();
+    const prisma = makePrisma({
+      ledgers: ledgersAfterRefund({ o1: { buyer: 25 } }),
+    });
     prisma.invoices.push(sentPackageInvoice("service_fee", 60));
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.

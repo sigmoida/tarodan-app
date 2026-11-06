@@ -70,7 +70,30 @@ number.
 
 A full refund of an unadjusted e-Arşiv within 8 days cancels it; everything else
 gets a RETURN invoice per refund attempt. A wrong choice distorts the tax
-declaration. Unsent documents are repriced in place.
+declaration. Unsent documents are repriced in place, with their lines (the
+send path writes the amounts from the line snapshot).
+
+- **One cap for every return** (`invoice/return-invoice-amounts.ts`): never
+  more than the document carries beyond what it should carry now. Documents
+  are often cut net of an early refund; that refund's late event must find no
+  room. The target comes from the cut's own reader
+  (`resolvePlatformSaleDocument`, `resolvePackageFeeBasis`,
+  `resolveFeeLedgerTotals`) at the rate(s) the document was cut with, read
+  strictly, with every refund request whose attempt is finalized counted as
+  refunded (`refundedAt` is stamped after the money commits). A new
+  document type cut from refund-dependent amounts must get a target in
+  `InvoiceReversalService.invoiceDocumentNow`, or it can be reversed twice.
+- **Decide inside the transaction**: the return amount is computed again in
+  the Serializable transaction that cuts it, from the returns read there and
+  the target read AFTER them (a return is cut only once its refund is
+  finalized, so that target includes the refund of every return it sees). The
+  installment fee document takes its amount from `installmentFeeReturnOf`
+  through the same transaction, under the same rule and the same claim.
+- **Cancel only under the claim** (`helpers/invoice-cancel-claim.ts`,
+  `cancelReason = refund_cancelling:<ms>:<token>`, 5-minute lease): taken
+  where no return exists; any other run backs off; a return is never cut
+  while a claim is held; a stale claim is settled from the provider status.
+  Runbook: `docs/OPERATIONS.md`, "e-document reversal alarms".
 
 ## Test lane and environments
 
@@ -95,4 +118,6 @@ needs a deploy note.
 `invoice/installment-fee-basis`, `invoice-test-lane`,
 `invoice-delivery.provider-port`, `invoice/package-fee-basis`,
 `invoice/penalty-basis`, `helpers/invoice-retry-budget`,
-`provider/e-invoice-provider.contract`.
+`provider/e-invoice-provider.contract`, `invoice-reversal-net-of-refund`,
+`invoice/return-invoice-amounts`, `helpers/invoice-cancel-claim`; on a real
+database `test/e2e/invoice-double-reversal.e2e-spec.ts`.

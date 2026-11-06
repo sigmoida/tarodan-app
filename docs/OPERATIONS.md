@@ -730,15 +730,8 @@ the delivered-orders backfill retry as for every document.
 
 - `cancel_reason = 'refund_cancelling:<ms>:<token>'` on a
   `buyer_installment_fee` row: one refund run holds the exclusive cancel
-  claim (a 5-minute lease); any other run of that document backs off with
-  `INSTALLMENT_FEE_CANCEL_IN_PROGRESS` and the outbox retries it. It turns
-  into `refund` when the cancel settles. A claim older than the lease is
-  settled by the next run from eLogo's status, logged as the error
-  `INSTALLMENT_FEE_CANCEL_CLAIM_STUCK`: cancelled -> marked cancelled;
-  standing -> cleared and reversed normally; unknown ->
-  `INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN`, retried. Repeating stuck errors
-  for one invoice: check its ETTN in the eLogo portal and hand it to a
-  developer; never clear the claim by hand.
+  claim, the same one every e-document uses; see "When needed: e-document
+  reversal alarms" for the codes and what to do. Never clear it by hand.
 
 **A payment left pending by `CHARGE_ATTEMPT_BASE_MISMATCH ... left pending`.**
 The payment's amount moved after the form was signed and PayTR collected the
@@ -1340,6 +1333,34 @@ A refund that keeps failing without reaching review (`failed`, e.g.
 with a growing wait (10 minutes up to 6 hours) and alarmed once a day per
 order. On staging, refunds of payments copied from production are left out of
 the sweeps on purpose.
+
+### When needed: e-document reversal alarms
+
+A refund reverses the platform's e-documents through the
+`invoice.refund_reverse` outbox event (fast path after the refund commits,
+outbox drainer as the durable one). The return is capped by what the
+document should still carry (`PAYMENTS.md` §8b), and a cancel runs only
+under an exclusive claim. Log codes, all with the invoice number and, where
+there is one, the refund attempt id:
+
+| Code                             | Level | Meaning and what to do                                                                                                                                                                                                                                                                                                       |
+| -------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVOICE_RETURN_CAPPED`          | warn  | The attempt's share was more than the document carries beyond its target (it was cut net of the refund, or another attempt reversed it). Expected; nothing to do. Many for one invoice with `due=0` while its customer says the refund is not on any document: developer.                                                    |
+| `INVOICE_CANCEL_IN_PROGRESS`     | warn  | Another run holds the cancel claim; the outbox retries. Repeating for over 10 minutes for one invoice: see the stuck claim below.                                                                                                                                                                                            |
+| `INVOICE_CANCEL_CLAIM_STUCK`     | error | A claim (`cancel_reason = 'refund_cancelling:<ms>:<token>'`) outlived its 5-minute lease; the next run settles it from eLogo's status: cancelled -> marked cancelled, standing -> cleared and reversed normally.                                                                                                             |
+| `INVOICE_CANCEL_OUTCOME_UNKNOWN` | error | The cancel call failed and eLogo's status does not show the document standing; the claim stays and the outbox retries. Repeating for one invoice: check its ETTN in the eLogo portal and hand it to a developer. Never clear a claim by hand.                                                                                |
+| `INVOICE_CANCEL_CLAIM_LOST`      | error | A run lost its claim to another one (its cancel outlived the 5-minute lease). If the message says eLogo cancelled the document after the claim was lost, the document is marked cancelled: check it for a return cut meanwhile (a second reversal; see the check below). Otherwise the outbox retries; repeating: developer. |
+| `INVOICE_BASIS_MISSING`          | error | The order or package a document was cut from is gone, so what it should carry cannot be computed; nothing is reversed. Developer.                                                                                                                                                                                            |
+
+**Documents reversed twice before the 2026-11 fix.** A document cut net of
+an early refund (`platform_sale`, the package fee documents, the legacy
+`commission` / `service_fee`) also got a return for that refund. They are
+found by a read-only check that compares, per document, the returns against
+the gap between what it carried and what it should carry (the query lives
+in the private hub, not in this public repo; it reads counts and ids only).
+A repair is a fiscal correction (a new SALE document for the over-returned
+amount, or an integrator-side action on the extra return), decided with the
+accountant per document; there is no repair script.
 
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 

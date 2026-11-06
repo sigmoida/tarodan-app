@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import { Logger } from "@nestjs/common";
 import type { ConfigService } from "@nestjs/config";
 import {
   CancellationActor,
@@ -615,6 +616,14 @@ describe("installment fee document on a real database (E2E)", () => {
     // nothing: the document already excludes its fee.
     await reversals.handleOrderRefund(early.orderId, early);
     expect(await returnsOf(small)).toEqual([]);
+    // Nor does the platform sale document, cut net of the same refund: 240.00.
+    const sale = await prisma.fiscalInvoice.findUniqueOrThrow({
+      where: {
+        type_sourceId: { type: "platform_sale", sourceId: target.orders.small },
+      },
+    });
+    expect(sale.total.toFixed(2)).toBe("240.00");
+    expect(await returnsOf(sale)).toEqual([]);
 
     // The big order refunded in full within 8 days: the e-Arşiv is cancelled.
     await refund(target.orders.big, 600, `e2e-a6-cart-big:${target.paymentId}`);
@@ -714,7 +723,7 @@ describe("installment fee document on a real database (E2E)", () => {
       ]);
       const rejected = results.find((r) => r.status === "rejected");
       expect(String((rejected as PromiseRejectedResult).reason)).toMatch(
-        /INSTALLMENT_FEE_CANCEL_IN_PROGRESS/,
+        /INVOICE_CANCEL_IN_PROGRESS/,
       );
       // The outbox retry of the backed-off run.
       await reversals.handleOrderRefund(full.orderId, full);
@@ -728,6 +737,353 @@ describe("installment fee document on a real database (E2E)", () => {
     expect(
       (await returnsOf(doc)).filter((r) => r.status !== "cancelled"),
     ).toEqual([]);
+  });
+
+  /** Net and VAT of the returns standing against `doc`, summed. */
+  async function returnedOf(doc: FiscalInvoice) {
+    const rows = (await returnsOf(doc)).filter((r) => r.status !== "cancelled");
+    const sum = (pick: (r: FiscalInvoice) => Prisma.Decimal) =>
+      rows.reduce((acc, r) => acc.plus(pick(r)), D(0)).toFixed(2);
+    return [
+      sum((r) => r.total),
+      sum((r) => r.netAmount),
+      sum((r) => r.taxAmount),
+    ];
+  }
+
+  /**
+   * The `refundAdjustedAt` stamp no longer skips a fee document: only the cap
+   * (what it carries beyond what it should carry now) keeps a document
+   * repriced while unsent from being reversed again, and it must also leave
+   * the next refunds room.
+   */
+  describe("a document repriced while unsent, then sent", () => {
+    /** eLogo refuses the fee document; a 400.00 refund reprices it to 39.83. */
+    async function repriced() {
+      const target = await singleOrder();
+      await capture(target, target.paymentId);
+      const send = provider.send.bind(provider);
+      const down = jest
+        .spyOn(provider, "send")
+        .mockImplementation(async (document, options) => {
+          if (document.lines[0]?.name === "Taksit vade farkı") {
+            throw new Error("eLogo is down");
+          }
+          return send(document, options);
+        });
+      let early: InvoiceRefundReversePayload;
+      try {
+        await deliver(target.orderId);
+        expect((await feeDocumentOf(target.packageId))?.status).toBe("failed");
+        early = await refund(
+          target.orderId,
+          400,
+          `e2e-a6-repriced-1:${target.paymentId}`,
+        );
+      } finally {
+        down.mockRestore();
+      }
+      const unsent = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+      const attempt = await prisma.refundAttempt.findUniqueOrThrow({
+        where: { id: early.refundAttemptId },
+      });
+      expect(unsent.status).toBe("pending");
+      expect(amounts(unsent)).toEqual(["39.83", "33.19", "6.64"]);
+      expect(unsent.refundAdjustedAt).toEqual(attempt.finalizedAt);
+
+      await delivery.sendRecord(unsent.id);
+      const doc = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+      expect([doc.status, ...amounts(doc)]).toEqual([
+        "sent",
+        "39.83",
+        "33.19",
+        "6.64",
+      ]);
+      return { target, early, doc };
+    }
+
+    it("cuts nothing on the repricing refund's late, replayed and doubled events", async () => {
+      const { target, early, doc } = await repriced();
+
+      await reversals.handleOrderRefund(early.orderId, early);
+      await Promise.all([
+        reversals.handleOrderRefund(early.orderId, early),
+        reversals.handleOrderRefund(early.orderId, early),
+      ]);
+
+      expect(await returnsOf(doc)).toEqual([]);
+      expect(cancelled).not.toContain(doc.ettn);
+      const after = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+      expect([after.status, after.cancelReason]).toEqual(["sent", null]);
+    });
+
+    it("reverses the later refunds once, even when the repricing refund's event replays between them (39.83 -> 0)", async () => {
+      const { target, early, doc } = await repriced();
+      const later = await refund(
+        target.orderId,
+        200,
+        `e2e-a6-repriced-2:${target.paymentId}`,
+        { handle: false },
+      );
+      const share = (
+        await prisma.refundAttempt.findUniqueOrThrow({
+          where: { id: later.refundAttemptId },
+        })
+      ).installmentFeeAmount.toFixed(2);
+      expect(share).toBe("13.28");
+
+      // The early event replays before the later refund's own: it may carry
+      // the return, but the document never drops below what it should carry.
+      await reversals.handleOrderRefund(early.orderId, early);
+      await reversals.handleOrderRefund(later.orderId, later);
+      await reversals.handleOrderRefund(early.orderId, early);
+      await reversals.handleOrderRefund(later.orderId, later);
+      expect((await returnedOf(doc))[0]).toBe("13.28");
+
+      await refund(
+        target.orderId,
+        400,
+        `e2e-a6-repriced-3:${target.paymentId}`,
+      );
+
+      expect(await returnedOf(doc)).toEqual(["39.83", "33.19", "6.64"]);
+      expect((await feeDocumentOf(target.packageId))?.status).toBe("sent");
+      expect(cancelled).not.toContain(doc.ettn);
+    });
+
+    it("cancels on the closing refund and cuts nothing on the repricing refund's replay after it", async () => {
+      const { target, early, doc } = await repriced();
+
+      await refund(
+        target.orderId,
+        600,
+        `e2e-a6-repriced-close:${target.paymentId}`,
+      );
+      await reversals.handleOrderRefund(early.orderId, early);
+
+      const after = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+      expect([after.status, after.cancelReason]).toEqual([
+        "cancelled",
+        "refund",
+      ]);
+      expect(cancelled).toContain(doc.ettn);
+      expect(await returnsOf(doc)).toEqual([]);
+    });
+
+    it("balances to the kuruş when the repricing refund's replay lands before the closing refund's event", async () => {
+      const { target, early, doc } = await repriced();
+      const closing = await refund(
+        target.orderId,
+        600,
+        `e2e-a6-repriced-late:${target.paymentId}`,
+        { handle: false },
+      );
+
+      await reversals.handleOrderRefund(early.orderId, early);
+      await reversals.handleOrderRefund(closing.orderId, closing);
+
+      expect(await returnedOf(doc)).toEqual(["39.83", "33.19", "6.64"]);
+      expect((await feeDocumentOf(target.packageId))?.status).toBe("sent");
+      expect(cancelled).not.toContain(doc.ettn);
+    });
+  });
+
+  it("reverses both refunds in full when the other's return lands after this handler read its target (66.38 -> 26.55)", async () => {
+    const target = await singleOrder();
+    await capture(target, target.paymentId);
+    await deliver(target.orderId);
+    const doc = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+    const first = await refund(
+      target.orderId,
+      400,
+      `e2e-a6-target-1:${target.paymentId}`,
+      { handle: false },
+    );
+    // The first handler's preview has read its target (39.83) when the second
+    // refund finalizes and its handler cuts 13.28. A target kept from that
+    // read would leave room for 13.27 only and cap the first short for good.
+    const read = documents.resolveInstallmentFeeBasis.bind(documents);
+    const between = jest
+      .spyOn(documents, "resolveInstallmentFeeBasis")
+      .mockImplementationOnce(async (packageId) => {
+        const basis = await read(packageId);
+        await refund(
+          target.orderId,
+          200,
+          `e2e-a6-target-2:${target.paymentId}`,
+        );
+        return basis;
+      });
+
+    try {
+      await reversals.handleOrderRefund(first.orderId, first);
+    } finally {
+      between.mockRestore();
+    }
+
+    expect((await returnsOf(doc)).map((r) => r.total.toFixed(2))).toEqual([
+      "13.28",
+      "26.55",
+    ]);
+    // 26.55 left of 66.38, net and VAT split on the cumulative amount.
+    expect(await returnedOf(doc)).toEqual(["39.83", "33.19", "6.64"]);
+  });
+
+  it("reverses the other package's shortfall with the refund that closes the payment, its net and VAT to the kuruş", async () => {
+    const target = await cart();
+    await capture(target, target.paymentId);
+    await deliver(target.orders.big);
+    await deliver(target.orders.small);
+    const big = (await feeDocumentOf(target.packages.big)) as FiscalInvoice;
+    const small = (await feeDocumentOf(target.packages.small)) as FiscalInvoice;
+
+    // 540.00 of 600.00: 35.85 of the big order's 39.83, a partial return.
+    await refund(
+      target.orders.big,
+      540,
+      `e2e-a6-sweep-big:${target.paymentId}`,
+    );
+    expect((await returnsOf(big)).map(amounts)).toEqual([
+      ["35.85", "29.88", "5.97"],
+    ]);
+
+    // The rest of the goods with the small order, as a refund carrying a
+    // sibling's shipping does (the refund limit is not under test here): the
+    // attempt carries the rest of F (30.53), more than its own document's 26.55.
+    await prisma.order.update({
+      where: { id: target.orders.small },
+      data: { totalAmount: D("460.00") },
+    });
+    const closing = await refund(
+      target.orders.small,
+      460,
+      `e2e-a6-sweep-small:${target.paymentId}`,
+    );
+    const attempt = await prisma.refundAttempt.findUniqueOrThrow({
+      where: { id: closing.refundAttemptId },
+    });
+    expect(attempt.installmentFeeAmount.toFixed(2)).toBe("30.53");
+    // Its replay reverses nothing again on either document.
+    await reversals.handleOrderRefund(closing.orderId, closing);
+
+    expect((await feeDocumentOf(target.packages.small))?.status).toBe(
+      "cancelled",
+    );
+    expect(cancelled).toContain(small.ettn);
+    expect(await returnsOf(small)).toEqual([]);
+    // Only the big document's shortfall: 39.83 - 35.85.
+    expect((await returnsOf(big)).map((r) => r.total.toFixed(2))).toEqual([
+      "35.85",
+      "3.98",
+    ]);
+    expect(await returnedOf(big)).toEqual(["39.83", "33.19", "6.64"]);
+    expect((await feeDocumentOf(target.packages.big))?.status).toBe("sent");
+  });
+
+  /**
+   * A row whose claim the earlier installment-only code wrote, literally: the
+   * stored format is a contract with the rows in flight when this ships.
+   */
+  describe("a cancel claim stored by the earlier code", () => {
+    const LEASE_MS = 5 * 60 * 1000;
+    const freshClaim = () => `refund_cancelling:${Date.now()}:old-code-run`;
+    const staleClaim = () =>
+      `refund_cancelling:${Date.now() - LEASE_MS - 1000}:old-code-run`;
+
+    async function claimed(claim: string) {
+      const target = await singleOrder();
+      await capture(target, target.paymentId);
+      await deliver(target.orderId);
+      const issued = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+      await prisma.fiscalInvoice.update({
+        where: { id: issued.id },
+        data: { cancelReason: claim },
+      });
+      const full = await refund(
+        target.orderId,
+        1000,
+        `e2e-a6-old-claim-${unique()}:${target.paymentId}`,
+        { handle: false },
+      );
+      return { target, doc: issued, full, before: cancelled.length };
+    }
+
+    let error: jest.SpyInstance;
+    beforeEach(() => {
+      error = jest.spyOn(Logger.prototype, "error").mockImplementation();
+    });
+    afterEach(() => error.mockRestore());
+
+    it("backs off while it is fresh: no eLogo call, no return, the claim untouched", async () => {
+      const claim = freshClaim();
+      const { target, doc, full, before } = await claimed(claim);
+
+      await expect(
+        reversals.handleOrderRefund(full.orderId, full),
+      ).rejects.toThrow(/INVOICE_CANCEL_IN_PROGRESS/);
+
+      expect(cancelled.length).toBe(before);
+      expect(await returnsOf(doc)).toEqual([]);
+      expect((await feeDocumentOf(target.packageId))?.cancelReason).toBe(claim);
+    });
+
+    it("settles it once stale when eLogo says the cancel went through: cancelled, no second cancel, no return", async () => {
+      const { target, doc, full, before } = await claimed(staleClaim());
+      const status = jest
+        .spyOn(provider, "getStatus")
+        .mockResolvedValueOnce({ state: "cancelled", resultMsg: "cancelled" });
+
+      await reversals.handleOrderRefund(full.orderId, full);
+      status.mockRestore();
+
+      const after = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+      expect([after.status, after.cancelReason]).toEqual([
+        "cancelled",
+        "refund",
+      ]);
+      expect(cancelled.length).toBe(before);
+      expect(await returnsOf(doc)).toEqual([]);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/^INVOICE_CANCEL_CLAIM_STUCK invoice=/),
+      );
+    });
+
+    it.each([
+      ["a stale claim", () => staleClaim()],
+      ["the bare marker", () => "refund_cancelling"],
+    ])(
+      "clears %s when eLogo says the document stands and decides again",
+      async (_name, claim) => {
+        const { target, doc, full, before } = await claimed(claim());
+        const status = jest
+          .spyOn(provider, "getStatus")
+          .mockResolvedValueOnce({ state: "completed" });
+
+        await reversals.handleOrderRefund(full.orderId, full);
+        status.mockRestore();
+
+        const after = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+        expect([after.status, after.cancelReason]).toEqual([
+          "cancelled",
+          "refund",
+        ]);
+        expect(cancelled.length).toBe(before + 1);
+        expect(await returnsOf(doc)).toEqual([]);
+      },
+    );
+
+    it("keeps it and reverses nothing while eLogo cannot tell", async () => {
+      const claim = staleClaim();
+      const { target, doc, full, before } = await claimed(claim);
+
+      await expect(
+        reversals.handleOrderRefund(full.orderId, full),
+      ).rejects.toThrow(/INVOICE_CANCEL_OUTCOME_UNKNOWN/);
+
+      expect(cancelled.length).toBe(before);
+      expect(await returnsOf(doc)).toEqual([]);
+      expect((await feeDocumentOf(target.packageId))?.cancelReason).toBe(claim);
+    });
   });
 
   it("issues no fee document for a single payment", async () => {
