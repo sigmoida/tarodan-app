@@ -15,6 +15,7 @@ import { PaytrOidField } from "@/components/detail/PaytrOidField";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import type { OrderGroupFile } from "../_lib/fileTypes";
 import { statusConfig } from "@/lib/statusLabels";
+import { installmentCountLabel } from "@/lib/payment-installment";
 
 /**
  * Grubun TEK ödemesi. Sepet ödemesinde tutar tüm sepeti kapsar — kart bunu
@@ -27,6 +28,9 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
   // PSP scale (C): what the card was charged, like `refundedTotal`.
   const charged = payment.chargedAmount ?? payment.amount;
   const installmentCount = payment.installmentCount ?? 1;
+  // In kuruş: a float sum of refund attempts can land a hair under C.
+  const remainingKurus =
+    Math.round(charged * 100) - Math.round(payment.refundedTotal * 100);
 
   return (
     <SectionCard title={t("admin.operations.orders.paymentTitle")}>
@@ -40,9 +44,7 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
         {installmentCount > 1 && (
           <>
             <Field label={t("admin.finance.payments.installment.title")}>
-              {t("admin.finance.installments.rules.countSingle", {
-                count: installmentCount,
-              })}
+              {installmentCountLabel(t, installmentCount)}
             </Field>
             <Field label={t("admin.finance.installments.preview.columns.fee")}>
               {fmtTry(payment.installmentFeeAmount ?? 0)}
@@ -56,11 +58,11 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
             </span>
           </Field>
         )}
-        {payment.refundedTotal > 0 && payment.refundedTotal < charged && (
+        {payment.refundedTotal > 0 && remainingKurus > 0 && (
           <Field
             label={t("admin.operations.orders.file.remainingChargedTotal")}
           >
-            {fmtTry(charged - payment.refundedTotal)}
+            {fmtTry(remainingKurus / 100)}
           </Field>
         )}
         <Field label={t("admin.operations.orders.provider")}>

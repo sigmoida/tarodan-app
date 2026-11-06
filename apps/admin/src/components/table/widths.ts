@@ -40,6 +40,8 @@ export const COL_WIDTH = {
   /** Two amounts in one cell (`₺1.000 / ₺5.000`, a price range, old + campaign price). */
   amountRange: 200,
   count: 100,
+  /** A PayTR merchant_oid (`TRD` + 17 characters) — flexible. */
+  paytrOid: 240,
   /** Switch + its visible `Aktif` / `Pasif` text. */
   toggle: 120,
   /** Inline action buttons (`col.actions`). */

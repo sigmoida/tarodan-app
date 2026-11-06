@@ -182,7 +182,7 @@ export interface OrderGroupFile {
         amount: number;
         provider: string | null;
         providerPaymentId: string | null;
-        /** PayTR "sipariş no" (güncel) + önceki denemeler (en yenisi başta). */
+        /** PayTR "sipariş no" (current) + earlier attempts (newest first). */
         paytrOid: string | null;
         paytrOidHistory: string[];
         paidAt: string | null;

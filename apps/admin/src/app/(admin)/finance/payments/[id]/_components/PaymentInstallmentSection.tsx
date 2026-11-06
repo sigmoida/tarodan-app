@@ -10,7 +10,7 @@ import type {
 import { DataTable } from "@/components/DataTable";
 import { DataList, Field } from "@/components/detail/DataList";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { col } from "@/components/table";
+import { COL_SIZE, COL_WIDTH, col } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { STATUS_TONE } from "@/lib/status-tone";
 import type { Translate } from "@/lib/statusLabels";
@@ -21,7 +21,7 @@ import {
   installmentCountLabel,
   installmentRuleLabel,
   paymentInstallmentKind,
-} from "../_lib/installment";
+} from "@/lib/payment-installment";
 
 const L = "admin.finance.payments.installment";
 const NOT_SORTABLE = { sortable: false } as const;
@@ -32,18 +32,30 @@ interface InstallmentProps {
   paidAt: string | null | undefined;
 }
 
-/** The compact line in the payment info: "Tek çekim", "3 taksit" or not captured. */
+/**
+ * The compact lines in the payment info: "Tek çekim", "3 taksit" or not
+ * captured, and the charged amount of an installment payment.
+ */
 export function PaymentInstallmentField({
   installment,
   paidAt,
 }: InstallmentProps) {
   const t = useTranslations();
   return (
-    <Field label={t(`${L}.title`)}>
-      {paymentInstallmentKind(installment, paidAt) === "notCaptured"
-        ? t(`${L}.notCaptured`)
-        : installmentCountLabel(t, installment.installmentCount)}
-    </Field>
+    <>
+      <Field label={t(`${L}.title`)}>
+        {paymentInstallmentKind(installment, paidAt) === "notCaptured"
+          ? t(`${L}.notCaptured`)
+          : installmentCountLabel(t, installment.installmentCount)}
+      </Field>
+      {/* The amount above is the goods scale; refunds are PSP scale, so the
+          charge they come off is shown next to them when it differs. */}
+      {installment.installmentFeeAmount > 0 && (
+        <Field label={t(`${L}.chargedAmount`)}>
+          {fmtTry(installment.chargedAmount)}
+        </Field>
+      )}
+    </>
   );
 }
 
@@ -112,7 +124,7 @@ const attemptColumns = (t: Translate) => [
   col.text<AdminPaymentChargeAttempt>(
     t(`${L}.attempts.columns.oid`),
     (a) => a.merchantOid,
-    { ...NOT_SORTABLE, minWidth: 220 },
+    { ...NOT_SORTABLE, minWidth: COL_WIDTH.paytrOid },
   ),
   col.text<AdminPaymentChargeAttempt>(
     t(`${L}.attempts.columns.count`),
@@ -125,20 +137,26 @@ const attemptColumns = (t: Translate) => [
     NOT_SORTABLE,
   ),
   col.money<AdminPaymentChargeAttempt>(
-    t(`${L}.attempts.columns.fee`),
+    t("admin.finance.installments.preview.columns.fee"),
     (a) => a.installmentFeeAmount,
     NOT_SORTABLE,
   ),
   col.status<AdminPaymentChargeAttempt>(
-    t(`${L}.attempts.columns.status`),
+    t("common.status"),
     (a) =>
-      a.capturedAt
-        ? { variant: STATUS_TONE.live, children: t(`${L}.attempts.captured`) }
-        : {
-            variant: STATUS_TONE.inactive,
-            children: t(`${L}.attempts.notCaptured`),
-          },
-    NOT_SORTABLE,
+      a.applied
+        ? { variant: STATUS_TONE.live, children: t(`${L}.attempts.applied`) }
+        : a.capturedAt
+          ? {
+              // A second charge of the payment: someone has to resolve it.
+              variant: STATUS_TONE.failed,
+              children: t(`${L}.attempts.capturedNotApplied`),
+            }
+          : {
+              variant: STATUS_TONE.inactive,
+              children: t(`${L}.notCaptured`),
+            },
+    { ...NOT_SORTABLE, ...COL_SIZE.statusLong },
   ),
   col.date<AdminPaymentChargeAttempt>(
     t(`${L}.attempts.columns.createdAt`),

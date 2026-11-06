@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { AdminPaymentInstallment } from "@tarodan/types";
 import { fakeT } from "@/test-utils/dom";
 import type { Translate } from "@/lib/statusLabels";
-import { installmentCardLabel, paymentInstallmentKind } from "./installment";
+import {
+  installmentCardLabel,
+  paymentInstallmentKind,
+} from "./payment-installment";
 
 const t = fakeT as unknown as Translate;
 const PAID = "2026-11-01T10:05:00.000Z";

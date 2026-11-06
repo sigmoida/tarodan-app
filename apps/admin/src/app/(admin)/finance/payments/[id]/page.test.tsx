@@ -59,6 +59,7 @@ const attempt = (
   chargedAmount: 1000,
   installmentFeeAmount: 0,
   capturedAt: "2026-11-01T10:05:00.000Z",
+  applied: true,
   createdAt: "2026-11-01T10:00:00.000Z",
   ...over,
 });
@@ -125,6 +126,7 @@ const installmentPayment = (
       chargedAmount: 1040.5,
       installmentFeeAmount: 40.5,
       capturedAt: null,
+      applied: false,
     }),
   ],
   ...over,
@@ -197,6 +199,7 @@ describe("payment detail installment block", () => {
     expect(bodyText()).toContain(`${L}.single`);
     expect(bodyText()).not.toContain(`${L}.goodsAmount`);
     expect(bodyText()).not.toContain(`${L}.platformCost`);
+    expect(bodyText()).not.toContain(`${L}.chargedAmount`);
     // The signed form is still listed.
     expect(bodyText()).toContain(`${L}.attempts.title`);
     expect(bodyText()).toContain("TRDOIDSINGLE1");
@@ -249,11 +252,47 @@ describe("payment detail installment block", () => {
     const superseded = rows.find((row) => row.includes("TRDOIDOLD1"));
     expect(captured).toContain(countLabel(3));
     expect(captured).toContain(fmtTry(1062.4));
-    expect(captured).toContain(`${L}.attempts.captured`);
+    expect(captured).toContain(`${L}.attempts.applied`);
     expect(superseded).toContain(countLabel(2));
     expect(superseded).toContain(fmtTry(1040.5));
     expect(superseded).toContain(fmtTry(40.5));
-    expect(superseded).toContain(`${L}.attempts.notCaptured`);
+    expect(superseded).toContain(`${L}.notCaptured`);
+  });
+
+  it("flags a captured attempt the payment is not booked from as a second charge", async () => {
+    await render(
+      payment({
+        installment: singleInstallment({
+          chargeAttempts: [
+            attempt({
+              id: "att-late",
+              merchantOid: "TRDOIDLATE",
+              applied: false,
+            }),
+            attempt(),
+          ],
+        }),
+      }),
+    );
+
+    const rows = Array.from(document.body.querySelectorAll("tbody tr")).map(
+      (row) => row.textContent ?? "",
+    );
+    expect(rows.find((row) => row.includes("TRDOIDLATE"))).toContain(
+      `${L}.attempts.capturedNotApplied`,
+    );
+    expect(rows.find((row) => row.includes("TRDOIDSINGLE1"))).toContain(
+      `${L}.attempts.applied`,
+    );
+  });
+
+  it("shows the charged amount next to the goods amount and refunds of an installment payment", async () => {
+    await render(
+      payment({ refundedTotal: 1062.4, installment: installmentPayment() }),
+    );
+    const info = section("admin.finance.payments.paymentInfo");
+    expect(info).toContain(`${L}.chargedAmount`);
+    expect(info).toContain(fmtTry(1062.4));
   });
 
   it("warns instead of guessing when an installment payment has no pricing record", async () => {
@@ -281,6 +320,7 @@ describe("payment detail installment block", () => {
               chargedAmount: 1062.4,
               installmentFeeAmount: 62.4,
               capturedAt: null,
+              applied: false,
             }),
           ],
         }),

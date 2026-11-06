@@ -107,6 +107,22 @@ describe("GroupPaymentCard installment terms", () => {
     expect(valueOf(`${F}.remainingChargedTotal`)).toBe(fmtTry(531.2));
   });
 
+  it("shows no remaining amount once refund attempts add up to the charge", () => {
+    view = mount(
+      <GroupPaymentCard
+        file={file({
+          installmentCount: 3,
+          installmentFeeAmount: 62.4,
+          chargedAmount: 1062.4,
+          // A float sum of three attempts, a hair under C.
+          refundedTotal: 354.13 + 354.13 + 354.14 - 1e-9,
+        })}
+      />,
+    );
+
+    expect(valueOf(`${F}.remainingChargedTotal`)).toBeNull();
+  });
+
   it("keeps a single or legacy payment to its amount, without installment lines", () => {
     view = mount(<GroupPaymentCard file={file({})} />);
 

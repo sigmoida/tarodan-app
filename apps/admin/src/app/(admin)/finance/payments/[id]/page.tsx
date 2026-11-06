@@ -111,18 +111,18 @@ export default function PaymentDetailPage() {
                       {p.id}
                     </Field>
                     <Field label={t("common.amount")}>{fmtTry(p.amount)}</Field>
+                    {p.installment && (
+                      <PaymentInstallmentField
+                        installment={p.installment}
+                        paidAt={p.paidAt}
+                      />
+                    )}
                     {(p.refundedTotal ?? 0) > 0 && (
                       <Field label={t("admin.finance.payments.refundedTotal")}>
                         <span className="text-danger-600">
                           −{fmtTry(p.refundedTotal ?? 0)}
                         </span>
                       </Field>
-                    )}
-                    {p.installment && (
-                      <PaymentInstallmentField
-                        installment={p.installment}
-                        paidAt={p.paidAt}
-                      />
                     )}
                     <Field label={t("admin.finance.payments.currency")}>
                       {p.currency}
