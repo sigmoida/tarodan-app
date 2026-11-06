@@ -349,6 +349,43 @@ describe("PaymentReady installments: new card (PCI)", () => {
         ?.value,
     ).toBe(CARD_NUMBER);
   });
+
+  it("a new card typed, then a saved card: priced by its id, signed without the typed digits", async () => {
+    render();
+    await flush();
+    click(button("payment.addCard"));
+    await fillNewCard();
+    expect(h.installmentOptions).toHaveBeenLastCalledWith(
+      { bin: CARD_NUMBER.slice(0, 8), paymentId: "pay-1" },
+      expect.anything(),
+    );
+    click(option(6));
+
+    // Back to the saved card: the choice and the BIN belong to the new card.
+    click(button("checkout.payWithSavedCard"));
+    await flush();
+    expect(h.installmentOptions).toHaveBeenLastCalledWith(
+      { savedCardId: "card-1", paymentId: "pay-1" },
+      expect.anything(),
+    );
+    expect(option(1).checked).toBe(true);
+
+    click(option(3));
+    click(consent());
+    click(payButton());
+    await flush(10);
+    const body = sentBody();
+    expect(body.installment).toEqual({ count: 3, expectedTotal: 1066.38 });
+    expect(body.installment).not.toHaveProperty("bin");
+    expect(body.savedCardId).toBe("card-1");
+    expect(JSON.stringify(body)).not.toContain(CARD_NUMBER.slice(0, 6));
+    // Nothing of the typed card goes to PayTR either.
+    const posted = document.querySelector(
+      'form[action="https://www.paytr.com/odeme"]',
+    );
+    expect(posted?.querySelector('input[name="card_number"]')).toBeNull();
+    expect(posted?.querySelector('input[name="cvv"]')).toBeNull();
+  });
 });
 
 describe("PaymentReady installments: refusals at signing", () => {
@@ -396,6 +433,51 @@ describe("PaymentReady installments: refusals at signing", () => {
 
     click(payButton());
     await flush(10);
+    expect(sentBody(1).installment).toEqual({ count: 3, expectedTotal: 1070 });
+  });
+
+  it("409 pricingChanged: no stale total is shown or payable while the count is priced again", async () => {
+    let answer: (value: unknown) => void = () => {};
+    h.prepareDirectForm.mockRejectedValueOnce(
+      refusal(409, "server.payment.installmentPricingChanged"),
+    );
+    h.installmentOptions
+      .mockResolvedValueOnce({ data: ANSWER })
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (answer = resolve)),
+      );
+    await chooseThreeAndPay();
+    await flush(10);
+
+    // Repricing: the pay button waits, the old total is not stated.
+    expect(payButton().disabled).toBe(true);
+    expect(q('[data-testid="installment-terms"]')).toBeNull();
+    expect(text()).not.toContain("1.066,38");
+
+    await act(async () =>
+      answer({
+        data: {
+          ...ANSWER,
+          options: [
+            ANSWER.options[0],
+            {
+              count: 3,
+              totalAmount: 1070,
+              feeAmount: 70,
+              monthlyAmount: 356.67,
+            },
+          ],
+        },
+      }),
+    );
+    await flush(10);
+    expect(payButton().disabled).toBe(false);
+    expect(q('[data-testid="installment-terms"]')?.textContent).toContain(
+      '"total":"1.070,00 TL"',
+    );
+    click(payButton());
+    await flush(10);
+    expect(h.prepareDirectForm).toHaveBeenCalledTimes(2);
     expect(sentBody(1).installment).toEqual({ count: 3, expectedTotal: 1070 });
   });
 
