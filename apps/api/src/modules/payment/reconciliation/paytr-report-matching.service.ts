@@ -17,6 +17,7 @@ import {
 } from "../../account-lane/live-lane.where";
 import { LedgerService } from "../../ledger/ledger.service";
 import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { paymentOids } from "../helpers/payment-oids";
 import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
 import {
@@ -626,10 +627,10 @@ export class PaytrReportMatchingService {
           data: { ledgerRecordedAt: new Date() },
         });
         recorded++;
-      } catch (error: any) {
+      } catch (error: unknown) {
         failed++;
         this.logger.warn(
-          `psp_fee ledger kaydı başarısız (satır ${line.id}): ${error?.message}`,
+          `psp_fee ledger write failed (line ${line.id}): ${errorMessage(error)}`,
         );
       }
     }

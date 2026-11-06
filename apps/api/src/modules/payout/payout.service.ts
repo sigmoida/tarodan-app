@@ -374,16 +374,16 @@ export class PayoutService {
             where: { transId: code },
           })) > 0,
       );
-      const pendingAdjustment = await (
-        this.prisma as any
-      ).sellerAccountAdjustment?.findFirst({
-        where: {
-          sellerId: hold.sellerId,
-          status: "open",
-          remainingAmount: { gt: 0 },
-        },
-        select: { id: true },
-      });
+      // Optional chaining kept for narrow test doubles without the table.
+      const pendingAdjustment =
+        await this.prisma.sellerAccountAdjustment?.findFirst({
+          where: {
+            sellerId: hold.sellerId,
+            status: "open",
+            remainingAmount: { gt: 0 },
+          },
+          select: { id: true },
+        });
       if (pendingAdjustment) {
         const createdWithAdjustment = await this.createAdjustedOrderPayout({
           hold,
