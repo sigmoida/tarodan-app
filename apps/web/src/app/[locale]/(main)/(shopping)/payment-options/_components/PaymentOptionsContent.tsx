@@ -1,12 +1,20 @@
-"use client";
-
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
-import { useLocale, useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 
-export default function PaymentOptionsClient() {
-  const t = useTranslations();
+/**
+ * The payment options information page (a Server Component: no interaction).
+ * The installment paragraph follows the switch (plan 6.6): with it off the
+ * neutral text says card payments are single payments; with it on, where the
+ * options are shown.
+ */
+export default async function PaymentOptionsContent({
+  installmentsEnabled,
+}: {
+  installmentsEnabled: boolean;
+}) {
+  const t = await getTranslations();
 
   return (
     <DocPage
@@ -39,7 +47,9 @@ export default function PaymentOptionsClient() {
               {t("information.paymentOptions.installments")}
             </h2>
             <p className="text-body">
-              {t("information.paymentOptions.installmentsDesc")}
+              {installmentsEnabled
+                ? t("information.paymentOptions.installmentsDescEnabled")
+                : t("information.paymentOptions.installmentsDesc")}
             </p>
           </section>
         </div>
