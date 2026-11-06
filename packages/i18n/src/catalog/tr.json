@@ -7015,6 +7015,7 @@
           "buyerCommission": "Alıcı Komisyonu",
           "buyerServiceFee": "Alıcı Koruma Hizmet Bedeli",
           "buyerShipping": "Kargo Bedeli (Alıcı Payı)",
+          "buyerInstallmentFee": "Taksit Vade Farkı",
           "sellerCommission": "Satıcı Komisyonu",
           "sellerPlatformFee": "Platform Hizmet Bedeli",
           "sellerShipping": "Kargo Bedeli (Satıcı Payı)",

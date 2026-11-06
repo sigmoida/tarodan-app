@@ -7015,6 +7015,7 @@
           "buyerCommission": "Buyer Commission",
           "buyerServiceFee": "Buyer Protection Fee",
           "buyerShipping": "Shipping Fee (Buyer Share)",
+          "buyerInstallmentFee": "Installment Fee",
           "sellerCommission": "Seller Commission",
           "sellerPlatformFee": "Platform Service Fee",
           "sellerShipping": "Shipping Fee (Seller Share)",
