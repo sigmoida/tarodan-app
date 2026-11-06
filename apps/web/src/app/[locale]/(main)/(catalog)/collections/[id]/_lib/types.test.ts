@@ -1,7 +1,12 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { isNotForSale, itemToProduct, type CollectionItem } from "./types";
+import {
+  isNotForSale,
+  itemCardProps,
+  itemToProduct,
+  type CollectionItem,
+} from "./types";
 
 const item = (overrides: Partial<CollectionItem> = {}): CollectionItem => ({
   id: "i1",
@@ -31,5 +36,24 @@ describe("isNotForSale", () => {
       true,
     );
     expect(isNotForSale(item({ productPrice: 100 }))).toBe(false);
+  });
+});
+
+describe("itemCardProps", () => {
+  it("a custom item: no link, the not-for-sale label", () => {
+    const props = itemCardProps(
+      item({ isCustom: true, productId: undefined, customTitle: "Mine" }),
+      "Satışta değil",
+    );
+    expect(props.href).toBeNull();
+    expect(props.noPriceLabel).toBe("Satışta değil");
+    expect(props.product.title).toBe("Mine");
+  });
+
+  it("a listing item: the default link and its price", () => {
+    const props = itemCardProps(item({ productPrice: 100 }), "Satışta değil");
+    expect(props.href).toBeUndefined();
+    expect(props.noPriceLabel).toBeUndefined();
+    expect(props.product.price).toBe(100);
   });
 });

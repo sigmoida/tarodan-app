@@ -56,6 +56,11 @@ describe("customItemSchema", () => {
     expect(errorsOf({ year: "2020.5" })).toEqual({
       year: "validation.enterValidValue",
     });
+    for (const year of ["1967.", "1e3", "0x7B2", "-1950"])
+      expect(errorsOf({ year })).toEqual({
+        year: "validation.enterValidValue",
+      });
+    expect(errorsOf({ year: " 1967 " })).toEqual({});
     expect(errorsOf({ year: "abc" })).toEqual({
       year: "validation.enterValidValue",
     });

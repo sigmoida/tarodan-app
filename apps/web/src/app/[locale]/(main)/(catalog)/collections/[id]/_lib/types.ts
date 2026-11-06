@@ -68,8 +68,8 @@ export const isNotForSale = (item: CollectionItem): boolean => item.isCustom;
  * the shared `ProductCard` consumes, so both render through one component.
  * `status` is intentionally left off: SOLD is shown via the card overlay badge,
  * not the out-of-stock treatment. `price` is only a placeholder for a custom
- * item (the card shape needs a number); its card is rendered with
- * `noPriceLabel` (see `isNotForSale`), so the price is never shown.
+ * item (the card shape needs a number): render items through `itemCardProps`,
+ * which sets `noPriceLabel`, so that price is never shown.
  */
 export const itemToProduct = (item: CollectionItem): Product => ({
   id: item.productId ?? item.id,
@@ -86,6 +86,21 @@ export const itemToProduct = (item: CollectionItem): Product => ({
   scale: item.customScale,
   year: item.customYear,
   isBoosted: Boolean(item.isBoosted) && item.productStatus !== "sold",
+});
+
+/**
+ * The `ProductCard` props of a collection item: the one place that decides
+ * its card. A custom item is non-navigating (no listing) and not for sale
+ * (`noPriceLabel`, so its placeholder price is never shown); a listing item
+ * links to its listing and shows its price.
+ */
+export const itemCardProps = (
+  item: CollectionItem,
+  notForSaleLabel: string,
+): { product: Product; href: null | undefined; noPriceLabel?: string } => ({
+  product: itemToProduct(item),
+  href: item.productId ? undefined : null,
+  noPriceLabel: isNotForSale(item) ? notForSaleLabel : undefined,
 });
 
 /**

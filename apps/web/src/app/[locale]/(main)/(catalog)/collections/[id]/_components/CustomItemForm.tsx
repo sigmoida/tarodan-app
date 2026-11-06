@@ -20,7 +20,6 @@ import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import { useCollectionFilters } from "../_hooks/useCollectionFilters";
 import { useCarModels } from "../_hooks/useCarModels";
 import {
-  CUSTOM_ITEM_LIMITS,
   customItemSchema,
   EMPTY_CUSTOM_ITEM,
   type CustomItemForm as CustomItemValues,
@@ -42,8 +41,7 @@ export default function CustomItemForm({
   const { collection, invalidateCollection } = useCollectionDetail();
   const filters = useCollectionFilters(true);
 
-  const schema = useMemo(() => customItemSchema(t), [t]);
-  const form = useZodForm(schema, {
+  const form = useZodForm(customItemSchema(t), {
     defaultValues: EMPTY_CUSTOM_ITEM,
   });
   const brand = form.watch("brand");
@@ -56,8 +54,9 @@ export default function CustomItemForm({
   const add = useWebMutation(
     (values: CustomItemValues) =>
       collectionsApi.addItem(collection!.id, {
-        customTitle: values.title.trim(),
-        customDescription: values.description?.trim() || undefined,
+        // The schema already trimmed the title and the description.
+        customTitle: values.title,
+        customDescription: values.description || undefined,
         customBrand: values.brand?.trim() || undefined,
         customModel: values.model?.trim() || undefined,
         customYear: values.year ? Number(values.year) : undefined,
@@ -146,11 +145,11 @@ export default function CustomItemForm({
       <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
         <FormInput
           name="year"
-          type="number"
+          // Text, not `number`: a number input reports text it cannot
+          // parse as "", which would drop the year without an error.
+          inputMode="numeric"
           label={t("product.releaseYear")}
           placeholder="2026"
-          min={CUSTOM_ITEM_LIMITS.yearMin}
-          max={CUSTOM_ITEM_LIMITS.yearMax}
         />
         <FormSelect
           name="scale"

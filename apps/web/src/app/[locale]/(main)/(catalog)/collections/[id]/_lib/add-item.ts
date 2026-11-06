@@ -48,7 +48,8 @@ export const customItemSchema = (t: Translate) =>
       .superRefine((value, ctx) => {
         if (!value) return;
         const year = Number(value);
-        const message = !Number.isInteger(year)
+        // Digits only: `Number` would also take "1967.", "1e3" or "0x7B2".
+        const message = !/^\d+$/.test(value)
           ? t("validation.enterValidValue")
           : year < L.yearMin
             ? t("validation.minValue", { min: L.yearMin })

@@ -110,6 +110,15 @@ describe("CustomItemForm", () => {
     expect(h.mutate).not.toHaveBeenCalled();
   });
 
+  it("rejects a year that is not a number instead of dropping it", async () => {
+    render();
+    setInput("title", "My Camaro");
+    setInput("year", "1967.");
+    await submit();
+    expect(container.textContent).toContain("validation.enterValidValue");
+    expect(h.mutate).not.toHaveBeenCalled();
+  });
+
   it("submits a valid item", async () => {
     render();
     setInput("title", "  My Camaro ");
