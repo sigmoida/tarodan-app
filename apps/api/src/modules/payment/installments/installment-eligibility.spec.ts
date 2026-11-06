@@ -4,6 +4,7 @@ import {
   evaluateInstallmentOffer,
   offeredInstallmentCounts,
   paymentKindAllowsInstallments,
+  paymentLaneConsistent,
   rateFamiliesOf,
   type InstallmentPaymentKind,
   type InstallmentRateSource,
@@ -20,6 +21,21 @@ const goods: InstallmentPaymentKind = {
   checkoutGroupId: null,
   orderOrigins: [OrderOrigin.direct_sale],
 };
+
+describe("paymentLaneConsistent (plan 5.2)", () => {
+  it.each`
+    case                                       | input                                                                               | expected
+    ${"a live payment of live orders"}         | ${{ paymentIsTest: false, orderIsTest: [false, false], buyerIsTestAccount: false }} | ${true}
+    ${"a test payment of a test account"}      | ${{ paymentIsTest: true, orderIsTest: [true], buyerIsTestAccount: true }}           | ${true}
+    ${"a guest payment (no buyer to compare)"} | ${{ paymentIsTest: false, orderIsTest: [false], buyerIsTestAccount: null }}         | ${true}
+    ${"a trade cash payment (no orders)"}      | ${{ paymentIsTest: true, orderIsTest: [], buyerIsTestAccount: true }}               | ${true}
+    ${"a test payment of a live order"}        | ${{ paymentIsTest: true, orderIsTest: [false], buyerIsTestAccount: true }}          | ${false}
+    ${"a cart mixing lanes"}                   | ${{ paymentIsTest: false, orderIsTest: [false, true], buyerIsTestAccount: false }}  | ${false}
+    ${"a live payment of a test account"}      | ${{ paymentIsTest: false, orderIsTest: [false], buyerIsTestAccount: true }}         | ${false}
+  `("$case: $expected", ({ input, expected }) => {
+    expect(paymentLaneConsistent(input)).toBe(expected);
+  });
+});
 
 describe("paymentKindAllowsInstallments (D6)", () => {
   it.each`

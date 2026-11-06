@@ -61,6 +61,27 @@ export function paymentKindAllowsInstallments(
   );
 }
 
+/**
+ * The lane check of plan 5.2: a test-lane payment (`Payment.isTest`, signed
+ * with PayTR `test_mode=1`) must belong to test-lane orders and, when a buyer
+ * is signed in, a test account; a live payment to live ones. The DB stamps
+ * the payment from its order or cart buyer at insert, so a difference means
+ * the account changed lanes after checkout (or a bad import): the payment
+ * still pays as today, in one, but no installment is priced for it.
+ */
+export function paymentLaneConsistent(input: {
+  paymentIsTest: boolean;
+  orderIsTest: readonly boolean[];
+  /** The signed-in buyer's `isTestAccount`; null for a guest purchase. */
+  buyerIsTestAccount: boolean | null;
+}): boolean {
+  return (
+    input.orderIsTest.every((isTest) => isTest === input.paymentIsTest) &&
+    (input.buyerIsTestAccount === null ||
+      input.buyerIsTestAccount === input.paymentIsTest)
+  );
+}
+
 // ── Card (D5) ───────────────────────────────────────────────────────────────
 
 export interface InstallmentCardFacts {

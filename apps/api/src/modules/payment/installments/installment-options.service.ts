@@ -11,6 +11,7 @@ import { PaytrMerchant, Prisma, SavedCardStatus } from "@prisma/client";
 import * as Sentry from "@sentry/node";
 import { INSTALLMENT_SETTINGS } from "@tarodan/types";
 import type {
+  InstallmentBuyerSegment,
   InstallmentOption,
   InstallmentOptionsCard,
   InstallmentOptionsReason,
@@ -38,9 +39,13 @@ import {
   cardAllowsInstallments,
   evaluateInstallmentOffer,
   paymentKindAllowsInstallments,
+  paymentLaneConsistent,
   type InstallmentCardFacts,
+  type InstallmentOfferResult,
+  type InstallmentRateSource,
 } from "./installment-eligibility";
 import {
+  INSTALLMENT_FEE_SPLIT_ORDER_BY,
   singlePaymentPrice,
   type InstallmentPrice,
   type KeepGuardSlice,
@@ -83,7 +88,16 @@ export type CachedBinFacts =
 /** `failed` / `success` are cacheable answers; `error` is a non-answer. */
 export type BinFacts = CachedBinFacts | { outcome: "error" };
 
+/** A card PayTR knows (`success`). */
+export type KnownCardFacts = Extract<CachedBinFacts, { outcome: "success" }>;
+
+/** The card to price: a new card's BIN, or a saved card of the caller. */
+export type InstallmentCardSource =
+  { bin: string } | { savedCardId: string; userId: string };
+
 const ORDER_SLICE_SELECT = {
+  id: true,
+  isTest: true,
   origin: true,
   totalAmount: true,
   commissionAmount: true,
@@ -96,9 +110,16 @@ const ORDER_SLICE_SELECT = {
   platformFundedDiscount: true,
 } satisfies Prisma.OrderSelect;
 
+/** The buyer, for the segment and the lane check. */
+const TARGET_BUYER_SELECT = {
+  ...INSTALLMENT_BUYER_SELECT,
+  isTestAccount: true,
+} satisfies Prisma.UserSelect;
+
 const PAYMENT_SELECT = {
   id: true,
   amount: true,
+  isTest: true,
   paytrMerchant: true,
   tradeCashPaymentId: true,
   orderId: true,
@@ -109,32 +130,68 @@ const PAYMENT_SELECT = {
       ...ORDER_SLICE_SELECT,
       buyerId: true,
       shippingAddress: true,
-      buyer: { select: INSTALLMENT_BUYER_SELECT },
+      buyer: { select: TARGET_BUYER_SELECT },
     },
   },
   checkoutGroup: {
     select: {
       buyerId: true,
       isGuest: true,
-      buyer: { select: INSTALLMENT_BUYER_SELECT },
-      orders: { select: ORDER_SLICE_SELECT, orderBy: { createdAt: "asc" } },
+      buyer: { select: TARGET_BUYER_SELECT },
+      orders: {
+        select: ORDER_SLICE_SELECT,
+        orderBy: INSTALLMENT_FEE_SPLIT_ORDER_BY,
+      },
     },
   },
 } satisfies Prisma.PaymentSelect;
 
-type OptionsPayment = Prisma.PaymentGetPayload<{
+export type OptionsPayment = Prisma.PaymentGetPayload<{
   select: typeof PAYMENT_SELECT;
 }>;
-type SliceOrder = Prisma.OrderGetPayload<{ select: typeof ORDER_SLICE_SELECT }>;
+export type SliceOrder = Prisma.OrderGetPayload<{
+  select: typeof ORDER_SLICE_SELECT;
+}>;
 
-/** What the options are priced for. */
-interface PricingTarget {
+/** What the options (and the signed charge) are priced for. */
+export interface InstallmentPricingTarget {
+  /** T. In payment mode `Payment.amount`, the amount signing charges from. */
   baseAmount: Prisma.Decimal;
   guest: boolean;
   buyer: InstallmentSegmentBuyer | null;
+  /** The account the payment belongs to (order or cart buyer, trade payer). */
+  ownerId: string | null;
   /** null in amount mode: there is no payment to check the kind of. */
   orders: SliceOrder[] | null;
   payment: OptionsPayment | null;
+  /**
+   * The payment's test-lane stamp agrees with its orders and its signed-in
+   * buyer (plan 5.2). A mismatch is a data anomaly: no installments for it.
+   * Always true in amount mode.
+   */
+  laneConsistent: boolean;
+}
+
+/**
+ * The pricing of a target for a card (plan 5.2): the eligibility verdict and,
+ * once the card and the rates were read, every count's outcome. One pipeline
+ * for the options call and for signing.
+ */
+export interface InstallmentQuote {
+  /** The buyer's segment, resolved on the server. */
+  segment: InstallmentBuyerSegment;
+  /** Why no count above 1 is offered; null = at least one is. */
+  reason: InstallmentOptionsReason | null;
+  card?: InstallmentOptionsCard;
+  /** Set with `below_minimum`. */
+  minAmount?: Prisma.Decimal;
+  /** Set once the card and the rates were read. */
+  priced?: {
+    facts: KnownCardFacts;
+    family: PaytrCardFamily;
+    snapshot: InstallmentRateSource;
+    result: InstallmentOfferResult;
+  };
 }
 
 /** A guest order keeps the flag in its delivery snapshot. */
@@ -231,49 +288,83 @@ export class InstallmentOptionsService {
     const target = query.paymentId
       ? await this.paymentTarget(query.paymentId, caller)
       : await this.amountTarget(query.amount as number, caller.userId);
-    const settings = await this.settings.read();
+    const card: InstallmentCardSource = query.savedCardId
+      ? { savedCardId: query.savedCardId, userId: caller.userId as string }
+      : { bin: query.bin as string };
+    const quote = await this.quoteTarget(target, card);
     const single = optionOf(singlePaymentPrice(target.baseAmount));
-    const answer = (
-      reason: InstallmentOptionsReason,
-      extra: Partial<InstallmentOptionsResponse> = {},
-    ): InstallmentOptionsResponse => {
-      Sentry.getIsolationScope().setTag("installment_options", reason);
+    if (quote.reason || !quote.priced) {
+      Sentry.getIsolationScope().setTag(
+        "installment_options",
+        quote.reason ?? "unavailable",
+      );
       return {
         enabled: false,
-        reason,
+        reason: quote.reason ?? "unavailable",
         baseAmount: single.totalAmount,
         options: [single],
-        ...extra,
+        ...(quote.card ? { card: quote.card } : {}),
+        ...(quote.minAmount ? { minAmount: money(quote.minAmount) } : {}),
       };
+    }
+    Sentry.getIsolationScope().setTag("installment_options", "offered");
+    return {
+      enabled: true,
+      card: quote.card ?? {},
+      baseAmount: single.totalAmount,
+      options: [
+        single,
+        ...quote.priced.result.offers.map((offer) => optionOf(offer.price)),
+      ],
     };
+  }
 
-    if (!settings.enabled) return answer("disabled");
-    if (target.payment && !this.kindAllows(target.payment, target.orders)) {
-      return answer("not_offered_for_payment");
-    }
-    if (target.baseAmount.lessThan(settings.minAmount)) {
-      return answer("below_minimum", { minAmount: money(settings.minAmount) });
-    }
-
-    const facts = query.savedCardId
-      ? await this.savedCardFacts(query.savedCardId, caller.userId as string)
-      : await this.lookupCard(query.bin as string);
-    if (facts.outcome === "error") return answer("unavailable");
-    if (facts.outcome === "failed") return answer("card_not_eligible");
-    const card = cardOf(facts);
-    if (!cardAllowsInstallments(facts) || !isPaytrCardFamily(facts.family)) {
-      return answer("card_not_eligible", { card });
-    }
-
-    const snapshot = await this.rates.freshSnapshot();
-    if (!snapshot) return answer("unavailable", { card });
-
-    const now = new Date();
+  /**
+   * Prices `target` for a card: the settings (kill switch, minimum amount),
+   * the payment kind and lane, the card (D5), the fresh rate snapshot, the
+   * buyer's segment rules and, with orders, the keep guard. The options call
+   * and the signing call (`InstallmentChargeService`) both run it, so what a
+   * buyer is shown and what is signed cannot be priced two ways. A card is
+   * read only when the settings and the payment allow installments.
+   */
+  async quoteTarget(
+    target: InstallmentPricingTarget,
+    cardSource: InstallmentCardSource,
+    now: Date = new Date(),
+  ): Promise<InstallmentQuote> {
     const segment = installmentSegmentOf({
       guest: target.guest,
       buyer: target.buyer,
     });
     Sentry.getIsolationScope().setTag("installment_segment", segment);
+    const settings = await this.settings.read();
+    const refuse = (
+      reason: InstallmentOptionsReason,
+      extra: Partial<InstallmentQuote> = {},
+    ): InstallmentQuote => ({ segment, reason, ...extra });
+
+    if (!settings.enabled) return refuse("disabled");
+    if (target.payment && !this.kindAllows(target)) {
+      return refuse("not_offered_for_payment");
+    }
+    if (target.baseAmount.lessThan(settings.minAmount)) {
+      return refuse("below_minimum", { minAmount: settings.minAmount });
+    }
+
+    const facts =
+      "savedCardId" in cardSource
+        ? await this.savedCardFacts(cardSource.savedCardId, cardSource.userId)
+        : await this.lookupCard(cardSource.bin);
+    if (facts.outcome === "error") return refuse("unavailable");
+    if (facts.outcome === "failed") return refuse("card_not_eligible");
+    const card = cardOf(facts);
+    if (!cardAllowsInstallments(facts) || !isPaytrCardFamily(facts.family)) {
+      return refuse("card_not_eligible", { card });
+    }
+
+    const snapshot = await this.rates.freshSnapshot();
+    if (!snapshot) return refuse("unavailable", { card });
+
     const result = evaluateInstallmentOffer({
       baseAmount: target.baseAmount,
       snapshot,
@@ -284,21 +375,16 @@ export class InstallmentOptionsService {
       feeVatRatePct: INSTALLMENT_FEE_VAT_RATE_PCT,
       slices: target.orders ? target.orders.map(sliceOf) : null,
     });
+    const priced = { facts, family: facts.family, snapshot, result };
     if (result.offers.length === 0) {
-      return answer(
+      return refuse(
         result.offeredByPaytr.length === 0
           ? "card_not_eligible"
           : "not_offered_for_payment",
-        { card },
+        { card, priced },
       );
     }
-    Sentry.getIsolationScope().setTag("installment_options", "offered");
-    return {
-      enabled: true,
-      card,
-      baseAmount: single.totalAmount,
-      options: [single, ...result.offers.map((offer) => optionOf(offer.price))],
-    };
+    return { segment, reason: null, card, priced };
   }
 
   /**
@@ -345,10 +431,10 @@ export class InstallmentOptionsService {
     );
   }
 
-  private async savedCardFacts(
+  async savedCardFacts(
     savedCardId: string,
     userId: string,
-  ): Promise<CachedBinFacts> {
+  ): Promise<KnownCardFacts> {
     const saved = await this.prisma.savedCard.findFirst({
       where: {
         id: savedCardId,
@@ -381,22 +467,14 @@ export class InstallmentOptionsService {
   private async paymentTarget(
     paymentId: string,
     caller: InstallmentOptionsCaller,
-  ): Promise<PricingTarget> {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: PAYMENT_SELECT,
-    });
-    if (!payment) {
+  ): Promise<InstallmentPricingTarget> {
+    const target = await this.loadPaymentTarget(paymentId);
+    if (!target) {
       throw new NotFoundException(
         i18nMessage("server.payment.paymentNotFound"),
       );
     }
-    const buyerId =
-      payment.order?.buyerId ??
-      payment.checkoutGroup?.buyerId ??
-      payment.tradeCashPayment?.payerId ??
-      null;
-    const owns = !!caller.userId && buyerId === caller.userId;
+    const owns = !!caller.userId && target.ownerId === caller.userId;
     if (!caller.capabilityAuthorized && !owns) {
       throw new ForbiddenException(
         i18nMessage("server.payment.viewPaymentForbidden"),
@@ -405,24 +483,67 @@ export class InstallmentOptionsService {
     // Charged only after the access check: a stranger who knows the id
     // cannot spend the buyer's budget.
     await this.consumePaymentBudget(paymentId);
+    return target;
+  }
+
+  /**
+   * The payment as a pricing target, WITHOUT an access check (the caller
+   * owns it: the options call checks the buyer or the capability first,
+   * signing runs after `direct-form`'s own checks). T is `Payment.amount`;
+   * the segment comes from the payment's buyer (a guest purchase is `guest`,
+   * never the shared system account's tier); the orders are the keep guard's
+   * slices. Null = no such payment.
+   */
+  async loadPaymentTarget(
+    paymentId: string,
+  ): Promise<InstallmentPricingTarget | null> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: PAYMENT_SELECT,
+    });
+    if (!payment) return null;
+    const payerId = payment.tradeCashPayment?.payerId ?? null;
+    const ownerId =
+      payment.order?.buyerId ?? payment.checkoutGroup?.buyerId ?? payerId;
     const guest = payment.checkoutGroup
       ? payment.checkoutGroup.isGuest
       : isGuestAddress(payment.order?.shippingAddress ?? null);
+    const orderBuyer =
+      payment.order?.buyer ?? payment.checkoutGroup?.buyer ?? null;
+    // A trade cash payment has no order: its buyer is the payer.
     const buyer = guest
       ? null
-      : (payment.order?.buyer ?? payment.checkoutGroup?.buyer ?? null);
+      : (orderBuyer ??
+        (payerId
+          ? await this.prisma.user.findUnique({
+              where: { id: payerId },
+              select: TARGET_BUYER_SELECT,
+            })
+          : null));
     const orders = payment.checkoutGroup
       ? payment.checkoutGroup.orders
       : payment.order
         ? [payment.order]
         : [];
-    return { baseAmount: payment.amount, guest, buyer, orders, payment };
+    return {
+      baseAmount: payment.amount,
+      guest,
+      buyer,
+      ownerId,
+      orders,
+      payment,
+      laneConsistent: paymentLaneConsistent({
+        paymentIsTest: payment.isTest,
+        orderIsTest: orders.map((order) => order.isTest),
+        buyerIsTestAccount: buyer ? buyer.isTestAccount : null,
+      }),
+    };
   }
 
   private async amountTarget(
     amount: number,
     userId: string | null,
-  ): Promise<PricingTarget> {
+  ): Promise<InstallmentPricingTarget> {
     const buyer = userId
       ? await this.prisma.user.findUnique({
           where: { id: userId },
@@ -433,15 +554,23 @@ export class InstallmentOptionsService {
       baseAmount: new Prisma.Decimal(amount).toDecimalPlaces(2),
       guest: !buyer,
       buyer,
+      ownerId: userId,
       orders: null,
       payment: null,
+      laneConsistent: true,
     };
   }
 
-  private kindAllows(
-    payment: OptionsPayment,
-    orders: SliceOrder[] | null,
-  ): boolean {
+  /** D6 payment kind and the lane check (plan 5.2). */
+  private kindAllows(target: InstallmentPricingTarget): boolean {
+    const { payment, orders } = target;
+    if (!payment) return true;
+    if (!target.laneConsistent) {
+      this.logger.warn(
+        `INSTALLMENT_LANE_MISMATCH payment=${payment.id}: the payment's test-lane stamp differs from its orders or buyer; single payment only`,
+      );
+      return false;
+    }
     return paymentKindAllowsInstallments({
       paytrMerchant: payment.paytrMerchant,
       tradeCashPaymentId: payment.tradeCashPaymentId,
