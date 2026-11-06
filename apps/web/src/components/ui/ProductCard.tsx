@@ -20,6 +20,7 @@ import ProductCardPriceRow from "@/components/ui/ProductCardAction";
 import ProductCardTitleLink from "@/components/ui/ProductCardTitleLink";
 import {
   describeProductBadges,
+  MAX_CARD_BADGES,
   productBadgeLabels,
   selectProductCardBadges,
 } from "@/lib/productCardBadges";
@@ -69,6 +70,11 @@ import { listingPath } from "@tarodan/types";
  * top-left slot with `overlayStart`. The list layout shows the trade icon
  * (top-left of the image) and the boosted badge above the title; the discount
  * stays beside the price.
+ *
+ * `noPriceLabel` is the not-for-sale variant (a collection's custom item): the
+ * price row shows that text instead of the price, and the card has no discount
+ * badge and no action. The row keeps its height, so a grid of mixed cards
+ * stays aligned.
  */
 
 function cardImageUrl(image: ProductImage | string | undefined): string {
@@ -119,6 +125,12 @@ export interface ProductCardProps {
    * Never shown on non-navigating cards (`href={null}`).
    */
   showFavorite?: boolean;
+  /**
+   * Not-for-sale variant: this text (e.g. "Satışta değil") replaces the price
+   * row's old price, price and discount badge, and the card shows no action.
+   * For items that have no price at all; never pass a price of 0 to show.
+   */
+  noPriceLabel?: string;
 }
 
 export default function ProductCard({
@@ -132,6 +144,7 @@ export default function ProductCard({
   footer,
   href,
   showFavorite = true,
+  noPriceLabel,
 }: ProductCardProps) {
   const t = useTranslations();
   const badgeLabels = productBadgeLabels(t);
@@ -149,15 +162,22 @@ export default function ProductCard({
   // Kalp yalnız gerçek ilan kartında: özel (ilansız) koleksiyon öğesi
   // favorilenemez.
   const favorite = showFavorite && linkHref !== null;
-  // The card action needs a real listing, and gives way to a caller's footer.
-  const withAction = linkHref !== null && !footer;
+  const forSale = noPriceLabel === undefined;
+  // The card action needs a real listing for sale, and gives way to a
+  // caller's footer.
+  const withAction = forSale && linkHref !== null && !footer;
   const listing = toProductCardListing(product);
 
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
-  const salePercent = getProductDiscountPercent(product);
+  const salePercent = forSale ? getProductDiscountPercent(product) : 0;
+  // The badge selection without the discount when the card shows no price.
+  const cardBadges = (max: number) =>
+    selectProductCardBadges(product, Infinity)
+      .filter((badge) => forSale || badge.kind !== "sale")
+      .slice(0, max);
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
     : undefined;
@@ -182,7 +202,7 @@ export default function ProductCard({
   if (layout === "list") {
     // The list row shows the discount, boosted and trade badges (the
     // selection is the grid stack's `selectProductCardBadges`).
-    const listBadges = selectProductCardBadges(product, Infinity).filter(
+    const listBadges = cardBadges(Infinity).filter(
       (badge) =>
         badge.kind === "sale" ||
         badge.kind === "boosted" ||
@@ -285,22 +305,30 @@ export default function ProductCard({
             layout="list"
             withAction={withAction}
           >
-            {onSale && (
-              <span className="text-sm text-subtle line-through">
-                {fmtTL(originalPrice)}
-              </span>
-            )}
-            <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
-              {fmtTL(effectivePrice)}
-            </p>
-            {salePercent >= 1 && (
-              <ProductBadge
-                variant="sale"
-                className="xs:mt-1"
-                aria-hidden="true"
-              >
-                %{salePercent}
-              </ProductBadge>
+            {forSale ? (
+              <>
+                {onSale && (
+                  <span className="text-sm text-subtle line-through">
+                    {fmtTL(originalPrice)}
+                  </span>
+                )}
+                <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
+                  {fmtTL(effectivePrice)}
+                </p>
+                {salePercent >= 1 && (
+                  <ProductBadge
+                    variant="sale"
+                    className="xs:mt-1"
+                    aria-hidden="true"
+                  >
+                    %{salePercent}
+                  </ProductBadge>
+                )}
+              </>
+            ) : (
+              <p className="text-sm xs:text-base text-muted whitespace-nowrap">
+                {noPriceLabel}
+              </p>
             )}
           </ProductCardPriceRow>
         </div>
@@ -313,7 +341,7 @@ export default function ProductCard({
   }
 
   // Badges are drawn only when the caller leaves the top-left slot free.
-  const gridBadges = overlayStart ? [] : selectProductCardBadges(product);
+  const gridBadges = overlayStart ? [] : cardBadges(MAX_CARD_BADGES);
 
   return (
     <div className="@container relative group h-full flex flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
@@ -331,7 +359,7 @@ export default function ProductCard({
         {outOfStock && <OutOfStockOverlay />}
         {/* The top-left slot is `overlayStart`'s; when set, no badge stack. */}
         {!overlayStart && (
-          <ProductCardBadges product={product} labels={badgeLabels} />
+          <ProductCardBadges badges={gridBadges} labels={badgeLabels} />
         )}
       </div>
       <div className="p-2.5 flex-1 flex flex-col">
@@ -368,14 +396,20 @@ export default function ProductCard({
             layout="grid"
             withAction={withAction}
           >
-            {onSale && (
-              <span className="text-sm text-subtle line-through ml-1.5">
-                {fmtTL(originalPrice)}
-              </span>
+            {forSale ? (
+              <>
+                {onSale && (
+                  <span className="text-sm text-subtle line-through ml-1.5">
+                    {fmtTL(originalPrice)}
+                  </span>
+                )}
+                <p className="font-bold text-primary-600 text-base sm:text-lg">
+                  {fmtTL(effectivePrice)}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted">{noPriceLabel}</p>
             )}
-            <p className="font-bold text-primary-600 text-base sm:text-lg">
-              {fmtTL(effectivePrice)}
-            </p>
           </ProductCardPriceRow>
         </div>
       </div>

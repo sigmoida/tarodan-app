@@ -362,3 +362,104 @@ describe("ProductCard rozet düzeni", () => {
     expect(container.textContent).not.toContain("product.sponsored");
   });
 });
+
+describe.each(["grid", "list"] as const)(
+  "ProductCard not-for-sale variant (%s)",
+  (layout) => {
+    const discounted: Product = {
+      ...product,
+      oldPrice: 400,
+      price: 250,
+      discountPercent: 38,
+      tradeAvailable: true,
+    };
+    const actionButtons = () =>
+      Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.getAttribute("aria-label") !== "product.favorite",
+      );
+
+    it("without noPriceLabel: the price row shows the price and the action", () => {
+      act(() =>
+        root.render(<ProductCard product={discounted} layout={layout} />),
+      );
+      expect(container.textContent).toContain("TL");
+      expect(container.textContent).toContain("%38");
+      expect(actionButtons().length).toBeGreaterThan(0);
+    });
+
+    it("noPriceLabel replaces old price, price and discount; no action", () => {
+      act(() =>
+        root.render(
+          <ProductCard
+            product={discounted}
+            layout={layout}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      const text = container.textContent ?? "";
+      expect(text).toContain("Satışta değil");
+      expect(text).not.toContain("TL");
+      expect(text).not.toContain("250");
+      expect(text).not.toContain("400");
+      expect(text).not.toContain("%38");
+      expect(text).not.toContain("product.discount");
+      expect(actionButtons()).toHaveLength(0);
+      // The other badges stay (trade), and the label is plain readable text.
+      expect(container.querySelector("a")!.textContent).toContain("faq.trade");
+      const label = Array.from(container.querySelectorAll("p")).find(
+        (p) => p.textContent === "Satışta değil",
+      )!;
+      expect(label.className).toContain("text-muted");
+      expect(label.closest("[aria-hidden]")).toBeNull();
+    });
+
+    it("non-navigating not-for-sale card: no link, no heart, no button, no click tracking", () => {
+      act(() =>
+        root.render(
+          <ProductCard
+            product={product}
+            layout={layout}
+            href={null}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      expect(container.querySelector("a")).toBeNull();
+      expect(container.querySelector("button")).toBeNull();
+      expect(container.textContent).toContain(product.title);
+      expect(container.textContent).toContain("Satışta değil");
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  },
+);
+
+describe("ProductCard not-for-sale grid badges", () => {
+  it("drops only the discount from the stack and keeps two other badges", () => {
+    act(() =>
+      root.render(
+        <ProductCard
+          product={{
+            ...product,
+            oldPrice: 400,
+            discountPercent: 38,
+            isBoosted: true,
+            tradeAvailable: true,
+            feeCampaigns: ["Komisyonsuz"],
+          }}
+          noPriceLabel="Satışta değil"
+        />,
+      ),
+    );
+    const stack = container.querySelector<HTMLElement>(
+      '[data-testid="product-card-badges"]',
+    )!;
+    expect(Array.from(stack.children).map((c) => c.textContent)).toEqual([
+      "product.boostedBadge",
+      "faq.trade",
+    ]);
+    expect(container.querySelector("a .sr-only")!.textContent).toBe(
+      " product.boostedBadgeHint, faq.trade",
+    );
+  });
+});
