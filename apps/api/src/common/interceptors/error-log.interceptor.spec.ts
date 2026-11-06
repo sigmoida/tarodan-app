@@ -98,6 +98,25 @@ describe("ErrorLogInterceptor body redaction", () => {
     expect(JSON.stringify(lastRow)).not.toContain("opaque-header-token");
   });
 
+  // A refused `POST /payments/installment-options` (400/429/5xx) or
+  // `POST /payments/direct-form` (400/409) writes a row; the card BIN in its
+  // body is card-number digits and is never stored (docs/PCI_PAYMENT_PAGE.md).
+  it("never stores the card BIN, top-level or under installment", async () => {
+    const options = await run("POST", { bin: "45467112", paymentId: "p1" });
+    const directForm = await run("POST", {
+      paymentId: "p1",
+      installment: { count: 3, bin: "45467112", expectedTotal: 1066.38 },
+    });
+
+    expect(JSON.stringify(options.body)).not.toContain("45467112");
+    expect(JSON.stringify(directForm.body)).not.toContain("45467112");
+    expect(options.body).toEqual({ bin: "[REDACTED]", paymentId: "p1" });
+    expect(directForm.body).toMatchObject({
+      paymentId: "p1",
+      installment: { count: 3, bin: "[REDACTED]", expectedTotal: 1066.38 },
+    });
+  });
+
   it("stores no body for a GET", async () => {
     const metadata = await run("GET", { password: "hunter2" });
     expect(metadata.body).toBeUndefined();
