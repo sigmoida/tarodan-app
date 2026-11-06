@@ -10,6 +10,7 @@ import {
   paytrTaksitOranlariStagingBody,
   PAYTR_STAGING_FAMILIES,
   PAYTR_STAGING_FAMILY_RATES,
+  PAYTR_STAGING_SINGLE_RATE_PCT,
 } from "../../../../test/fixtures/paytr-taksit-oranlari-staging";
 import { INSTALLMENT_FEE_VAT_RATE_PCT } from "./installment-config";
 import {
@@ -27,8 +28,11 @@ describe("Installment rates: PayTR staging capture end to end (S0)", () => {
   let paytr: PayTRService;
   let fetchSpy: jest.SpyInstance;
   let warn: jest.SpyInstance;
+  /** The answer text for the echoed request_id; a test may swap it. */
+  let answerText: (requestId: string) => string;
 
   beforeEach(async () => {
+    answerText = paytrTaksitOranlariStagingBody;
     const module = await Test.createTestingModule({
       providers: [
         PayTRCredentials,
@@ -57,7 +61,7 @@ describe("Installment rates: PayTR staging capture end to end (S0)", () => {
       init: { body: string },
     ) => {
       const sent = new URLSearchParams(init.body).get("request_id") ?? "";
-      const text = paytrTaksitOranlariStagingBody(sent);
+      const text = answerText(sent);
       return { text: async () => text };
     }) as never) as unknown as jest.SpyInstance;
     warn = jest
@@ -169,5 +173,125 @@ describe("Installment rates: PayTR staging capture end to end (S0)", () => {
     expect(twelve?.price.feeAmount.toFixed(2)).toBe("438.32");
     expect(twelve?.price.monthlyAmount.toFixed(2)).toBe("119.86");
     expect(twelve?.price.platformCostAmount.toFixed(2)).toBe("0.00");
+  });
+
+  it.each([
+    ["without tumu", (oranlar: Record<string, unknown>) => delete oranlar.tumu],
+    [
+      "with tumu as a list",
+      (oranlar: Record<string, unknown>) => {
+        oranlar.tumu = [oranlar.tumu];
+      },
+    ],
+    [
+      "with a tek_cekim that rounds to 100",
+      (oranlar: Record<string, unknown>) => {
+        oranlar.tumu = { tek_cekim: "99.9995" };
+      },
+    ],
+  ])(
+    "stores no snapshot for the capture %s (fail closed to a single payment)",
+    async (_label, edit) => {
+      answerText = (requestId) => {
+        const answer = JSON.parse(
+          paytrTaksitOranlariStagingBody(requestId),
+        ) as {
+          oranlar: Record<string, unknown>;
+        };
+        edit(answer.oranlar);
+        return JSON.stringify(answer);
+      };
+      const { service, prisma } = ratesService();
+
+      expect(await service.refresh()).toBe("incomplete");
+      expect(prisma.installmentRateSnapshot.create).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Installment rates incomplete .*single rate missing, 9 families/,
+        ),
+      );
+      expect(await service.freshSnapshot()).toBeNull();
+    },
+  );
+
+  /**
+   * Derived from the fixture, not pinned: for every family and count of the
+   * capture and a spread of totals, the charge is the smallest equal-kurus
+   * charge that leaves the platform its single-payment net (s = 0), read back
+   * from the snapshot the way Postgres returns it (JSONB rates,
+   * Decimal(6,3) single rate).
+   */
+  it("prices every family and count of the stored capture as the minimal charge that keeps the single-payment net", async () => {
+    const { service } = ratesService();
+    const stored = await service.freshSnapshot();
+    expect(stored).not.toBeNull();
+    if (!stored) return;
+    const snapshot: InstallmentRateSource = {
+      ...stored,
+      singleRatePct: new Prisma.Decimal(stored.singleRatePct.toFixed(3)),
+      rates: JSON.parse(JSON.stringify(stored.rates)) as Prisma.JsonValue,
+    };
+    const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
+    const r1 = D(PAYTR_STAGING_SINGLE_RATE_PCT).div(100);
+    const k = INSTALLMENT_FEE_VAT_RATE_PCT.div(
+      INSTALLMENT_FEE_VAT_RATE_PCT.plus(100),
+    );
+    const counts = Object.keys(PAYTR_STAGING_FAMILY_RATES)
+      .map(Number)
+      .sort((a, b) => a - b);
+    // What the platform keeps of a charge C at rate rn, VAT of F = C - T out.
+    const netOf = (C: Prisma.Decimal, T: Prisma.Decimal, rn: Prisma.Decimal) =>
+      C.times(D(1).minus(rn)).minus(k.times(C.minus(T)));
+
+    const violations: string[] = [];
+    for (const total of [
+      "0.01",
+      "1.00",
+      "99.99",
+      "1000.00",
+      "1234.56",
+      "99999.99",
+    ]) {
+      const T = D(total);
+      const singleNet = T.times(D(1).minus(r1));
+      for (const family of PAYTR_STAGING_FAMILIES) {
+        const result = evaluateInstallmentOffer({
+          baseAmount: T,
+          snapshot,
+          family,
+          segment: "free",
+          rules: [],
+          now: new Date(),
+          feeVatRatePct: INSTALLMENT_FEE_VAT_RATE_PCT,
+          slices: null,
+        });
+        expect(result.offeredByPaytr).toEqual(counts);
+        expect(result.offers.map((o) => o.price.count)).toEqual(counts);
+        for (const { price, installmentRatePct } of result.offers) {
+          const n = price.count;
+          const rate = D(PAYTR_STAGING_FAMILY_RATES[String(n)]);
+          const rn = rate.div(100);
+          const C = price.chargedAmount;
+          const less = C.minus(D("0.01").times(n));
+          const checks: Record<string, boolean> = {
+            "rn is the fixture rate": installmentRatePct.equals(rate),
+            "installment is whole kurus":
+              price.monthlyAmount.decimalPlaces() <= 2,
+            "C = n x installment": price.monthlyAmount.times(n).equals(C),
+            "F = C - T > 0":
+              price.feeAmount.equals(C.minus(T)) && price.feeAmount.gt(0),
+            "P = 0": price.platformCostAmount.isZero(),
+            "keeps the single-payment net": netOf(C, T, rn).gte(singleNet),
+            // One kurus less per installment would not keep it.
+            "is the smallest such charge": netOf(less, T, rn).lt(singleNet),
+          };
+          for (const [check, holds] of Object.entries(checks)) {
+            if (!holds)
+              violations.push(`${family} T=${total} n=${n}: ${check}`);
+          }
+        }
+      }
+    }
+    expect(violations).toEqual([]);
   });
 });

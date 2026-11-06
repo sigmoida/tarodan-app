@@ -13,7 +13,18 @@ import {
   chargeAttemptCreateData,
   type ChargeQuoteInput,
 } from "./installment-charge.service";
+import { parsePaytrInstallmentRates } from "../../payment-providers/paytr/paytr-installments";
+import {
+  paytrTaksitOranlariStagingBody,
+  PAYTR_STAGING_FAMILY_RATES,
+  PAYTR_STAGING_SINGLE_RATE_PCT,
+} from "../../../../test/fixtures/paytr-taksit-oranlari-staging";
+import { INSTALLMENT_FEE_VAT_RATE_PCT } from "./installment-config";
 import { InstallmentOptionsService } from "./installment-options.service";
+import {
+  allocateInstallmentFee,
+  priceInstallment,
+} from "./installment-pricing";
 import type { InstallmentRuleCandidate } from "./installment-rules";
 
 /**
@@ -543,6 +554,126 @@ describe("InstallmentChargeService.quoteCharge", () => {
       const quote = await service.quoteCharge(input(THREE));
       expect(quote.chargedAmount.toFixed(2)).toBe("1066.38");
     });
+  });
+});
+
+/**
+ * The snapshot the rate service stores from the PayTR staging capture (the
+ * real parser over the fixture), signed end to end: the attempt row carries
+ * the snapshot's r1 and rn at the column scale, and the fee splits over a
+ * cart to the kurus. Expected totals come from the fixture through the one
+ * formula, so a replaced fixture keeps this spec valid.
+ */
+describe("InstallmentChargeService.quoteCharge with the staging capture snapshot", () => {
+  const parsed = parsePaytrInstallmentRates(
+    (JSON.parse(paytrTaksitOranlariStagingBody()) as { oranlar: unknown })
+      .oranlar,
+  );
+  const STAGING_SNAPSHOT = {
+    id: "snap-staging",
+    fetchedAt: new Date(NOW - 60_000),
+    singleRatePct: D(parsed.singleRatePct ?? "NaN"),
+    maxInstallmentNonBusiness: 12,
+    rates: parsed.rates,
+  };
+  const shownTotal = (base: string, count: number) =>
+    priceInstallment({
+      baseAmount: D(base),
+      count,
+      singleRatePct: D(PAYTR_STAGING_SINGLE_RATE_PCT),
+      installmentRatePct: D(PAYTR_STAGING_FAMILY_RATES[String(count)]),
+      platformSharePct: D(0),
+      feeVatRatePct: INSTALLMENT_FEE_VAT_RATE_PCT,
+    }).chargedAmount;
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each([2, 3, 6, 12])(
+    "signs %p installments with the snapshot's r1 and rn in the attempt row",
+    async (count) => {
+      const { service } = setup({ snapshot: STAGING_SNAPSHOT });
+      const expected = shownTotal("1000.00", count);
+      const quote = await service.quoteCharge(
+        input({ count, bin: "45467112", expectedTotal: expected.toNumber() }),
+      );
+      const data = chargeAttemptCreateData(quote, {
+        paymentId: "pay-1",
+        merchantOid: "ORDSTAGING",
+        paytrMerchant: PaytrMerchant.marketplace,
+      });
+
+      expect(data.installmentCount).toBe(count);
+      expect(data.rateSnapshotId).toBe("snap-staging");
+      expect(String(data.singleRatePct)).toBe(
+        D(PAYTR_STAGING_SINGLE_RATE_PCT).toString(),
+      );
+      expect(String(data.installmentRatePct)).toBe(
+        D(PAYTR_STAGING_FAMILY_RATES[String(count)]).toString(),
+      );
+      // Decimal(6,3) would round a finer rate silently: the row must hold
+      // exactly the rates the charge was priced with.
+      expect(D(String(data.singleRatePct)).decimalPlaces()).toBeLessThanOrEqual(
+        3,
+      );
+      expect(
+        D(String(data.installmentRatePct)).decimalPlaces(),
+      ).toBeLessThanOrEqual(3);
+      // The amounts CHECK: C = T + F, F > 0 for a buyer-paid installment.
+      const charged = D(String(data.chargedAmount));
+      const fee = D(String(data.installmentFeeAmount));
+      expect(charged.toFixed(2)).toBe(expected.toFixed(2));
+      expect(charged.equals(D("1000.00").plus(fee))).toBe(true);
+      expect(fee.gt(0)).toBe(true);
+      expect(String(data.platformCostAmount)).toBe("0");
+    },
+  );
+
+  it("prices a two-seller cart at 12 installments and splits its fee to the kurus", async () => {
+    const group = {
+      ...orderPayment({
+        orderId: null,
+        order: null,
+        checkoutGroupId: "grp-1",
+      }),
+      checkoutGroup: {
+        buyerId: "buyer-1",
+        isGuest: false,
+        buyer: buyer(MembershipTierType.free),
+        orders: [
+          order({
+            id: "o-a",
+            totalAmount: D("600.00"),
+            commissionAmount: D("60.00"),
+          }),
+          order({
+            id: "o-b",
+            totalAmount: D("400.00"),
+            commissionAmount: D("40.00"),
+          }),
+        ],
+      },
+    };
+    const { service } = setup({ payment: group, snapshot: STAGING_SNAPSHOT });
+    const expected = shownTotal("1000.00", 12);
+    const quote = await service.quoteCharge(
+      input({ count: 12, bin: "45467112", expectedTotal: expected.toNumber() }),
+    );
+    expect(quote.chargedAmount.equals(expected)).toBe(true);
+
+    const shares = allocateInstallmentFee(quote.feeAmount, [
+      D("600.00"),
+      D("400.00"),
+    ]);
+    expect(shares.every((share) => share.decimalPlaces() <= 2)).toBe(true);
+    expect(
+      shares
+        .reduce((sum, share) => sum.plus(share), D(0))
+        .equals(quote.feeAmount),
+    ).toBe(true);
   });
 });
 
