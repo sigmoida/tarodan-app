@@ -1147,9 +1147,29 @@ yerdedir: `modules/invoicing/invoice/package-fee-components.ts`.
   faturalanmış paketlerde ücretler LEGACY `commission` / `service_fee` ile
   kesilir; aksi halde aynı bedel iki belgede yer alır. Kargo payı belgeleri iki
   nesilde de kalem bazlıdır (birleşik belgeye hiç girmiyordu).
-- **İade** her belgeyi kendi kaleminin iade tutarı oranında tersler
-  (`RefundFinancialComponent`); satıcı kargo payının kalem karşılığı yoktur,
-  genel iade oranına düşer.
+- **Refunds** reverse each document by its own component's refunded amount
+  (`RefundFinancialComponent`); the seller shipping share has no component
+  and follows the general refund ratio.
+- **A return never takes more than the document carries beyond what it
+  should carry now** (`invoicing/invoice/return-invoice-amounts.ts`): due =
+  min(the attempt's share, document total - returns cut - target), where the
+  target is the document rebuilt by its cut's own reader, after every
+  finalized refund, at the VAT rate(s) it was cut with. A document is often
+  cut net of an early refund (`platform_sale` from `refundedOrders`, the
+  package fee documents and the legacy `commission` / `service_fee` from the
+  ledger's refunded columns); that refund's late event then finds no room
+  and cuts nothing. The amount is decided inside the Serializable
+  transaction that cuts the return. Types whose amount never follows a
+  refund (membership, boost, seller shipping, trade) have no target and keep
+  the `refundAdjustedAt` stamp of an unsent reprice.
+- **Cancel claim**: a full refund that closes a fresh e-Arşiv cancels it only
+  under an exclusive, leased claim (`cancelReason =
+refund_cancelling:<ms>:<token>`, `helpers/invoice-cancel-claim.ts`) taken
+  where no return exists. Any other run, the same attempt's other handler
+  included, backs off (`INVOICE_CANCEL_IN_PROGRESS`, the outbox retries), and
+  a return is never cut while a claim is held; a stale claim is settled from
+  eLogo's status. Two handlers of one refund, or a cancel and another
+  attempt's return, never reverse a document twice.
 
 **Ceza faturası** (`penalty`) iadede kusurlu taraftan tahsil edilen KARGO
 bedelini belgeler. Politika parayı zaten doğru dağıtıyordu
