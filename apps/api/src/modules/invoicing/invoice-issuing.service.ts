@@ -10,6 +10,7 @@ import { buildPenaltyBasis } from "./invoice/penalty-basis";
 import { resolveGuestInvoiceRecipient } from "./invoice/guest-recipient";
 import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
 import { translateMessage } from "../i18n/translate";
+import { errorMessage } from "../../common/helpers/error-message";
 import { InvoiceDocumentService } from "./invoice-document.service";
 import { InvoiceDeliveryService } from "./invoice-delivery.service";
 
@@ -81,10 +82,10 @@ export class InvoiceIssuingService {
     const run = async (step: () => Promise<void>) => {
       try {
         await step();
-      } catch (error: any) {
+      } catch (error: unknown) {
         failures++;
         this.logger.warn(
-          `eLogo teslim faturası hatası ${orderId}: ${error?.message ?? error}`,
+          `eLogo teslim faturası hatası ${orderId}: ${errorMessage(error)}`,
         );
       }
     };
@@ -104,9 +105,9 @@ export class InvoiceIssuingService {
         where: { id: orderId },
         data: { revenueInvoicedAt: new Date() },
       })
-      .catch((e: any) =>
+      .catch((e: unknown) =>
         this.logger.warn(
-          `revenueInvoicedAt işareti yazılamadı ${orderId}: ${e?.message}`,
+          `revenueInvoicedAt işareti yazılamadı ${orderId}: ${errorMessage(e)}`,
         ),
       );
   }
@@ -272,8 +273,8 @@ export class InvoiceIssuingService {
     for (const step of steps) {
       try {
         await step();
-      } catch (error: any) {
-        failures.push(String(error?.message ?? error));
+      } catch (error: unknown) {
+        failures.push(errorMessage(error));
       }
     }
     if (failures.length > 0) {
