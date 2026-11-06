@@ -20,7 +20,11 @@ export interface UseAdminMutationOptions<TData, TVars> {
    * automatically after an action, no manual refetch().
    */
   invalidates?: string[];
-  successMessage?: string;
+  /**
+   * Success toast. A function builds it from the response, for a write whose
+   * outcome the server decides (e.g. the cash a refund gives back).
+   */
+  successMessage?: string | ((data: TData, vars: TVars) => string | undefined);
   errorMessage?: string;
   /**
    * Show the shared error toast on failure. Disable when the caller renders
@@ -154,10 +158,12 @@ export function useAdminMutation<TData, TVars = void>(
     },
     onSuccess: (data, vars) => {
       invalidateAdminResources(queryClient, invalidates);
-      if (successMessage) {
-        toast.success(successMessage, {
-          id: toastId("success", successMessage),
-        });
+      const message =
+        typeof successMessage === "function"
+          ? successMessage(data, vars)
+          : successMessage;
+      if (message) {
+        toast.success(message, { id: toastId("success", message) });
       }
       onSuccess?.(data, vars);
     },
