@@ -25,6 +25,13 @@ import { errorMessage } from "../../../common/helpers/error-message";
 import { payerIpFromPaymentMetadata } from "../helpers/paytr-merchant.helper";
 import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
 import { resolveTimingValue } from "../../../common/timing-rules";
+import {
+  chargeAttemptByOid,
+  expectedPaytrChargeFor,
+  expectedPaytrChargeOf,
+  paytrAmountMatches,
+  paytrKurusMatches,
+} from "../helpers/charged-amount";
 
 /**
  * A callback whose four protocol-required fields are present.
@@ -225,10 +232,15 @@ export class PaymentCallbackService {
       const tolerance = parseFloat(
         this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
       );
+      // A recurring renewal is never an installment charge: PayTR charged
+      // its amount (`chargeRecurring` signs installment_count 0).
       if (
         inquiry.ok &&
-        Math.abs(inquiry.paymentTotalTl - Number(recurringPayment.amount)) <=
-          tolerance
+        paytrAmountMatches(
+          inquiry.paymentTotalTl,
+          recurringPayment.amount,
+          tolerance,
+        )
       ) {
         if (!this.virtualOrder) {
           throw new Error("Virtual order fulfillment service is unavailable");
@@ -299,18 +311,20 @@ export class PaymentCallbackService {
       inquiry = await provider.queryPaymentStatus(oid.replace(/-/g, ""));
     }
 
+    // PSP scale: what THIS oid was signed for (its charge attempt), else
+    // the legacy `amount`.
+    const expected = await expectedPaytrChargeFor(this.prisma, payment, oid);
     if (!inquiry.ok) {
       const fail = inquiry as { ok: false; errNo?: string; errMsg?: string };
       this.logger.error(
-        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? "unknown"} ourAmount=${Number(payment.amount)}`,
+        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? "unknown"} ourAmount=${expected.toFixed(2)}`,
       );
       return "OK";
     }
 
-    const ourAmount = Number(payment.amount);
-    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+    if (!paytrAmountMatches(inquiry.paymentTotalTl, expected, tolerance)) {
       this.logger.error(
-        `PayTR hash mismatch: amount mismatch payment=${payment.id} merchant_oid=${dto.merchant_oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+        `PayTR hash mismatch: amount mismatch payment=${payment.id} merchant_oid=${dto.merchant_oid} paytr=${inquiry.paymentTotalTl} ours=${expected.toFixed(2)}`,
       );
       return "OK";
     }
@@ -449,8 +463,11 @@ export class PaymentCallbackService {
       const expectedKurus = Math.round(Number(recurringPayment.amount) * 100);
       const callbackKurus = parseInt(dto.total_amount, 10);
       if (
-        !Number.isFinite(callbackKurus) ||
-        Math.abs(callbackKurus - expectedKurus) / 100 > toleranceTl
+        !paytrKurusMatches(
+          dto.total_amount,
+          recurringPayment.amount,
+          toleranceTl,
+        )
       ) {
         this.logger.error(
           `PayTR recurring callback amount mismatch membershipPayment=${recurringPayment.id} expected=${expectedKurus} received=${dto.total_amount}`,
@@ -536,13 +553,24 @@ export class PaymentCallbackService {
       const toleranceTl = parseFloat(
         this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
       );
-      const expectedKurus = Math.round(Number(payment.amount) * 100);
-      const callbackKurus = parseInt(dto.total_amount, 10);
-      if (Math.abs(callbackKurus - expectedKurus) / 100 > toleranceTl) {
+      // PSP scale: the amount signed for THIS oid (its charge attempt; a late
+      // callback of a superseded attempt is checked against its own), else
+      // the legacy `amount`.
+      const attempt = await chargeAttemptByOid(
+        this.prisma,
+        payment.id,
+        dto.merchant_oid,
+      );
+      const expected = expectedPaytrChargeOf(payment, attempt);
+      if (!paytrKurusMatches(dto.total_amount, expected, toleranceTl)) {
+        const code =
+          attempt && attempt.installmentCount > 1
+            ? "INSTALLMENT_CALLBACK_AMOUNT_MISMATCH"
+            : "PAYTR_CALLBACK_AMOUNT_MISMATCH";
         this.logger.error(
-          `PayTR callback tutar uyuşmazlığı (merchant_oid=${dto.merchant_oid}): ` +
-            `beklenen ${expectedKurus} kuruş, gelen ${callbackKurus} kuruş — ` +
-            `ödeme TAMAMLANMADI, manuel inceleme gerekir`,
+          `${code} payment=${payment.id} merchant_oid=${dto.merchant_oid}: ` +
+            `expected ${expected.times(100).toFixed(0)} kuruş, received ${dto.total_amount}; ` +
+            `payment NOT completed, manual review required`,
         );
         return "OK";
       }

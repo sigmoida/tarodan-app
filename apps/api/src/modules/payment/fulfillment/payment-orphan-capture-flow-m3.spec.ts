@@ -14,6 +14,12 @@ describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M
     casCount?: number;
   }) => {
     const prisma = {
+      // Forms signed before charge attempts: every oid falls back to `amount`.
+      paymentChargeAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       payment: {
         findMany: jest.fn().mockResolvedValue([opts.candidate]),
         findUnique: jest.fn().mockResolvedValue(opts.full),

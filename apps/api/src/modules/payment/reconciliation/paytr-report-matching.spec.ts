@@ -1,7 +1,9 @@
+import { Logger } from "@nestjs/common";
 import {
   PaytrMatchStatus,
   PaytrStatementLineType,
   PaymentStatus,
+  Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PaytrReportMatchingService } from "./paytr-report-matching.service";
@@ -54,6 +56,11 @@ function makePrisma(opts: {
   items?: any[];
 }) {
   return {
+    // Forms signed before charge attempts: every oid falls back to `amount`.
+    paymentChargeAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     paytrStatementLine: {
       findMany: jest.fn().mockImplementation((args: any) => {
         if (args?.distinct) {
@@ -140,6 +147,48 @@ describe("PaytrReportMatchingService.matchStatementLines", () => {
         }),
       }),
     );
+  });
+
+  it("matches an installment sale line at the C its oid was signed for (PSP scale)", async () => {
+    const prisma = makePrisma({
+      lines: [makeLine({ amount: 106.64 })],
+      payment: { id: "pay-1", amount: 100, chargedAmount: null },
+    });
+    prisma.paymentChargeAttempt.findFirst.mockResolvedValue({
+      chargedAmount: new Prisma.Decimal("106.64"),
+    });
+    const service = new PaytrReportMatchingService(prisma as never);
+
+    const r = await service.matchStatementLines();
+
+    expect(r.matched).toBe(1);
+    expect(prisma.paymentChargeAttempt.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { merchantOid: "ORD1", paymentId: "pay-1" },
+      }),
+    );
+  });
+
+  it("flags an installment sale line that shows T where C was charged", async () => {
+    const prisma = makePrisma({
+      lines: [makeLine({ amount: 100 })],
+      payment: { id: "pay-1", amount: 100, chargedAmount: null },
+    });
+    prisma.paymentChargeAttempt.findFirst.mockResolvedValue({
+      chargedAmount: new Prisma.Decimal("106.64"),
+    });
+    const errorLog = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const service = new PaytrReportMatchingService(prisma as never);
+
+    const r = await service.matchStatementLines();
+
+    expect(r.mismatched).toBe(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining("PAYTR_STATEMENT_MISMATCH"),
+    );
+    errorLog.mockRestore();
   });
 
   it("selects only unmatched, unresolved lines not attempted in the last day, newest-first", async () => {

@@ -15,6 +15,7 @@ import {
   refundRequestAdminReasonCode,
 } from "../helpers/refund-attempt-actor";
 import { REFUND_FAILURE_PROVIDER_NOTHING_LEFT } from "../helpers/refund-provider-failure";
+import { paytrAmountMatches } from "../helpers/charged-amount";
 import {
   claimRefundAlarm,
   sweepablePaymentWhere,
@@ -164,8 +165,11 @@ export class RefundReconciliationService {
         if (match) {
           if (
             match.amountTl != null &&
-            Math.abs(match.amountTl - amount) >
-              REFUND_RESOLVE_AMOUNT_TOLERANCE_TL
+            !paytrAmountMatches(
+              match.amountTl,
+              attempt.amount,
+              REFUND_RESOLVE_AMOUNT_TOLERANCE_TL,
+            )
           ) {
             this.logger.warn(
               `Refund resolve: attempt ${attempt.id} referansı eşleşti ama tutar tutmuyor ` +
@@ -204,8 +208,11 @@ export class RefundReconciliationService {
             (r) =>
               !r.referenceNo &&
               r.amountTl != null &&
-              Math.abs(r.amountTl - amount) <=
+              paytrAmountMatches(
+                r.amountTl,
+                attempt.amount,
                 REFUND_RESOLVE_AMOUNT_TOLERANCE_TL,
+              ),
           );
           if (ambiguous) {
             // Referanssız aynı-tutarlı iade: bizim referanssız (özellik öncesi)

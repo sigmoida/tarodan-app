@@ -1,8 +1,15 @@
 import { Prisma } from "@prisma/client";
 import {
+  chargeAttemptByOid,
   chargedAmountOf,
+  expectedPaytrChargeFor,
   orderChargedTotalOf,
+  orderInstallmentFeeOf,
+  paytrAmountMatches,
+  paytrChargeExpectationsOf,
+  paytrKurusMatches,
   refundGoodsPartOf,
+  type ChargeAttemptReader,
 } from "./charged-amount";
 
 const d = (value: string) => new Prisma.Decimal(value);
@@ -90,4 +97,131 @@ describe("refundGoodsPartOf", () => {
       }).toFixed(2),
     ).toBe("120.00");
   });
+});
+
+describe("orderInstallmentFeeOf", () => {
+  it("reads the order's allocated fee share", () => {
+    expect(
+      orderInstallmentFeeOf({ installmentFeeAmount: d("39.83") }).toFixed(2),
+    ).toBe("39.83");
+  });
+});
+
+/**
+ * The PSP-scale expectation per merchant_oid (plan 5.6): a form signed with
+ * an attempt is checked against that attempt's C, also after a later form
+ * superseded it; anything else against the legacy rule.
+ */
+describe("expected PayTR charge by oid", () => {
+  const pending = { id: "pay-1", amount: d("1000.00"), chargedAmount: null };
+  const attempts = [
+    { merchantOid: "ORD1A", chargedAmount: d("1066.38") }, // 3 x, superseded
+    { merchantOid: "ORD1B", chargedAmount: d("1000.00") }, // single, current
+  ];
+  const reader = () => {
+    const paymentChargeAttempt = {
+      findFirst: jest.fn(
+        async ({
+          where,
+        }: {
+          where: { merchantOid: string; paymentId: string };
+        }) =>
+          where.paymentId === "pay-1"
+            ? (attempts.find((a) => a.merchantOid === where.merchantOid) ??
+              null)
+            : null,
+      ),
+      findMany: jest.fn(async (_args: unknown) => attempts),
+    };
+    return {
+      paymentChargeAttempt,
+      db: { paymentChargeAttempt } as unknown as ChargeAttemptReader,
+    };
+  };
+
+  it("checks a late callback of a superseded attempt against its own C", async () => {
+    expect(
+      (await expectedPaytrChargeFor(reader().db, pending, "ORD1A")).toFixed(2),
+    ).toBe("1066.38");
+    expect(
+      (await expectedPaytrChargeFor(reader().db, pending, "ORD1B")).toFixed(2),
+    ).toBe("1000.00");
+  });
+
+  it("falls back to the legacy amount for an oid signed before attempts", async () => {
+    expect(
+      (await expectedPaytrChargeFor(reader().db, pending, "ORD1OLD")).toFixed(
+        2,
+      ),
+    ).toBe("1000.00");
+  });
+
+  it("falls back to the captured charged amount of a completed payment", async () => {
+    const captured = { ...pending, chargedAmount: d("1066.38") };
+    expect(
+      (await expectedPaytrChargeFor(reader().db, captured, "ORD1OLD")).toFixed(
+        2,
+      ),
+    ).toBe("1066.38");
+  });
+
+  it("reads only THIS payment's attempt for the oid", async () => {
+    const { db, paymentChargeAttempt } = reader();
+    await chargeAttemptByOid(db, "pay-1", "ORD1A");
+    expect(paymentChargeAttempt.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { merchantOid: "ORD1A", paymentId: "pay-1" },
+      }),
+    );
+    expect(await chargeAttemptByOid(db, "pay-2", "ORD1A")).toBeNull();
+  });
+
+  it("maps every oid of a payment with one query (the sweeps)", async () => {
+    const { db, paymentChargeAttempt } = reader();
+    const expectedFor = await paytrChargeExpectationsOf(db, pending);
+    expect(expectedFor("ORD1A").toFixed(2)).toBe("1066.38");
+    expect(expectedFor("ORD1B").toFixed(2)).toBe("1000.00");
+    expect(expectedFor("ORD1OLD").toFixed(2)).toBe("1000.00");
+    expect(paymentChargeAttempt.findMany).toHaveBeenCalledTimes(1);
+    expect(paymentChargeAttempt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { paymentId: "pay-1" } }),
+    );
+  });
+});
+
+describe("paytrAmountMatches / paytrKurusMatches (the one comparison rule)", () => {
+  it.each`
+    reported        | expected     | matches
+    ${1066.38}      | ${"1066.38"} | ${true}
+    ${1066.43}      | ${"1066.38"} | ${true}
+    ${1066.44}      | ${"1066.38"} | ${false}
+    ${1000}         | ${"1066.38"} | ${false}
+    ${"1066.33"}    | ${"1066.38"} | ${true}
+    ${d("1066.38")} | ${1066.38}   | ${true}
+  `(
+    "TL $reported vs $expected within 0.05: $matches",
+    ({ reported, expected, matches }) => {
+      expect(paytrAmountMatches(reported, expected, 0.05)).toBe(matches);
+    },
+  );
+
+  it.each([NaN, Infinity, "abc", "", "1e3"])(
+    "never matches a value that is not an amount (%p): fail closed",
+    (reported) => {
+      expect(paytrAmountMatches(reported, d("1000.00"), 0.05)).toBe(false);
+    },
+  );
+
+  it("reads the callback's kuruş", () => {
+    expect(paytrKurusMatches("106638", d("1066.38"), 0.05)).toBe(true);
+    // The goods total T instead of C: not completed (plan 6.1).
+    expect(paytrKurusMatches("100000", d("1066.38"), 0.05)).toBe(false);
+  });
+
+  it.each(["", "abc", "1066.38", "-100", " "])(
+    "never matches a kuruş value that is not whole digits (%p)",
+    (reported) => {
+      expect(paytrKurusMatches(reported, d("1066.38"), 0.05)).toBe(false);
+    },
+  );
 });

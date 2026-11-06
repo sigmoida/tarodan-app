@@ -1,4 +1,4 @@
-import { OrderStatus, PaymentStatus } from "@prisma/client";
+import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { PspReconciliationService } from "./psp-reconciliation.service";
 
 /**
@@ -10,7 +10,13 @@ import { PspReconciliationService } from "./psp-reconciliation.service";
  * fulfillment the same way the callback's `installment_count` does.
  */
 describe("PspReconciliationService.reconcilePendingPaytrPayments: provider data", () => {
-  const build = (inquiry: Record<string, unknown>) => {
+  const build = (
+    inquiry: Record<string, unknown>,
+    attempts: Array<{
+      merchantOid: string;
+      chargedAmount: Prisma.Decimal;
+    }> = [],
+  ) => {
     const row = {
       id: "pay-1",
       amount: 100,
@@ -32,6 +38,12 @@ describe("PspReconciliationService.reconcilePendingPaytrPayments: provider data"
       checkoutGroup: null,
     };
     const prisma = {
+      // Forms signed before charge attempts: every oid falls back to `amount`.
+      paymentChargeAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue(attempts),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       payment: {
         findMany: jest.fn().mockResolvedValue([row]),
         findUnique: jest.fn().mockResolvedValue(full),
@@ -107,6 +119,36 @@ describe("PspReconciliationService.reconcilePendingPaytrPayments: provider data"
     const res = await service.reconcilePendingPaytrPayments();
 
     expect(res).toEqual({ checked: 1, completed: 0 });
+    expect(processSuccessfulPayment).not.toHaveBeenCalled();
+  });
+
+  it("recovers an installment charge at the C its oid was signed for", async () => {
+    // The lost callback of a 3-installment form: PayTR charged C, not T.
+    const { service, processSuccessfulPayment } = build(
+      {
+        ok: true,
+        paymentTotalTl: 106.64,
+        paymentAmountTl: 106.64,
+        currency: "TL",
+        installmentCount: 3,
+      },
+      [{ merchantOid: "oid1", chargedAmount: new Prisma.Decimal("106.64") }],
+    );
+
+    const res = await service.reconcilePendingPaytrPayments();
+
+    expect(res).toEqual({ checked: 1, completed: 1 });
+    expect(processSuccessfulPayment.mock.calls[0][2]).toBe("oid1");
+  });
+
+  it("does not recover an installment oid PayTR reports at T", async () => {
+    const { service, processSuccessfulPayment } = build(
+      { ok: true, paymentTotalTl: 100, paymentAmountTl: 100, currency: "TL" },
+      [{ merchantOid: "oid1", chargedAmount: new Prisma.Decimal("106.64") }],
+    );
+
+    await service.reconcilePendingPaytrPayments();
+
     expect(processSuccessfulPayment).not.toHaveBeenCalled();
   });
 });
