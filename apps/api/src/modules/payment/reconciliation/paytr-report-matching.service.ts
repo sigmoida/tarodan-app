@@ -21,6 +21,7 @@ import { errorMessage } from "../../../common/helpers/error-message";
 import { paymentOids } from "../helpers/payment-oids";
 import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
 import {
+  chargedAmountOf,
   expectedPaytrChargeFor,
   paytrAmountMatches,
 } from "../helpers/charged-amount";
@@ -438,6 +439,7 @@ export class PaytrReportMatchingService {
           select: {
             id: true,
             amount: true,
+            chargedAmount: true,
             providerConversationId: true,
             metadata: true,
           },
@@ -458,11 +460,12 @@ export class PaytrReportMatchingService {
         const oids = paymentOids(payment);
         if (oids.length === 0 || oids.some((o) => paytrOids.has(o))) continue;
         missing++;
+        // The charged amount (PSP scale): what the statement would show.
         this.logger.error(
-          `PAYTR_MISSING_TRANSACTION (manuel inceleme gerekir): payment ${payment.id} ` +
-            `oid=${oids[0]} tutar=${payment.amount} bizde tamamlanmış görünüyor ama ` +
-            `${dayStart.toISOString().slice(0, 10)} işlem dökümünde YOK — para PayTR'ye ` +
-            `düşmemiş olabilir.`,
+          `PAYTR_MISSING_TRANSACTION (manual review required): payment ${payment.id} ` +
+            `oid=${oids[0]} amount=${chargedAmountOf(payment).toFixed(2)} is completed on our side but ` +
+            `missing from the ${dayStart.toISOString().slice(0, 10)} statement; the money may not ` +
+            `have reached PayTR.`,
         );
       }
       for (const renewal of renewals) {
