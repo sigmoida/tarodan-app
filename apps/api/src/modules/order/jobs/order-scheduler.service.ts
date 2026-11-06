@@ -106,7 +106,7 @@ export class OrderSchedulerService implements OnModuleInit {
             );
           } catch (err: unknown) {
             this.logger.error(
-              `Takılı kargo admin bildirimi başarısız (order=${order.id}): ${errorMessage(err)}`,
+              `Stuck shipment admin notification failed (order=${order.id}): ${errorMessage(err)}`,
             );
           }
         }
@@ -128,7 +128,7 @@ export class OrderSchedulerService implements OnModuleInit {
             );
           } catch (err: unknown) {
             this.logger.warn(
-              `Takılı kargo kullanıcı bildirimi başarısız (order=${order.id}, user=${userId}): ${errorMessage(err)}`,
+              `Stuck shipment user notification failed (order=${order.id}, user=${userId}): ${errorMessage(err)}`,
             );
           }
         }
@@ -371,7 +371,7 @@ export class OrderSchedulerService implements OnModuleInit {
     const sellerInvoices = await this.sellerInvoice
       .remindMissing({ deadlineDays: sellerInvoiceDeadlineDays })
       .catch((e: unknown) => {
-        this.logger.warn(`satıcı fatura taraması hatası: ${errorMessage(e)}`);
+        this.logger.warn(`Seller invoice scan failed: ${errorMessage(e)}`);
         return { missing: 0, reminded: 0, missingOrders: [] };
       });
     if (sellerInvoices.missing > 0) {
@@ -561,7 +561,7 @@ export class OrderSchedulerService implements OnModuleInit {
             })
             .catch((e: unknown) =>
               this.logger.warn(
-                `revenueInvoicedAt backfill işareti yazılamadı ${o.id}: ${errorMessage(e)}`,
+                `revenueInvoicedAt backfill stamp could not be written for order ${o.id}: ${errorMessage(e)}`,
               ),
             );
           continue;
@@ -571,7 +571,7 @@ export class OrderSchedulerService implements OnModuleInit {
           invoiced++;
         } catch (e: unknown) {
           this.logger.warn(
-            `processDeliveredOrders fatura hatası ${o.id}: ${errorMessage(e)}`,
+            `processDeliveredOrders invoice failed for order ${o.id}: ${errorMessage(e)}`,
           );
         }
       }
@@ -611,7 +611,7 @@ export class OrderSchedulerService implements OnModuleInit {
         if (r.completed) completed++;
       } catch (e: unknown) {
         this.logger.warn(
-          `processDeliveredOrders tamamlama hatası ${o.id}: ${errorMessage(e)}`,
+          `processDeliveredOrders completion failed for order ${o.id}: ${errorMessage(e)}`,
         );
       }
     }
@@ -678,7 +678,7 @@ export class OrderSchedulerService implements OnModuleInit {
           tradeInvoiced++;
         } catch (e: unknown) {
           this.logger.warn(
-            `processDeliveredOrders takas faturası hatası ${c.id}: ${errorMessage(e)}`,
+            `processDeliveredOrders trade invoice failed for ${c.id}: ${errorMessage(e)}`,
           );
         }
       }

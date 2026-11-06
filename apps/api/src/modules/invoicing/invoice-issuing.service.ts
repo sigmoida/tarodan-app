@@ -87,7 +87,7 @@ export class InvoiceIssuingService {
       } catch (error: unknown) {
         failures++;
         this.logger.warn(
-          `eLogo teslim faturası hatası ${orderId}: ${errorMessage(error)}`,
+          `eLogo delivery invoice failed for order ${orderId}: ${errorMessage(error)}`,
         );
       }
     };
@@ -113,7 +113,7 @@ export class InvoiceIssuingService {
       })
       .catch((e: unknown) =>
         this.logger.warn(
-          `revenueInvoicedAt işareti yazılamadı ${orderId}: ${errorMessage(e)}`,
+          `revenueInvoicedAt stamp could not be written for order ${orderId}: ${errorMessage(e)}`,
         ),
       );
   }
