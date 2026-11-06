@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import { Logger } from "@nestjs/common";
 import type { ConfigService } from "@nestjs/config";
 import {
   LedgerAccount,
@@ -493,6 +494,98 @@ describe("installment capture on a real database (E2E)", () => {
     });
     expect(payment.status).not.toBe(PaymentStatus.completed);
     expect(payment.chargeAttemptId).toBeNull();
+  });
+
+  describe("an attempt priced from another T than the payment's amount", () => {
+    let errorLog: jest.SpyInstance;
+    beforeEach(() => {
+      errorLog = jest.spyOn(Logger.prototype, "error");
+    });
+    afterEach(() => errorLog.mockRestore());
+
+    /** Signs 3 x at T 1,000.00 (C 1,066.38), then moves the amount outside the card flow. */
+    async function signedThenMoved(amount: string) {
+      const target = await cart();
+      const fields = await sign(target, {
+        count: 3,
+        bin: "45467112",
+        expectedTotal: 1066.38,
+      });
+      await prisma.payment.update({
+        where: { id: target.paymentId },
+        data: { amount: D(amount) },
+      });
+      return { target, fields };
+    }
+
+    it("leaves an under-collected payment pending: no capture, no hold, no ledger, alarm", async () => {
+      const { target, fields } = await signedThenMoved("1100.00");
+
+      await expect(
+        callbacks.handlePayTRCallback(
+          signedCallback(fields.merchant_oid, "106638", "3"),
+        ),
+      ).resolves.toBe("OK");
+
+      const payment = await prisma.payment.findUniqueOrThrow({
+        where: { id: target.paymentId },
+      });
+      expect(payment.status).toBe(PaymentStatus.pending);
+      expect(payment.chargeAttemptId).toBeNull();
+      expect(payment.chargedAmount).toBeNull();
+      const attempt = await prisma.paymentChargeAttempt.findUniqueOrThrow({
+        where: { merchantOid: fields.merchant_oid },
+      });
+      expect(attempt.capturedAt).toBeNull();
+      expect(
+        await prisma.paymentHold.count({
+          where: { paymentId: target.paymentId },
+        }),
+      ).toBe(0);
+      expect(
+        await prisma.ledgerEntry.count({
+          where: { orderId: { in: target.orderIds } },
+        }),
+      ).toBe(0);
+      const orders = await prisma.order.findMany({
+        where: { id: { in: target.orderIds } },
+        select: { status: true, installmentFeeAmount: true },
+      });
+      expect(orders.map((o) => o.status)).toEqual([
+        "pending_payment",
+        "pending_payment",
+      ]);
+      expect(orders.map((o) => o.installmentFeeAmount.toFixed(2))).toEqual([
+        "0.00",
+        "0.00",
+      ]);
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /CHARGE_ATTEMPT_BASE_MISMATCH .*payment NOT completed \(left pending\)/,
+        ),
+      );
+    });
+
+    it("completes a charge that covers the amount legacy-style, with the alarm", async () => {
+      const { target, fields } = await signedThenMoved("1050.00");
+
+      await callbacks.handlePayTRCallback(
+        signedCallback(fields.merchant_oid, "106638", "3"),
+      );
+
+      const payment = await prisma.payment.findUniqueOrThrow({
+        where: { id: target.paymentId },
+      });
+      expect(payment.status).toBe(PaymentStatus.completed);
+      expect(payment.chargeAttemptId).toBeNull();
+      expect(payment.chargedAmount).toBeNull();
+      expect(payment.installmentFeeAmount.toFixed(2)).toBe("0.00");
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /CHARGE_ATTEMPT_BASE_MISMATCH .*captured without the attempt/,
+        ),
+      );
+    });
   });
 
   it("refuses a total the buyer was not shown without claiming or writing an attempt", async () => {

@@ -57,6 +57,7 @@ import {
 import * as Sentry from "@sentry/node";
 import {
   chargeAttemptByOid,
+  paytrChargeCovers,
   type ChargeAttemptAmounts,
 } from "../helpers/charged-amount";
 import {
@@ -77,6 +78,15 @@ interface CapturedCharge {
 }
 
 const NO_FEE = new Prisma.Decimal(0);
+
+/**
+ * What a capture does with the captured oid's charge attempt: link it, go
+ * on without one (legacy), or refuse to complete the payment.
+ */
+type CaptureLink =
+  | { kind: "attempt"; attempt: ChargeAttemptAmounts }
+  | { kind: "legacy" }
+  | { kind: "refused" };
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -212,11 +222,14 @@ export class PaymentFulfillmentService {
     const { columns: providerColumns, metaPatch } = this.buildProviderPatch(
       opts.providerData,
     );
-    const attempt = await this.capturableAttempt(
+    const link = await this.captureLinkOf(
       tx,
       payment,
       opts.capturedMerchantOid,
     );
+    // Under-collected: the payment stays as it is (pending), the alarm is out.
+    if (link.kind === "refused") return null;
+    const attempt = link.kind === "attempt" ? link.attempt : null;
     if (
       attempt &&
       providerColumns.installmentCount !== undefined &&
@@ -286,34 +299,39 @@ export class PaymentFulfillmentService {
    *
    * An attempt whose T is not the payment's `amount` cannot be linked (DB
    * CHECK `charged_amount = amount + fee`; the claim pins `amount`, so this
-   * needs a write outside the card flow). PayTR has charged the buyer, so the
-   * payment still completes, legacy-style: a capture that threw would leave
-   * the order pending on every recovery path until the 24 h kill switch
-   * cancels it with the buyer's money held. The alarm asks for the fee (if
-   * any) to be booked by hand.
+   * needs a write outside the card flow). PayTR charged that attempt's C:
+   * - C covers `amount` (in kuruş): the buyer paid at least the goods total,
+   *   so the payment completes legacy-style; a capture that threw would leave
+   *   a correctly paid order pending until the 24 h kill switch cancels it.
+   *   The alarm asks for the difference (a fee, if any) to be booked by hand.
+   * - C is below `amount`: an under-collection, which the pre-A4 check
+   *   against `amount` refused too. The payment is NOT completed and stays
+   *   pending; the alarm hands it to manual handling.
    */
-  private async capturableAttempt(
+  private async captureLinkOf(
     tx: Prisma.TransactionClient,
     payment: { id: string; amount: Prisma.Decimal.Value },
     capturedMerchantOid: string | undefined,
-  ): Promise<ChargeAttemptAmounts | null> {
-    if (!capturedMerchantOid) return null;
+  ): Promise<CaptureLink> {
+    if (!capturedMerchantOid) return { kind: "legacy" };
     const attempt = await chargeAttemptByOid(
       tx,
       payment.id,
       capturedMerchantOid,
     );
-    if (!attempt || attempt.capturedAt) return null;
-    if (attempt.baseAmount.equals(new Prisma.Decimal(payment.amount))) {
-      return attempt;
-    }
+    if (!attempt || attempt.capturedAt) return { kind: "legacy" };
+    const amount = new Prisma.Decimal(payment.amount);
+    if (attempt.baseAmount.equals(amount)) return { kind: "attempt", attempt };
+    const covered = paytrChargeCovers(attempt.chargedAmount, amount);
     this.logger.error(
       `CHARGE_ATTEMPT_BASE_MISMATCH payment=${payment.id} attempt=${attempt.id}: ` +
-        `signed for T=${attempt.baseAmount.toFixed(2)} (fee ${attempt.installmentFeeAmount.toFixed(2)}), ` +
-        `payment amount is ${new Prisma.Decimal(payment.amount).toFixed(2)}; ` +
-        `captured without the attempt, manual review of the fee required`,
+        `signed for T=${attempt.baseAmount.toFixed(2)} C=${attempt.chargedAmount.toFixed(2)} ` +
+        `(fee ${attempt.installmentFeeAmount.toFixed(2)}), payment amount is ${amount.toFixed(2)}; ` +
+        (covered
+          ? `captured without the attempt, manual review of the fee required`
+          : `charge below the payment amount, payment NOT completed (left pending), manual review required`),
     );
-    return null;
+    return covered ? { kind: "legacy" } : { kind: "refused" };
   }
 
   /**

@@ -256,6 +256,46 @@ describe("PaymentFulfillmentService capture of a charge attempt", () => {
     );
   });
 
+  it("does not complete a charge below the payment amount: no update, no stamp, alarm (under-collection)", async () => {
+    // The attempt was priced at T 1,000.00 and charged C 1,066.38; the
+    // payment amount has since become 1,100.00.
+    const { tx, paths } = setup();
+    const capture = await paths.claimPaymentCompleted(
+      tx,
+      { ...payment, amount: D("1100.00") },
+      { capturedMerchantOid: "ORD1A" },
+    );
+    expect(capture).toBeNull();
+    expect(tx.payment.updateMany).not.toHaveBeenCalled();
+    expect(tx.paymentChargeAttempt.updateMany).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "CHARGE_ATTEMPT_BASE_MISMATCH payment=pay-1 attempt=att-3x",
+      ),
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining("payment NOT completed (left pending)"),
+    );
+  });
+
+  it.each`
+    amount       | completes
+    ${"1066.38"} | ${true}
+    ${"1066.39"} | ${false}
+  `(
+    "decides on the kuruş: C 1,066.38 against amount $amount completes: $completes",
+    async ({ amount, completes }) => {
+      const { tx, paths } = setup();
+      const capture = await paths.claimPaymentCompleted(
+        tx,
+        { ...payment, amount: D(amount) },
+        { capturedMerchantOid: "ORD1A" },
+      );
+      expect(capture !== null).toBe(completes);
+      expect(tx.payment.updateMany).toHaveBeenCalledTimes(completes ? 1 : 0);
+    },
+  );
+
   describe("fee allocation to the orders", () => {
     it("splits F over a two-seller cart by largest remainder in the keep guard's order (plan 4.4)", async () => {
       const { tx, paths } = setup({

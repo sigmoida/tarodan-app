@@ -230,3 +230,25 @@ export function paytrKurusMatches(
     toleranceTl,
   );
 }
+
+/** A TL amount in whole kuruş, half up (the PSP scale PayTR reports in). */
+function kurusOf(value: Prisma.Decimal): Prisma.Decimal {
+  return value.times(100).toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP);
+}
+
+/**
+ * Does a charge PayTR collected (`charged`, PSP scale) cover `required`,
+ * compared in whole kuruş? The capture of an attempt that cannot be linked
+ * completes the payment only when it does: a charge below the payment's
+ * amount is an under-collection, never a paid order. Anything that is not
+ * an amount does not cover (fail closed).
+ */
+export function paytrChargeCovers(
+  charged: AmountValue,
+  required: AmountValue,
+): boolean {
+  const collected = decimalOrNull(charged);
+  const needed = decimalOrNull(required);
+  if (!collected || !needed) return false;
+  return kurusOf(collected).gte(kurusOf(needed));
+}

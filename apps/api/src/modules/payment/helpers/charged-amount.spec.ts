@@ -7,6 +7,7 @@ import {
   orderInstallmentFeeOf,
   paytrAmountMatches,
   paytrChargeExpectationsOf,
+  paytrChargeCovers,
   paytrKurusMatches,
   refundGoodsPartOf,
   type ChargeAttemptReader,
@@ -224,4 +225,20 @@ describe("paytrAmountMatches / paytrKurusMatches (the one comparison rule)", () 
       expect(paytrKurusMatches(reported, d("1066.38"), 0.05)).toBe(false);
     },
   );
+});
+
+describe("paytrChargeCovers (kuruş scale)", () => {
+  it.each`
+    charged         | required     | covers
+    ${d("1066.38")} | ${"1000.00"} | ${true}
+    ${d("1066.38")} | ${"1066.38"} | ${true}
+    ${d("1066.38")} | ${"1066.39"} | ${false}
+    ${"1000.004"}   | ${"1000.00"} | ${true}
+    ${"999.995"}    | ${"1000.00"} | ${true}
+    ${"999.994"}    | ${"1000.00"} | ${false}
+    ${NaN}          | ${"1000.00"} | ${false}
+    ${"abc"}        | ${"1000.00"} | ${false}
+  `("$charged covers $required: $covers", ({ charged, required, covers }) => {
+    expect(paytrChargeCovers(charged, required)).toBe(covers);
+  });
 });
