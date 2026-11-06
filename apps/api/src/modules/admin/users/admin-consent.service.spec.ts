@@ -386,6 +386,47 @@ describe("AdminConsentService.export", () => {
     // The trade reference is not read as cookie categories.
     expect(values[header.indexOf("Çerez kategorileri")] ?? "").toBe("");
   });
+
+  it.each([
+    [false, "Evet", "Hayır"],
+    [true, "Hayır", "Evet"],
+  ])(
+    "flags the distance sales version in force with installments %p (base %p, installment %p)",
+    async (installmentsEnabled, baseCurrent, installmentCurrent) => {
+      const { service, consents } = makeService(
+        [
+          row({
+            id: "c-base",
+            document: "distance_sales",
+            version: CONSENT_DOCUMENTS.distance_sales.version,
+            source: "checkout",
+          }),
+          row({
+            id: "c-installment",
+            document: "distance_sales",
+            version: CONSENT_DOCUMENTS.distance_sales.installmentVersion,
+            source: "checkout",
+          }),
+        ],
+        installmentsEnabled,
+      );
+
+      const file = await service.export({}, "admin-1", "tr");
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file.body as never);
+      const sheet = workbook.worksheets[1];
+      const header = (sheet.getRow(1).values as unknown[]).map(String);
+      const column = header.indexOf("Güncel sürüm");
+      const cell = (rowNumber: number) =>
+        (sheet.getRow(rowNumber).values as unknown[])[column];
+
+      expect(column).toBeGreaterThan(0);
+      expect(cell(2)).toBe(baseCurrent);
+      expect(cell(3)).toBe(installmentCurrent);
+      // One reading of the switch for the whole file.
+      expect(consents.versionContext).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe("AdminConsentService.status", () => {
