@@ -14,12 +14,14 @@ import {
 } from "./dto";
 import { CollectionCommonService } from "./collection-common.service";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { StorageService } from "../storage/storage.service";
+import { resolveUploadTarget } from "../media/helpers/upload-target";
 import { i18nMessage } from "../i18n";
 
 /**
- * CollectionItemsService — koleksiyon öğesi işlemleri: addItemToCollection,
- * removeItemFromCollection, reorderItems. Öğe→DTO eşlemesi için common'a delege
- * eder (this.common.mapItemToDto).
+ * CollectionItemsService: collection item operations (addItemToCollection,
+ * removeItemFromCollection, reorderItems). Item-to-DTO mapping is delegated to
+ * the common service (this.common.mapItemToDto).
  */
 @Injectable()
 export class CollectionItemsService {
@@ -28,7 +30,34 @@ export class CollectionItemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly common: CollectionCommonService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * 404 when the collection does not exist, 403 when the caller is not its
+   * owner. Every item write checks this first; the controller also calls it
+   * before storing a multipart image, so a request that will be refused
+   * uploads nothing.
+   */
+  async assertCanEditItems(
+    collectionId: string,
+    userId: string,
+  ): Promise<void> {
+    const collection = await this.prisma.collection.findUnique({
+      where: { id: collectionId },
+      select: { userId: true },
+    });
+
+    if (!collection) {
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
+    }
+
+    if (collection.userId !== userId) {
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
+    }
+  }
 
   // ==========================================================================
   // ADD ITEM TO COLLECTION
@@ -39,17 +68,7 @@ export class CollectionItemsService {
     dto: AddCollectionItemDto,
     imageUrl?: string,
   ): Promise<CollectionItemResponseDto> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException(i18nMessage("server.collection.notFound"));
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyona ekleme yetkiniz yok");
-    }
+    await this.assertCanEditItems(collectionId, userId);
 
     // Validate: either productId or customTitle must be provided
     if (!dto.productId && !dto.customTitle) {
@@ -134,6 +153,12 @@ export class CollectionItemsService {
       );
     }
 
+    // Checked before any write: a refused image stores nothing.
+    const customImageUrl = this.ownCollectionImageUrl(
+      imageUrl ?? dto.customImageUrl,
+      userId,
+    );
+
     // Get max sort order
     const maxSort = await this.prisma.collectionItem.aggregate({
       where: { collectionId },
@@ -152,7 +177,7 @@ export class CollectionItemsService {
         customScale: dto.customScale,
         customManufacturer: dto.customManufacturer,
         customMaterial: dto.customMaterial,
-        customImageUrl: imageUrl || dto.customImageUrl,
+        customImageUrl,
         sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         isFeatured: dto.isFeatured ?? false,
       },
@@ -169,17 +194,7 @@ export class CollectionItemsService {
     itemId: string,
     userId: string,
   ): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException(i18nMessage("server.collection.notFound"));
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyondan silme yetkiniz yok");
-    }
+    await this.assertCanEditItems(collectionId, userId);
 
     const item = await this.prisma.collectionItem.findFirst({
       where: { id: itemId, collectionId },
@@ -204,27 +219,65 @@ export class CollectionItemsService {
     userId: string,
     dto: ReorderCollectionItemsDto,
   ): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
+    await this.assertCanEditItems(collectionId, userId);
+
+    // Every update is scoped to this collection. One id that is not an item of
+    // it (another collection's item, an unknown id) is a 404 and nothing is
+    // reordered. The check is one query and the writes one batch transaction,
+    // so a long list cannot run into the interactive-transaction timeout. The
+    // collectionId in each where keeps the writes scoped even if an item is
+    // deleted between the two steps (it is then simply not updated).
+    const ids = [...new Set(dto.items.map((item) => item.itemId))];
+    if (ids.length === 0) return;
+    const owned = await this.prisma.collectionItem.findMany({
+      where: { id: { in: ids }, collectionId },
+      select: { id: true },
     });
-
-    if (!collection) {
-      throw new NotFoundException(i18nMessage("server.collection.notFound"));
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException(
-        i18nMessage("server.collection.editForbidden"),
+    if (owned.length !== ids.length) {
+      throw new NotFoundException(
+        i18nMessage("server.collection.itemNotFound"),
       );
     }
 
     await this.prisma.$transaction(
       dto.items.map((item) =>
-        this.prisma.collectionItem.update({
-          where: { id: item.itemId },
+        this.prisma.collectionItem.updateMany({
+          where: { id: item.itemId, collectionId },
           data: { sortOrder: item.sortOrder },
         }),
       ),
     );
+  }
+
+  /**
+   * The image URL to store on a custom item, or null for none. Only an image
+   * the owner uploaded for collections is accepted: a URL on our own public
+   * storage (`StorageService.ownPublicAssetKey`) whose key sits in the folder
+   * `POST /media/upload?folder=collections` writes for this user (the
+   * multipart `image` path writes there too). Anything else would be shown to
+   * every viewer unmoderated and fetched by the cover generator, so it is
+   * refused with 400. The canonical URL is rebuilt from the key.
+   */
+  private ownCollectionImageUrl(
+    url: string | undefined,
+    userId: string,
+  ): string | null {
+    if (url === undefined || url.trim() === "") return null;
+
+    const target = resolveUploadTarget("collections", userId);
+    const ownFolder = this.storage.objectKeyPrefix(
+      target.bucket,
+      target.folder,
+    );
+    const key = this.storage.ownPublicAssetKey(url);
+    if (!key || !key.startsWith(ownFolder)) {
+      this.logger.warn(
+        `Refused customImageUrl for a collection item of user id=${userId}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.collection.invalidImageUrl"),
+      );
+    }
+    return this.storage.getPublicAssetUrl(key);
   }
 }

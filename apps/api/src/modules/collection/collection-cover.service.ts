@@ -6,34 +6,55 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { MediaService } from "../media/media.service";
-import { isPublicStorageKey, StorageService } from "../storage/storage.service";
+import {
+  isSafePublicObjectKey,
+  MAX_FILE_SIZE,
+  StorageService,
+} from "../storage/storage.service";
 import { CollectionResponseDto } from "./dto";
 import { CollectionCommonService } from "./collection-common.service";
-import * as https from "https";
-import * as http from "http";
+import { fetchImageBytes } from "./helpers/fetch-image-bytes";
 import { configureSharpSafety } from "../../common/image/sharp-safety";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { errorMessage } from "../../common/helpers/error-message";
 import { i18nMessage } from "../i18n";
 
-// Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
-// staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
-let sharp: any;
+type SharpFactory = typeof import("sharp");
+
+// Sharp is optional. A load failure is not swallowed silently (see
+// media.service: on staging an image without sharp could not be diagnosed from
+// a single 400).
+let sharp: SharpFactory | null;
 try {
-  sharp = configureSharpSafety(require("sharp"));
-} catch (e: any) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  sharp = configureSharpSafety(require("sharp") as SharpFactory);
+} catch (e) {
   sharp = null;
   // eslint-disable-next-line no-console
   console.error(
-    `[CollectionCoverService] sharp failed to load: ${e?.message ?? e}`,
+    `[CollectionCoverService] sharp failed to load: ${errorMessage(e)}`,
   );
 }
 
+/** Source images are never larger than what an upload may store. */
+const COVER_SOURCE_LIMITS = { maxBytes: MAX_FILE_SIZE, timeoutMs: 10_000 };
+
+/** The item fields the cover generator reads. */
+interface CoverSourceItem {
+  id: string;
+  customImageUrl: string | null;
+  product: { images: { cardKey: string | null }[] } | null;
+}
+
 /**
- * CollectionCoverService — kapak resmi işleri: updateCollectionCover ve
- * generateCoverImage (media/storage üzerinden 2x2 grid/tekil kapak üretimi).
- * generateCoverImage crud tarafından da (this.cover.generateCoverImage) çağrılır;
- * bu yüzden public kalır. mapCollectionToDto için common'a delege edilir.
+ * CollectionCoverService: cover image work, updateCollectionCover and
+ * generateCoverImage (a 2x2 grid or single cover built through media/storage).
+ * generateCoverImage is also called by crud (this.cover.generateCoverImage), so
+ * it stays public. mapCollectionToDto is delegated to common.
+ *
+ * Source images are only ever read from our own public storage: each item
+ * yields an object key (`coverSourceKey`) and the download URL is rebuilt from
+ * that key, so a stored URL on another host is never requested.
  */
 @Injectable()
 export class CollectionCoverService {
@@ -94,24 +115,35 @@ export class CollectionCoverService {
   // ==========================================================================
   // GENERATE COVER IMAGE FROM COLLECTION ITEMS
   // ==========================================================================
-  private async downloadImage(url: string): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const protocol = url.startsWith("https") ? https : http;
-      protocol
-        .get(url, (response) => {
-          if (response.statusCode !== 200) {
-            reject(
-              new Error(`Failed to download image: ${response.statusCode}`),
-            );
-            return;
-          }
-          const chunks: Buffer[] = [];
-          response.on("data", (chunk) => chunks.push(chunk));
-          response.on("end", () => resolve(Buffer.concat(chunks)));
-          response.on("error", reject);
-        })
-        .on("error", reject);
-    });
+
+  /**
+   * The object key of an item's cover source, or null to skip the item. A
+   * custom image counts only when its stored URL is one of our own public
+   * URLs; legacy or foreign URLs (another host, presigned, a bare key) are
+   * skipped, never fetched. A listing uses its card image key.
+   */
+  private coverSourceKey(item: CoverSourceItem): string | null {
+    if (item.customImageUrl) {
+      const key = this.storageService.ownPublicAssetKey(item.customImageUrl);
+      if (!key) {
+        this.logger.warn(
+          `Cover generation skipped a non-own image of collection item id=${item.id}`,
+        );
+      }
+      return key;
+    }
+    const cardKey = item.product?.images?.[0]?.cardKey;
+    return cardKey && isSafePublicObjectKey(cardKey) ? cardKey : null;
+  }
+
+  /** Downloads one of our own public objects by key, within fixed limits. */
+  private async downloadImage(key: string): Promise<Buffer> {
+    const url = this.storageService.getPublicAssetUrl(key);
+    // Defence in depth: the rebuilt URL must still be one of ours.
+    if (!url || this.storageService.ownPublicAssetKey(url) !== key) {
+      throw new Error(`Refusing to download a non-own image key ${key}`);
+    }
+    return fetchImageBytes(url, COVER_SOURCE_LIMITS);
   }
 
   async generateCoverImage(collectionId: string): Promise<string | null> {
@@ -145,31 +177,22 @@ export class CollectionCoverService {
         return null;
       }
 
-      // Get image URLs from items (product cardKey -> public URL, or customImageUrl)
-      const imageUrls: string[] = [];
+      // Image keys from items (custom image on our storage, or listing card key)
+      const imageKeys: string[] = [];
       for (const item of collection.items) {
-        const firstImg = item.product?.images?.[0];
-        const rawUrl =
-          item.customImageUrl ||
-          (firstImg?.cardKey
-            ? this.storageService.getPublicAssetUrl(firstImg.cardKey)
-            : null);
-        if (rawUrl) {
-          const resolved = await this.resolveProductImageUrl(rawUrl);
-          if (resolved) imageUrls.push(resolved);
-        }
-        if (imageUrls.length >= 4) break;
+        const key = this.coverSourceKey(item);
+        if (key) imageKeys.push(key);
+        if (imageKeys.length >= 4) break;
       }
 
-      if (imageUrls.length === 0) {
+      if (imageKeys.length === 0) {
         return null;
       }
 
       // If less than 4 images, use the first one
-      if (imageUrls.length < 4) {
-        const singleImageUrl = imageUrls[0];
+      if (imageKeys.length < 4) {
         try {
-          const imageBuffer = await this.downloadImage(singleImageUrl);
+          const imageBuffer = await this.downloadImage(imageKeys[0]);
           const resizedBuffer = await sharp(imageBuffer)
             .autoOrient()
             .resize(1200, 600, { fit: "cover" })
@@ -193,7 +216,7 @@ export class CollectionCoverService {
           return uploadResult.key;
         } catch (error) {
           this.logger.error(
-            `Failed to generate single cover image: ${errorMessage(error)}`,
+            `Failed to generate single cover image for collection id=${collectionId}: ${errorMessage(error)}`,
           );
           return null;
         }
@@ -201,9 +224,9 @@ export class CollectionCoverService {
 
       // Download and resize images to 400x400
       const imageBuffers: Buffer[] = [];
-      for (const url of imageUrls) {
+      for (const key of imageKeys) {
         try {
-          const buffer = await this.downloadImage(url);
+          const buffer = await this.downloadImage(key);
           const resized = await sharp(buffer)
             .autoOrient()
             .resize(400, 400, { fit: "cover" })
@@ -211,7 +234,7 @@ export class CollectionCoverService {
           imageBuffers.push(resized);
         } catch (error) {
           this.logger.warn(
-            `Failed to download image ${url}: ${errorMessage(error)}`,
+            `Failed to download image ${key}: ${errorMessage(error)}`,
           );
         }
       }
@@ -266,34 +289,7 @@ export class CollectionCoverService {
       return uploadResult.key;
     } catch (error) {
       this.logger.error(
-        `Failed to generate cover image: ${errorMessage(error)}`,
-      );
-      return null;
-    }
-  }
-
-  private async resolveProductImageUrl(
-    imageUrl: string | null | undefined,
-  ): Promise<string | null> {
-    if (!imageUrl) return null;
-    if (
-      imageUrl.startsWith("http://") ||
-      imageUrl.startsWith("https://") ||
-      imageUrl.startsWith("/")
-    )
-      return imageUrl;
-    if (isPublicStorageKey(imageUrl)) {
-      return this.storageService.getPublicAssetUrl(imageUrl);
-    }
-    try {
-      return await this.storageService.getPresignedDownloadUrl(
-        "products",
-        imageUrl,
-        3600,
-      );
-    } catch (e: any) {
-      this.logger.warn(
-        `Failed to resolve product image: ${imageUrl} - ${errorMessage(e)}`,
+        `Failed to generate cover image for collection id=${collectionId}: ${errorMessage(error)}`,
       );
       return null;
     }

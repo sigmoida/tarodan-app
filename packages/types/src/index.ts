@@ -42,6 +42,7 @@ export * from "./websocket";
 
 // Wishlist & Collection types
 export * from "./wishlist";
+export * from "./collection";
 
 // Rating types
 export * from "./rating";

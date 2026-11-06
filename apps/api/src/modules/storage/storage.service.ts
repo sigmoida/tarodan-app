@@ -11,6 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import {
   S3Client,
+  S3ClientConfig,
   PutObjectCommand,
   PutObjectCommandInput,
   CopyObjectCommand,
@@ -23,6 +24,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as crypto from "crypto";
 import { fromBuffer as fileTypeFromBuffer } from "file-type";
 import { i18nMessage } from "../i18n";
+import { errorMessage } from "../../common/helpers/error-message";
 
 export interface UploadResult {
   key: string;
@@ -77,7 +79,19 @@ export type StorageBucketType =
   | "messages"
   | "reviews"
   | "brands";
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+/** Largest object we store, and so the largest one we read back for processing. */
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+/** Longest URL accepted as a reference to one of our own stored objects. */
+const MAX_OWN_ASSET_URL_LENGTH = 2048;
+
+/**
+ * An object key in the layout `uploadFile` writes, with nothing a URL parser or
+ * a client could reinterpret: ASCII letters, digits, `_`, `-` and `.`, no
+ * leading slash, no empty, `.` or `..` segment, no percent-encoding, query,
+ * fragment, backslash, `@` or `:`.
+ */
+const SAFE_OBJECT_KEY = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*)+$/;
 
 /**
  * Bucket görünürlük politikası — TEK KAYNAK. S3 bucket-policy ile birebir uyumlu olmalı.
@@ -118,6 +132,31 @@ export function isPublicStorageKey(key: string): boolean {
   return /^[a-z0-9][a-z0-9_-]*\/(?:products|collections|avatars|reviews|brands)\//i.test(
     normalized,
   );
+}
+
+/**
+ * A public object key that is also safe to rebuild into a URL and to fetch:
+ * see `SAFE_OBJECT_KEY`. Stricter than `isPublicStorageKey`, which also accepts
+ * a leading slash and any characters after the bucket root.
+ */
+export function isSafePublicObjectKey(key: string): boolean {
+  return SAFE_OBJECT_KEY.test(key) && isPublicStorageKey(key);
+}
+
+/** Same scheme, host and port: a second check after the prefix match. */
+function sameHost(url: string, root: string): boolean {
+  try {
+    const a = new URL(url);
+    const b = new URL(root);
+    return (
+      a.origin === b.origin &&
+      (a.protocol === "https:" || a.protocol === "http:") &&
+      a.username === "" &&
+      a.password === ""
+    );
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()
@@ -187,7 +226,7 @@ export class StorageService implements OnModuleInit {
     this.hasCredentials = true;
 
     // S3 Client oluştur (MinIO veya AWS S3)
-    const s3Config: any = {
+    const s3Config: S3ClientConfig = {
       region: this.configService.get("AWS_REGION", "eu-west-1"),
       credentials: {
         accessKeyId,
@@ -224,8 +263,8 @@ export class StorageService implements OnModuleInit {
       );
       this.isS3Available = true;
       this.logger.log(`✅ AWS S3 connection established: ${this.baseBucket}`);
-    } catch (error: any) {
-      this.logger.error(`❌ AWS S3 connection failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error(`❌ AWS S3 connection failed: ${errorMessage(error)}`);
       this.isS3Available = false;
     }
   }
@@ -302,11 +341,7 @@ export class StorageService implements OnModuleInit {
     const uniqueId = crypto.randomBytes(16).toString("hex");
     const filename = options.filename || `${uniqueId}${ext}`;
 
-    // Klasör yapısı: {env}/{bucketType}/{folder}/{filename}
-    // Örnek: dev/products/product-images/abc123.jpg
-    const bucketFolder = this.bucketFolders[options.bucket];
-    const customFolder = options.folder ? `${options.folder}/` : "";
-    const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
+    const key = `${this.objectKeyPrefix(options.bucket, options.folder)}${filename}`;
 
     try {
       const contentType =
@@ -359,8 +394,8 @@ export class StorageService implements OnModuleInit {
         // Private servis uçları (message-attachment) MediaFile id ile çalışır.
         mediaFileId,
       };
-    } catch (error: any) {
-      this.logger.error(`❌ S3 upload error: ${error.message}`, error);
+    } catch (error) {
+      this.logger.error(`❌ S3 upload error: ${errorMessage(error)}`, error);
       throw new InternalServerErrorException(
         i18nMessage("server.storage.uploadFailed"),
       );
@@ -390,10 +425,8 @@ export class StorageService implements OnModuleInit {
       );
     }
 
-    const bucketFolder = this.bucketFolders[options.bucket];
-    const customFolder = options.folder ? `${options.folder}/` : "";
     const filename = options.filename || crypto.randomBytes(16).toString("hex");
-    const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
+    const key = `${this.objectKeyPrefix(options.bucket, options.folder)}${filename}`;
 
     try {
       await this.client().send(
@@ -405,9 +438,9 @@ export class StorageService implements OnModuleInit {
         }),
       );
       return { key };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `❌ S3 copy error (${sourceKey} → ${key}): ${error.message}`,
+        `❌ S3 copy error (${sourceKey} → ${key}): ${errorMessage(error)}`,
       );
       throw new InternalServerErrorException(
         i18nMessage("server.storage.copyFailed"),
@@ -576,8 +609,8 @@ export class StorageService implements OnModuleInit {
 
         await this.client().send(command);
         this.logger.log(`✅ File deleted: ${fullKey}`);
-      } catch (error: any) {
-        this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
+      } catch (error) {
+        this.logger.warn(`⚠️ S3 delete error: ${errorMessage(error)}`);
         if (options.throwOnError) throw error;
       }
     }
@@ -637,6 +670,68 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
+   * Strict inverse of `getPublicAssetUrl` for a URL a client hands back to be
+   * stored or that the server is about to fetch. Returns the object key only
+   * when the URL is exactly one of our own public roots (`ownPublicRoots`)
+   * followed by a safe public object key (`isSafePublicObjectKey`): no other
+   * host, scheme, port, credentials, query, fragment, encoding or dot segment.
+   * Null when the public base is not configured, since the caller then has no
+   * canonical URL to store or fetch.
+   *
+   * Callers store or fetch `getPublicAssetUrl(key)`, never the input string.
+   */
+  ownPublicAssetKey(url: string): string | null {
+    if (!this.hasPublicAssetBaseUrl()) return null;
+    if (typeof url !== "string" || url.length > MAX_OWN_ASSET_URL_LENGTH) {
+      return null;
+    }
+    // Roots can nest (a public base on the S3 endpoint origin and the
+    // path-style root under it), so a prefix match whose remainder is not a
+    // key moves on to the next root instead of refusing the URL.
+    for (const root of this.ownPublicRoots()) {
+      if (!url.startsWith(`${root}/`)) continue;
+      const key = url.slice(root.length + 1);
+      if (isSafePublicObjectKey(key) && sameHost(url, root)) return key;
+    }
+    return null;
+  }
+
+  /**
+   * Where an upload to `bucket` and `folder` lands: `<env>/<bucket root>/<folder>/`
+   * (`<env>/<bucket root>/` without a folder). The one place the key layout is
+   * defined; `uploadFile` builds its keys from it.
+   */
+  objectKeyPrefix(bucket: StorageBucketType, folder?: string): string {
+    const customFolder = folder ? `${folder}/` : "";
+    return `${this.envPrefix}/${this.bucketFolders[bucket]}/${customFolder}`;
+  }
+
+  /**
+   * URL roots that serve our public objects, without a trailing slash: the
+   * configured public base (`S3_PUBLIC_BASE_URL`, what `getPublicAssetUrl`
+   * builds) and the bucket's own S3 address in the form the client is
+   * configured for: path-style under a custom `S3_ENDPOINT` (MinIO), otherwise
+   * the AWS virtual-hosted and path-style forms. Stored URLs written while the
+   * public base named the bucket directly keep resolving if it later points at
+   * a CDN.
+   */
+  private ownPublicRoots(): string[] {
+    const trimRoot = (value: string) => value.trim().replace(/\/+$/, "");
+    const roots = [trimRoot(this.publicBaseUrl())];
+    const endpoint = this.configService.get<string>("S3_ENDPOINT");
+    if (endpoint) {
+      roots.push(`${trimRoot(endpoint)}/${this.baseBucket}`);
+    } else {
+      const region = this.configService.get<string>("AWS_REGION", "eu-west-1");
+      roots.push(
+        `https://${this.baseBucket}.s3.${region}.amazonaws.com`,
+        `https://s3.${region}.amazonaws.com/${this.baseBucket}`,
+      );
+    }
+    return [...new Set(roots.filter((root) => root !== ""))];
+  }
+
+  /**
    * Presigned URL for upload (client-side upload için)
    */
   async getPresignedUploadUrl(
@@ -672,8 +767,10 @@ export class StorageService implements OnModuleInit {
       return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
-    } catch (error: any) {
-      this.logger.error(`❌ Presigned upload URL error: ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Presigned upload URL error: ${errorMessage(error)}`,
+      );
       throw new InternalServerErrorException(
         i18nMessage("server.storage.presignFailed"),
       );
@@ -711,8 +808,10 @@ export class StorageService implements OnModuleInit {
       return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
-    } catch (error: any) {
-      this.logger.error(`❌ Presigned download URL error: ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Presigned download URL error: ${errorMessage(error)}`,
+      );
       throw new InternalServerErrorException(
         i18nMessage("server.storage.presignFailed"),
       );
@@ -738,8 +837,10 @@ export class StorageService implements OnModuleInit {
         throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
       }
       return Buffer.from(await body.transformToByteArray());
-    } catch (error: any) {
-      this.logger.error(`❌ S3 download error (${key}): ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ S3 download error (${key}): ${errorMessage(error)}`,
+      );
       throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
     }
   }
