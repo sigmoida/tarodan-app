@@ -814,6 +814,124 @@ describe("InvoiceReversalService: installment fee document", () => {
       );
       error.mockRestore();
     });
+
+    it.each(["processing", "unknown", "failed"])(
+      "keeps the claim and retries while eLogo answers %s",
+      async (state) => {
+        const { service, store, provider, adjustment, returns, error } =
+          await stuck();
+        provider.getStatus.mockResolvedValueOnce({ state } as never);
+
+        await expect(
+          service.handleOrderRefund("o1", adjustment),
+        ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN/);
+        expect(returns()).toEqual([]);
+        expect(provider.cancelEArchive).toHaveBeenCalledTimes(1);
+        expect(String(store.invoices[0].cancelReason)).toMatch(
+          /^refund_cancelling:/,
+        );
+        error.mockRestore();
+      },
+    );
+
+    it("cancels again under a new claim when eLogo says it stands and the window is still open", async () => {
+      const { service, store, provider, adjustment, returns, error } =
+        await stuck();
+      provider.eArchiveReversalStrategy.mockReturnValue("CANCEL");
+      provider.getStatus.mockResolvedValueOnce({ state: "completed" } as never);
+
+      await service.handleOrderRefund("o1", adjustment);
+
+      expect(provider.cancelEArchive).toHaveBeenCalledTimes(2);
+      expect(store.invoices[0]).toMatchObject({
+        status: "cancelled",
+        cancelReason: "refund",
+      });
+      expect(returns()).toEqual([]);
+      error.mockRestore();
+    });
+
+    it("cuts nothing when another run settled the stale claim first", async () => {
+      const { service, store, provider, adjustment, returns, error } =
+        await stuck();
+      // While this run asks eLogo, another run settles the claim and takes
+      // a new one.
+      provider.getStatus.mockImplementationOnce(async () => {
+        store.invoices[0].cancelReason = formatInstallmentFeeCancelClaim(
+          "other-run",
+          new Date(),
+        );
+        return { state: "completed" } as never;
+      });
+
+      await expect(service.handleOrderRefund("o1", adjustment)).rejects.toThrow(
+        /INSTALLMENT_FEE_CANCEL_CLAIM_LOST/,
+      );
+      expect(returns()).toEqual([]);
+      error.mockRestore();
+    });
+  });
+
+  it("backs off without asking eLogo while a crashed holder's claim is inside its lease", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    try {
+      const claimedAt = new Date();
+      const { service, refund, provider, returns } = makeService({
+        strategy: "RETURN_INVOICE",
+        invoices: [
+          sentFeeInvoice({
+            cancelReason: formatInstallmentFeeCancelClaim("dead", claimedAt),
+          }),
+        ],
+      });
+      jest.setSystemTime(
+        claimedAt.getTime() + INSTALLMENT_FEE_CANCEL_LEASE_MS - 1,
+      );
+
+      await expect(
+        service.handleOrderRefund("o1", refund("ra1", "o1", 26.55)),
+      ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_IN_PROGRESS/);
+      expect(provider.getStatus).not.toHaveBeenCalled();
+      expect(returns()).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("backs off when a cancel claim lands between its read and its return transaction", async () => {
+    const { service, refund, store, returns, db } = makeService();
+    const transaction = db.$transaction.getMockImplementation();
+    db.$transaction.mockImplementationOnce(async (fn) => {
+      store.invoices[0].cancelReason = formatInstallmentFeeCancelClaim(
+        "closing-run",
+        new Date(),
+      );
+      return transaction ? transaction(fn) : fn(db);
+    });
+
+    await expect(
+      service.handleOrderRefund("o1", refund("ra1", "o1", 26.55)),
+    ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_IN_PROGRESS/);
+    expect(returns()).toEqual([]);
+  });
+
+  it("does not fall back to a return when its claim was taken over during a refused cancel", async () => {
+    const { service, refund, store, provider, returns } = makeService({
+      strategy: "CANCEL",
+    });
+    provider.cancelEArchive.mockImplementationOnce(async () => {
+      store.invoices[0].cancelReason = formatInstallmentFeeCancelClaim(
+        "other-run",
+        new Date(),
+      );
+      return { success: false, resultMsg: "refused" };
+    });
+    provider.getStatus.mockResolvedValueOnce({ state: "completed" } as never);
+
+    await expect(
+      service.handleOrderRefund("o1", refund("ra1", "o1", 66.38, 1)),
+    ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_CLAIM_LOST/);
+    expect(returns()).toEqual([]);
   });
 
   it("cuts no return when another handler cancelled the document after it was read", async () => {
