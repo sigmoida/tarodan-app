@@ -376,6 +376,8 @@ paradır.
 
 `modules/payout/payout.service.ts`; scheduler: `payout-process` every 15 min,
 `payout-check-returned` daily at 06:00. Kill switch: `PAYOUTS_DISABLED=true`.
+The transfer `total_amount` is on the PSP scale, the net on the goods scale
+(§11, "Payout transfer").
 
 1. **Creation**: for every `released`, unfrozen hold without a blocking
    refund, a transfer with a `PYT…` reference (no hyphen: PayTR `trans_id`
@@ -550,6 +552,8 @@ on the payment − totals the other transfers on the oid took)`.
 ## 7. İadeler
 
 Politika saf ve merkezî: `modules/refund/refund-financial-policy.ts`.
+Installment payments: the policy amounts are goods scale; the vade farkı
+share is added to the PayTR refund after the policy (§11, "Refunds").
 
 **İade (return) politikaları** — `resolveReturnPolicy(reason)`:
 
@@ -1218,6 +1222,8 @@ RefundAttempt'e eşlenir (±0.05 TL toleransla `matched`/`amount_mismatch`/
 ödemeleri bulur (en yüksek alarm); settlement'lar `satış − iade == net` ile
 doğrulanır; PSP ücretleri ledger'a damgalanır. `ledger-reconciliation.service.ts`
 (her gün 04:00, salt-okuma) beş invariantı denetler ve para taşımaz, alarm basar.
+Installment payments: the PSP deduction is split into `psp_fee` and
+`installment_platform_cost`, and the checks sum both (§11).
 
 ### Finans Özeti sağlaması (admin → Finans → Özet)
 
@@ -1264,3 +1270,128 @@ Europe/Istanbul):
 
 Kargoyla ilgili cron'lar için [SHIPPING.md](./SHIPPING.md); kod/referans
 biçimleri için [CODE_SCHEME.md](./CODE_SCHEME.md).
+
+## 11. Installment payments (ADR 0019)
+
+Decision record: tarodan-ops ADR 0019 and plan `2026-11-03-installment-payments`
+(decisions D1-D8, assumptions register 12.6). Installments are off until a
+super admin turns on `installments_enabled`; the runbook is in
+[OPERATIONS.md](./OPERATIONS.md) ("Installment payments: ...").
+
+### Two scales, one helper
+
+- **Goods scale `T`**: `Payment.amount`, `Order.totalAmount`. The quote,
+  commission, buyer fees, stopaj, the escrow hold, the seller net, the refund
+  policy, refund caps, "fully refunded" and `metadata.refundedOrders` stay on
+  it. A seller is paid exactly what a single payment pays.
+- **PSP scale `C = T + F`**: what PayTR charged, `F` being the vade farkı the
+  buyer pays. Every comparison with a PayTR amount and every PayTR call uses
+  it: callback, status inquiry, sweeps, statement matching, refund
+  `return_amount`, transfer `total_amount`.
+- `payment/helpers/charged-amount.ts` is the only reader of the PSP columns
+  (`Payment.chargedAmount`, `Order.installmentFeeAmount`,
+  `RefundAttempt.installmentFeeAmount`) and holds the one comparison rule; the
+  contract spec `charged-amount-contract.spec.ts` fails a PayTR amount
+  comparison written anywhere else.
+
+### Capture
+
+One `payment_charge_attempts` row per signed form (the pricing snapshot:
+count, rates, segment, rule version, `F`, `C`, expected platform cost `P`). The
+capture writes the matched attempt onto the payment and allocates `F` to the
+orders by largest remainder (`Order.installmentFeeAmount`, `F_o`). Ledger
+`payment_captured` per order: `buyer_payment` credit `T_o + F_o`, the usual
+escrow, commission and stopaj debits on `T_o`, and `installment_fee` debit
+`F_o`.
+
+### Refunds (D7)
+
+The vade farkı follows the cash refunded, pro rata per order, whatever the
+fault. `installmentFeeShareOf` (`charged-amount.ts`) is the one rule:
+
+- cumulative per order: `round2(F_o * goodsRefundedSoFar / T_o)` minus the fee
+  already given back, so many partial refunds never drift;
+- the refund that brings the order's goods refunds to `T_o` takes the rest of
+  `F_o`; the refund that brings the whole payment's goods back takes the rest
+  of `F` (a package's shipping can be refunded with a sibling order);
+- no goods money, no fee (zero-cash settlement). A refund that closes an
+  order with money kept (return shipping charged) keeps the fee share of that
+  money.
+
+Worked examples (1,000.00 TL, 3 installments): with `k = 0`, `F` 54.35 a full
+refund returns 1,054.35; 400.00 then 600.00 return 421.74 then 632.61; a
+buyer-remorse return keeping 60.00 of shipping returns 991.09. With
+`k = 1/6`, `F` 66.38: 1,066.38; 426.55 then 639.83; 1,002.40 (3.98 stays).
+
+Every order refund path goes through `PaymentRefundService.processRefund`
+(buyer return and cancel, instant pre-shipment refund, admin and platform
+cancel, admin manual and goodwill refunds, the auto-refund of an order
+cancelled before its capture, the stock-shortage refund, the refund retry
+sweep and the stuck-attempt recovery). Its amount is the goods part; the claim
+(`PaymentRefundAttemptService.claimRefundAttempt`, under the payment lock)
+prices the fee share with `refundFeeShareFor` and stores
+`RefundAttempt.amount = goods + fee` (the PayTR `return_amount`) with
+`installmentFeeAmount = fee`. A refused attempt (no money moved) is priced
+again before it is resent; replays compare the goods part. A cart order is
+refunded once (`orderAlreadyRefunded`), a single-order payment in as many
+parts as its goods allow.
+
+Ledger `refund_issued`: `refund` debit goods + fee; `seller_escrow`,
+`platform_commission` and `withholding_tax` credits pro rata on the goods
+part, exactly as for a single payment; `installment_fee` credit = the fee
+share. A fully refunded order closes `installment_fee` to 0. Notifications
+show the cash back to the card against the charged total.
+
+PayTR keeps its deduction on a refund (AS-P4): the platform installment cost
+and the `psp_fee` are never reversed by our code. Trades never take
+installments (D6): the trade cash refund stays goods scale and refuses a
+payment that carries a fee (`TRADE_REFUND_INSTALLMENT_FEE`).
+
+### Payout transfer
+
+`payout/helpers/transfer-total.ts` is on the PSP scale: the order's source
+total is its charged slice `T_o + F_o`, the payment amount is `C` and the
+refunds are their `return_amount`s; `submerchant_amount` stays the seller's
+goods-scale net. Assumption AS-P5 (PayTR needs the slice margin
+`total_amount - submerchant_amount` to cover its deduction on the slice) is
+written at the formula: the PSP slice carries `F_o` on top of the platform
+fees and signing refuses a count whose margin would not cover the deduction
+(keep guard, `installment-eligibility.ts`).
+
+### PSP fee, platform cost and matching
+
+- `accruePspFees` splits a matched sale line's deduction `D` with
+  `splitStatementFee` (`payment/helpers/statement-fee-split.ts`):
+  `installment_platform_cost` = `min(D, P)` of the oid's attempt (a segment
+  rule share), `psp_fee` the rest, `buyer_payment` credit `D`. Assumption
+  AS-P6 (`kesinti_tutari` includes the whole installment deduction) lives
+  there only. `ledger-reconciliation` sums both accounts against the stamped
+  statement fees (`PSP_FEE_LEDGER_DRIFT`).
+- A matched installment sale is checked against its attempt: another card
+  family or BIN than the one priced logs `INSTALLMENT_CARD_MISMATCH` (error,
+  no card digits, no automatic action: the fee may be under-recovered); a
+  deduction rate more than 0.5 points off the priced `rn` logs
+  `INSTALLMENT_RATE_DRIFT` (warn).
+- Refund lines match the attempt's `amount` (PSP scale); sale lines match the
+  oid's attempt `C`. The admin statement-line list shows both the goods total
+  (`payment.amount`) and the expected charge (`payment.chargedAmount`).
+
+### Finance summary
+
+S1 collections are on the PSP scale with the vade farkı as its own line
+("Vade farkı (KDV dahil)"); S3 shows "Vade farkı geliri" (fee kept after
+refunds, without its VAT at each attempt's `feeVatRatePct`) and "Taksit
+kampanya maliyeti" (`installment_platform_cost`) next to "PayTR kesintisi";
+the buyer refunds breakdown shows the fee given back; the PayTR comparison
+reads sales as `C` and the fee as `psp_fee + installment_platform_cost`. The
+`installments` block of `GET /admin/finance/overview` has the rows by count
+and buyer segment (payments, fee collected / refunded / net income, expected
+`P` and booked cost).
+
+### Not handled in code
+
+- **Chargebacks**: no flow exists; PayTR debits the full `C`. Manual steps in
+  OPERATIONS.md.
+- **Invoicing** of the vade farkı (`buyer_installment_fee`, D4) and its
+  reversal on refund (AS-F3, basis `RefundAttempt.installmentFeeAmount`):
+  task A6.

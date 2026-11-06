@@ -503,8 +503,8 @@ at the next nightly run. The author still sees it on the order, flagged
 ### Installment payments: schema
 
 Reference: tarodan-ops ADR 0019 and plan `2026-11-03-installment-payments`
-(the full installment runbook, with the flag flip and the assumptions
-register, comes with the refund and reconciliation task). Migrations
+(the flag flip, the assumptions register, refunds and reconciliation are in
+"Installment payments: release, refunds and reconciliation" below). Migrations
 `20261103120000_installment_payments_schema`,
 `20261103120100_installment_payments_validate_constraints` and
 `20261103120200_installment_payments_charge_attempt_index` add the tables
@@ -625,6 +625,106 @@ cleared, mobile with the selector live).
 - **BIN cache.** PayTR BIN answers are cached in Redis under
   `paytr:bin:<bin>` (success 7 days, "not defined" 1 day; errors and timeouts
   never). Deleting the keys is safe; they refill on demand.
+
+### Installment payments: release, refunds and reconciliation
+
+Reference: tarodan-ops ADR 0019, plan `2026-11-03-installment-payments` (task
+A5); money rules in [PAYMENTS.md](./PAYMENTS.md) §11. Every production step
+below needs the user's approval, each time.
+
+**Turning installments on in production** (release order: the tarodan-app
+release with the flag off, then the mobile version with the selector live,
+then the flag):
+
+1. Every row of the assumptions register (plan 12.6: AS-P1 to AS-P8, AS-F1 to
+   AS-F4, AS-L1 to AS-L3) is confirmed by PayTR, the accountant or legal, or
+   accepted as-is by the user in writing; the plan records which. A different
+   answer goes into the one place the row names before the flag flip.
+2. ADR 0019 is accepted; the staging test plan (plan 10.3) passed.
+3. A rate snapshot younger than 24 h exists (query in "options, rates and
+   settings" above).
+4. A super admin turns on `installments_enabled`
+   (`PATCH /admin/installments/settings`, audited). Rollback: turn it off; it
+   acts on the next options or signing call. Once any installment payment
+   exists the code rolls forward only (refund, payout and ledger must keep
+   reading `F` and `P`).
+
+**Segment rules.** Super admin only; use the preview first (it shows the
+platform cost `P` per count before saving). An edit is a new version, an
+archive is an instant rollback; past payments keep their snapshot. Watch
+the cost afterwards in admin → Finance → Overview (`installments` rows, "Taksit
+kampanya maliyeti").
+
+**Refunding an installment payment.**
+
+- Every refund form and policy amount is the **goods** amount. The system
+  adds the vade farkı share (pro rata, the completing refund takes the rest)
+  and PayTR gets goods + share; the refund attempt in admin shows that PSP
+  amount, and `installment_fee_amount` the share inside it.
+- Do not refund an installment payment by hand in the PayTR panel: there is
+  no attempt and no ledger reversal for it (the statement line stays
+  unmatched). If it was unavoidable, resolve the line with a note and hand
+  the ledger correction to a developer.
+- The card holder's bank decides how a refund shows on the card (remaining
+  installments reduced or cancelled); that is not ours to change.
+- Manual review: use the table in "When needed: refund attempts in manual
+  review"; compare the panel's refund amount with the attempt's `amount`
+  (goods + share), never with the order total.
+- Read-only checks for one payment:
+
+  ```sql
+  SELECT id, order_id, status, amount, installment_fee_amount,
+         amount - installment_fee_amount AS goods
+  FROM refund_attempts WHERE payment_id = '<payment id>' ORDER BY created_at;
+
+  SELECT o.order_number, o.total_amount, o.installment_fee_amount,
+         COALESCE(SUM(r.installment_fee_amount)
+           FILTER (WHERE r.status IN ('succeeded', 'finalized')), 0) AS fee_refunded
+  FROM orders o
+  LEFT JOIN refund_attempts r ON r.order_id = o.id
+  WHERE o.id IN (SELECT id FROM orders WHERE checkout_group_id = '<group id>'
+                 UNION SELECT order_id FROM payments WHERE id = '<payment id>')
+  GROUP BY o.id ORDER BY o.created_at;
+  ```
+
+  A fully refunded order has `fee_refunded = installment_fee_amount`.
+
+**A payment left pending by `CHARGE_ATTEMPT_BASE_MISMATCH ... left pending`.**
+The payment's amount moved after the form was signed and PayTR collected the
+attempt's `C`, which is below the new amount: the payment is not completed
+(no hold, no ledger), the money is at PayTR. The pending sweep finds the
+capture on every run and the capture refuses it again, so the alarm repeats
+(once per payment per ~20 h in Sentry) until it is resolved. Owner: finance
+on call with a developer.
+
+1. From the log line take the payment and the attempt; check the attempt's
+   `merchant_oid` in the PayTR panel (paid at `charged_amount`).
+2. Find why the amount moved (audit log, `payments.metadata`). The order
+   cannot be fulfilled at a price the buyer did not pay.
+3. Refund the full `C` in the PayTR panel (production action, approval),
+   cancel the orders in admin, then force-cancel the payment. The statement's
+   refund line will stay unmatched: resolve it with a note naming the
+   payment. The orphan-capture sweep may alarm once for the failed payment
+   within its lookback: expected, note it in the incident.
+
+**Reconciliation alarms.**
+
+| Alarm                                                 | Meaning                                                                                                                      | What to do                                                                                                                                                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INSTALLMENT_CARD_MISMATCH` (error)                   | The statement's card family or BIN prefix is not the one the price was quoted for (the client declares the BIN).             | Nothing to correct: the count and amount were signed and collected. The fee may be under-recovered by the rate gap; finance notes it. Repeated cases from one client version: tell the web or mobile team. |
+| `INSTALLMENT_RATE_DRIFT` (warn)                       | `kesinti_orani` is more than 0.5 points off the rate the attempt was priced with.                                            | Check the rate snapshot's age. Persistent drift on one family: PayTR changed rates, or part of the cost is billed monthly (AS-P6); raise with PayTR and finance.                                           |
+| `PAYTR_STATEMENT_MISMATCH` on an installment sale     | The line does not show the attempt's `C`.                                                                                    | If PayTR shows `T` or another figure for an installment oid (AS-P2 wrong): turn `installments_enabled` off and raise it with PayTR before anything else.                                                   |
+| `PSP_FEE_LEDGER_DRIFT`                                | Stamped statement fees differ from `psp_fee` + `installment_platform_cost` in the ledger.                                    | As before: a lost or double ledger row, or a stamped line not written. The split never changes the sum.                                                                                                    |
+| `REVENUE_SPLIT_DRIFT` / red S1 on the finance summary | Collections (PSP scale) do not split into the components; an installment payment's fee is the "Vade farkı (KDV dahil)" line. | Check `paymentsWithoutOrders`; a payment whose `installment_fee_amount` has no matching order allocation is a data problem for a developer.                                                                |
+
+**Chargebacks (no flow, manual).** PayTR debits the full charged amount `C`
+from the merchant balance. Identify the payment by oid; if the seller has not
+been paid, keep the payout from going out (an open refund request or
+dispute on the order blocks the hold release and the transfer; otherwise ask
+a developer); send PayTR the evidence. If the chargeback is lost,
+the platform decides the seller's share under the dispute policy, and finance
+books the debit (goods and vade farkı) by hand with a developer: no automatic
+ledger entry exists (backlog P2 "no chargeback flow").
 
 ### One-off: saved-search tier limits
 
