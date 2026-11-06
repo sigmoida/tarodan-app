@@ -27,7 +27,7 @@ export interface DateTimePickerProps {
   /** The calendar's "today" and "clear" buttons (the app passes its copy). */
   todayLabel?: string;
   clearLabel?: string;
-  /** Accessible name of the time field (the app passes its copy). */
+  /** Accessible name of the time field (the app passes its copy); defaults to `label`. */
   timeLabel?: string;
   "aria-label"?: string;
 }
@@ -92,7 +92,8 @@ export function DateTimePicker({
           disabled={disabled || !datePart}
           inputSize={inputSize}
           className="w-28"
-          aria-label={timeLabel}
+          // Without its own name the time field is named by the picker's label.
+          aria-label={timeLabel ?? label}
         />
       </div>
       {error ? (
