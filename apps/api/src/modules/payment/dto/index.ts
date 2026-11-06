@@ -5,3 +5,4 @@ export * from "./cancel-payment.dto";
 export * from "./retry-payment.dto";
 export * from "./direct-payment.dto";
 export * from "./payment-query.dto";
+export * from "./installment-options.dto";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import type { AdminPaymentInstallment } from "@tarodan/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert } from "@tarodan/ui";
 import {
@@ -10,6 +11,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { DataList, Field } from "@/components/detail/DataList";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import {
   BoostRefundRedirectAlert,
@@ -23,18 +25,39 @@ import { adminKeys } from "@/lib/query/keys";
 import { useTranslations } from "next-intl";
 import { refundPaymentSchema, type RefundPaymentValues } from "../_lib/schema";
 
+/**
+ * Manual refund of a single-order or trade cash payment.
+ *
+ * Two scales (ADR 0019): `amount` is the goods amount T, and the admin enters
+ * the goods part to refund (the server caps it at T). When the buyer paid an
+ * installment fee F, PayTR also gives back its proportional share, priced by
+ * the server (`installmentFeeShareOf`), so the modal shows C and F, says
+ * that the fee follows, and the success toast names the cash actually
+ * refunded from the response.
+ */
 export function RefundPaymentModal({
   paymentId,
   amount,
+  installment,
   trade,
   onClose,
 }: {
   paymentId: string;
+  /** T: the goods-scale amount (`Payment.amount`), the refund cap. */
   amount: number;
+  /** The payment's installment block; F > 0 switches to the two-scale copy. */
+  installment?: Pick<
+    AdminPaymentInstallment,
+    "installmentFeeAmount" | "chargedAmount"
+  >;
   trade?: { tradeNumber: string; refundableTotal: number };
   onClose: () => void;
 }) {
   const t = useTranslations();
+  const fee =
+    !trade && installment && installment.installmentFeeAmount > 0
+      ? installment
+      : null;
   const idempotencyKey = useRef(crypto.randomUUID()).current;
   const form = useZodForm(
     refundPaymentSchema(t, trade?.refundableTotal ?? amount),
@@ -53,7 +76,14 @@ export function RefundPaymentModal({
       }),
     {
       invalidates: ["payments"],
-      successMessage: t("admin.finance.payments.refundStarted"),
+      successMessage: ({ data }) =>
+        // The split only when a fee share actually went back with it.
+        data.cashRefunded != null && (data.installmentFeeRefunded ?? 0) > 0
+          ? t("admin.finance.payments.refundInstallment.started", {
+              cash: fmtTry(data.cashRefunded) ?? "",
+              fee: fmtTry(data.installmentFeeRefunded) ?? "",
+            })
+          : t("admin.finance.payments.refundStarted"),
       // Shown inline instead of a toast: a boost payment is refused with a
       // pointer to the boost screen, and an unknown outcome replaces the form.
       showErrorToast: (error) =>
@@ -104,16 +134,50 @@ export function RefundPaymentModal({
         </Alert>
       ) : (
         <>
-          <p className="text-muted">
-            {t("admin.finance.payments.totalPaymentAmount")}: {fmtTry(amount)}
-          </p>
+          {fee ? (
+            <>
+              <DataList columns={1}>
+                <Field
+                  label={t("admin.finance.payments.installment.goodsAmount")}
+                >
+                  {fmtTry(amount)}
+                </Field>
+                <Field
+                  label={t("admin.finance.installments.preview.columns.fee")}
+                >
+                  {fmtTry(fee.installmentFeeAmount)}
+                </Field>
+                <Field
+                  label={t("admin.finance.payments.installment.chargedAmount")}
+                >
+                  {fmtTry(fee.chargedAmount)}
+                </Field>
+              </DataList>
+              <Alert
+                variant="info"
+                title={t(
+                  "admin.finance.payments.refundInstallment.noticeTitle",
+                )}
+              >
+                {t("admin.finance.payments.refundInstallment.notice")}
+              </Alert>
+            </>
+          ) : (
+            <p className="text-muted">
+              {t("admin.finance.payments.totalPaymentAmount")}: {fmtTry(amount)}
+            </p>
+          )}
           {/* Text, not type="number" (see `@tarodan/shared` `parseTlAmount`). */}
           <FormInput
             name="amount"
             type="text"
             inputMode="decimal"
             autoComplete="off"
-            label={t("admin.finance.payments.refundAmountLabel")}
+            label={
+              fee
+                ? t("admin.finance.payments.refundInstallment.amountLabel")
+                : t("admin.finance.payments.refundAmountLabel")
+            }
             placeholder={t("admin.finance.payments.refundAmountPlaceholder")}
           />
         </>

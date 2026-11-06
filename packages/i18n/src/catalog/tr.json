@@ -132,7 +132,8 @@
       "select": "Dosya Seç",
       "replace": "Dosyayı Değiştir",
       "remove": "Kaldır"
-    }
+    },
+    "today": "Bugün"
   },
   "boost": {
     "offer": {
@@ -3028,6 +3029,28 @@
         "retry": "Tekrar dene"
       },
       "cancelled": "Öne çıkarma ödemesi iptal edildi."
+    },
+    "installments": {
+      "title": "Taksit seçenekleri",
+      "single": "Tek çekim",
+      "count": "{count} taksit",
+      "monthly": "{count} x {amount}",
+      "total": "Toplam {amount}",
+      "fee": "Vade farkı {amount}",
+      "noFee": "Vade farksız",
+      "enterCard": "Taksit seçeneklerini görmek için kart numaranızı girin.",
+      "loading": "Taksit seçenekleri yükleniyor",
+      "notEligible": "Bu kartla yalnız tek çekim ödeme yapılabilir.",
+      "notOffered": "Bu ödeme için yalnız tek çekim kullanılabilir.",
+      "belowMinimum": "Taksit, {amount} ve üzeri ödemelerde kullanılabilir.",
+      "unavailable": "Taksit seçenekleri şu an gösterilemiyor. Tek çekim ile ödeyebilirsiniz.",
+      "terms": "{count} taksit: aylık {monthly}, vade farkı {fee}, toplam {total}.",
+      "refundNote": "Taksitli ödemelerin iadesi, bankanızın uygulamasına göre kartınıza taksitler hâlinde yansıyabilir."
+    },
+    "summary": {
+      "installments": "Taksit",
+      "installmentFee": "Vade farkı",
+      "chargedTotal": "Karttan çekilen tutar"
     }
   },
   "bankAccount": {
@@ -3347,7 +3370,7 @@
       "alisverisVeTakasRehberi": "Alışveriş ve Takas Rehberi",
       "nasilSiparisOlusturabilirim": "Nasıl sipariş oluşturabilirim?",
       "koleksiyonunuzaDahilEtmekIstediginizModelAraclari": "Koleksiyonunuza dahil etmek istediğiniz model araçları sepetinize ekleyerek alışverişe hemen başlayabilirsiniz. Sepetinize tıkladıktan sonra aktif indirimlerden yararlanabilir, varsa indirim kuponu kodunuzu ilgili alana girebilirsiniz.",
-      "odemeyeGecButonunaTikladiktanSonraTeslimat": "“Ödemeye geç” butonuna tıkladıktan sonra teslimat adresinizi kontrol edebilir; farklı bir adrese gönderim yapacaksanız yeni bir adres ekleyebilir veya mevcut bilgilerinizi güncelleyebilirsiniz. Ödeme adımında kart bilgilerinizi girdikten ve dilerseniz size uygun taksit seçeneğini seçtikten sonra “Alışverişi tamamla” butonuna basarak siparişinizi güvenle oluşturabilirsiniz.",
+      "odemeyeGecButonunaTikladiktanSonraTeslimat": "“Ödemeye geç” butonuna tıkladıktan sonra teslimat adresinizi kontrol edebilir; farklı bir adrese gönderim yapacaksanız yeni bir adres ekleyebilir veya mevcut bilgilerinizi güncelleyebilirsiniz. Ödeme adımında kart bilgilerinizi girdikten sonra “Alışverişi tamamla” butonuna basarak siparişinizi güvenle oluşturabilirsiniz.",
       "takasIslemleriniNasilYapiyoruz": "Takas işlemlerini nasıl yapıyoruz?",
       "heyecanVericiBirDigerDetayIse": "Heyecan verici bir diğer detay ise: koleksiyonlar arası takas da yapılabiliyor! Takas sürecinde her iki taraf da model araçlarını Tarodan deposuna gönderiyor. Uzman ekibimiz depoda gerekli kontrolleri sağlıyor; ürünler ilanla tamamen eşleşiyorsa takas işlemini güvenle başlatıyoruz. Eğer beklenmeyen kusurlu veya yanlış bir ürünle karşılaşırsak hemen taraflara bilgi veriyor, onayınızla süreci düzenliyor veya ürünleri güvenle sizlere iade ediyoruz. Böylece garaj değiştirmek tamamen güvence altında ilerliyor!",
       "siparisiminVeyaTakasiminDurumunuNasilTakip": "Siparişimin veya takasımın durumunu nasıl takip edebilirim?",
@@ -3658,7 +3681,10 @@
       "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
       "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
       "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
-      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz."
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz.",
+      "installmentTermsField": "Taksitli ödemede: taksit sayısı, aylık taksit tutarı, vade farkı (KDV dahil) ve karttan çekilecek toplam tutar",
+      "installmentPaymentTerms": "Kredi kartıyla taksitli ödeme, yalnız ödeme ekranında Alıcı'nın kartı ve ödeme tutarı için sunulan seçeneklerle yapılabilir; tek çekim her zaman seçilebilir ve tek çekimde vade farkı alınmaz. Alıcı taksitli ödemeyi seçerse taksit sayısı, aylık taksit tutarı, vade farkı ve karttan çekilecek toplam tutar ödeme onayından önce ödeme ekranında gösterilir. Vade farkı, taksitlendirmenin bedeli olarak ödenecek toplam tutara ayrı bir kalem olarak eklenir, Platform tarafından tahsil edilir ve Alıcı'ya KDV dahil ayrı bir belgeyle faturalandırılır. Taksitlerin kart ekstresine yansıması kartı veren bankanın uygulamasına tabidir.",
+      "installmentRefundTerms": "Taksitli ödenen bir siparişte cayma, iade veya iptal halinde vade farkı, iade edilen tutarla orantılı olarak Alıcı'ya geri ödenir; siparişin tamamı iade edildiğinde vade farkının tamamı iade edilir. İade tutarı, kartı veren bankanın uygulamasına göre Alıcı'nın kartına taksitler hâlinde yansıyabilir."
     },
     "terms": {
       "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
@@ -4174,7 +4200,8 @@
       "security": "Güvenlik",
       "securityDesc": "Kart bilgileriniz 256-bit SSL ile şifrelenir. Ödeme sayfamızda kart numaranız bizde saklanmaz.",
       "installments": "Taksit",
-      "installmentsDesc": "Banka kampanyalarına göre taksit seçenekleri ödeme ekranında sunulmaktadır."
+      "installmentsDesc": "Kartla ödemeler şu an tek çekim olarak alınır.",
+      "installmentsDescEnabled": "Uygun kredi kartlarıyla taksit seçenekleri, kart numaranızı girdiğinizde ödeme ekranında gösterilir."
     },
     "returns": {
       "title": "İade ve Değişim",
@@ -7015,6 +7042,7 @@
           "buyerCommission": "Alıcı Komisyonu",
           "buyerServiceFee": "Alıcı Koruma Hizmet Bedeli",
           "buyerShipping": "Kargo Bedeli (Alıcı Payı)",
+          "buyerInstallmentFee": "Taksit Vade Farkı",
           "sellerCommission": "Satıcı Komisyonu",
           "sellerPlatformFee": "Platform Hizmet Bedeli",
           "sellerShipping": "Kargo Bedeli (Satıcı Payı)",
@@ -7196,7 +7224,40 @@
         },
         "cartInfo": "Sepet Bilgileri",
         "refundedTotal": "İade edilen",
-        "manualRefundGroupHint": "Sepet ödemesinde iade sipariş bazında yapılır — ilgili siparişin iade talebini kullanın."
+        "manualRefundGroupHint": "Sepet ödemesinde iade sipariş bazında yapılır — ilgili siparişin iade talebini kullanın.",
+        "installment": {
+          "title": "Taksit",
+          "single": "Tek çekim",
+          "notCaptured": "Tahsil edilmedi",
+          "goodsAmount": "Vade farkı hariç tutar",
+          "chargedAmount": "Karttan çekilen",
+          "card": "Kart",
+          "cardTypes": {
+            "credit": "Kredi kartı",
+            "debit": "Banka kartı"
+          },
+          "businessCard": "Ticari kart",
+          "platformCost": "Beklenen platform maliyeti",
+          "noPricing": "Bu ödemenin fiyatlama kaydı yok: kullanıcı grubu, kural, platform payı ve kart bilgisi gösterilemiyor.",
+          "attempts": {
+            "title": "Çekim denemeleri",
+            "description": "Bu ödeme için imzalanan her PayTR formu, en yenisi başta. Ödeme yalnız işlenen denemeden kaydedilir; tahsil edilip işlenmeyen bir deneme ikinci bir çekimdir ve ayrıca çözülmelidir.",
+            "columns": {
+              "oid": "PayTR sipariş no",
+              "count": "Taksit",
+              "charged": "Çekim tutarı",
+              "createdAt": "Oluşturma"
+            },
+            "applied": "Ödemeye işlendi",
+            "capturedNotApplied": "Tahsil edildi, ödemeye işlenmedi"
+          }
+        },
+        "refundInstallment": {
+          "amountLabel": "İade edilecek ürün tutarı, vade farkı hariç (boş bırakırsanız tam iade)",
+          "noticeTitle": "Vade farkı da iade edilir",
+          "notice": "Girdiğiniz tutar vade farkı hariç ürün tutarıdır. Alıcıya bununla birlikte vade farkının orantılı payı da iade edilir; ödemeyi tamamen kapatan iade, vade farkından kalanın tamamını geri verir.",
+          "started": "İade başlatıldı: alıcıya {cash} iade edilecek ({fee} vade farkı dahil)."
+        }
       },
       "psp": {
         "title": "PayTR Mutabakat",
@@ -7264,7 +7325,8 @@
           "resolved": "Satır çözüldü olarak işaretlendi",
           "resolveTitle": "Satırı çözüldü olarak kapat",
           "resolveDescription": "{oid} · {amount} — satır iş listesinden düşer ve gün kartında sayılmaz. Neden çözüldüğünü yazın (denetim kaydına geçer).",
-          "resolveNotePlaceholder": "Örn. PayTR panelinden teyit edildi; test işlemi."
+          "resolveNotePlaceholder": "Örn. PayTR panelinden teyit edildi; test işlemi.",
+          "chargedAmount": "Bizde çekilen"
         },
         "settlements": {
           "empty": "Henüz hakediş kaydı yok.",
@@ -7510,7 +7572,8 @@
               "serviceVat": "Hizmet KDV'si",
               "shipping": "Kargo (Sürat'a)",
               "withholding": "Stopaj",
-              "shippingDeficit": "Kargo açığı (hold sıfırlandı)"
+              "shippingDeficit": "Kargo açığı (hold sıfırlandı)",
+              "installmentFee": "Vade farkı (KDV dahil)"
             }
           },
           "sellerShare": {
@@ -7544,7 +7607,9 @@
               "tradeFeeReversed": "Takas tam iadesi (ücret geri)",
               "virtualRefundsNet": "Üyelik / öne çıkarma iadeleri",
               "platformAbsorbed": "Platformun karşıladığı iade kalemleri",
+              "installmentFeeIncome": "Vade farkı geliri (KDV hariç)",
               "pspFee": "PayTR kesintisi",
+              "installmentPlatformCost": "Taksit kampanya maliyeti",
               "tarodanNet": "Tarodan hak edişi"
             }
           },
@@ -7557,6 +7622,7 @@
               "buyerFees": "Alıcı ücretleri",
               "buyerVat": "Alıcı KDV'si",
               "returnShippingCharged": "Alıcıya yansıtılan iade kargosu",
+              "installmentFee": "Vade farkı",
               "unclassified": "Ayrıştırılamayan (eski politika / elle / takas)"
             }
           }
@@ -7583,6 +7649,169 @@
           "ordersWithoutHold": "Hold'u olmayan ödenmiş sipariş",
           "productTax": "Ürün KDV'si sıfır değil (kod tutarsızlığı)",
           "commissionLedgerDrift": "Sipariş komisyonu ile komisyon defteri farkı"
+        },
+        "installments": {
+          "title": "Taksit",
+          "description": "Taksitli ödemeler taksit sayısı ve kullanıcı grubuna göre: alıcıların ödediği vade farkı, iadelerle geri verilen payı ve kurallar nedeniyle platformun üstlendiği taksit maliyeti.",
+          "columns": {
+            "payments": "Ödeme",
+            "feeCollected": "Tahsil edilen vade farkı (KDV dahil)",
+            "feeRefunded": "İade edilen vade farkı",
+            "platformCostBooked": "Kayda geçen platform maliyeti"
+          },
+          "empty": "Henüz taksitli ödeme yok."
+        }
+      },
+      "installments": {
+        "title": "Taksit",
+        "subtitle": "Taksit ana anahtarı, en düşük tutar, PayTR oranları, kullanıcı grubuna göre taksit kuralları ve fiyat önizleme.",
+        "readOnly": "Bu ekranı yalnız görüntüleyebilirsiniz. Taksit ayarlarını ve kurallarını yalnız süper yönetici değiştirebilir.",
+        "error": {
+          "title": "Taksit ayarları yüklenemedi",
+          "description": "Bağlantıyı kontrol edip tekrar deneyin."
+        },
+        "segments": {
+          "all": "Herkes",
+          "guest": "Misafir"
+        },
+        "general": {
+          "title": "Genel",
+          "enabledLabel": "Taksitli ödeme",
+          "enabledOn": "Açık",
+          "enabledOff": "Kapalı",
+          "enabledHint": "Kapalıyken alıcılar yalnız tek çekim görür. Bu ana anahtar yayında en son açılır: önce taksiti destekleyen mobil sürüm mağazalarda yayında olmalı.",
+          "enableConfirm": {
+            "title": "Taksitli ödeme açılsın mı?",
+            "description": "Alıcılar uygun kredi kartlarında taksit seçeneklerini görmeye başlar. Yayın kuralı: bayraklar en son açılır. Açmadan önce taksiti destekleyen mobil sürümün mağazalarda yayında olduğunu ve yayın kontrol listesinin tamamlandığını doğrulayın.",
+            "staleRates": "Güncel bir PayTR oran kaydı yok: oranlar alınana kadar alıcılar yine yalnız tek çekim görür.",
+            "confirm": "Taksiti aç"
+          },
+          "disableConfirm": {
+            "title": "Taksitli ödeme kapatılsın mı?",
+            "description": "Bundan sonra alıcılara yalnız tek çekim sunulur ve yeni taksitli ödeme kabul edilmez.",
+            "confirm": "Taksiti kapat"
+          },
+          "enabledSaved": "Taksitli ödeme açıldı.",
+          "disabledSaved": "Taksitli ödeme kapatıldı.",
+          "minAmountLabel": "En düşük tutar (TL)",
+          "minAmountHint": "Taksit, ürün toplamı bu tutar ve üzerindeki ödemelerde sunulur. Varsayılan: {amount}.",
+          "minAmountSave": "Tutarı kaydet",
+          "minAmountSaved": "En düşük tutar kaydedildi."
+        },
+        "rates": {
+          "title": "PayTR oranları",
+          "status": "Durum",
+          "fresh": "Güncel",
+          "stale": "Eski",
+          "staleHint": "Son oran kaydı güncel değil: yenisi alınana kadar alıcılar yalnız tek çekim görür. Önizleme son kayıtla hesaplanır.",
+          "fetchedAt": "Alınma zamanı",
+          "maxCount": "En çok taksit (ticari olmayan kart)",
+          "families": "Kart aileleri",
+          "none": {
+            "title": "Henüz PayTR oranı alınmadı",
+            "description": "İlk oran kaydı alınana kadar alıcılar yalnız tek çekim görür ve fiyat önizlemesi hesaplanamaz."
+          }
+        },
+        "preview": {
+          "title": "Fiyat önizleme",
+          "description": "Bir kullanıcı grubu, ürün toplamı ve kart ailesi için alıcının göreceği taksit seçenekleri (son oran kaydıyla, yürürlükteki kurallarla).",
+          "draftDescription": "Kaydetmeden önce: bu taslak kural şu an yürürlükteymiş gibi uygulanır.",
+          "segment": "Kullanıcı grubu",
+          "amount": "Ürün toplamı (TL)",
+          "family": "Kart ailesi",
+          "failed": "Önizleme hesaplanamadı",
+          "unavailable": "Oran kaydı olmadığı için önizleme hesaplanamıyor.",
+          "cardNotEligible": "PayTR bu kart ailesi için taksit sunmuyor.",
+          "staleRates": "Önizleme güncel olmayan bir oran kaydıyla hesaplandı ({fetchedAt}). Yeni kayıt alınana kadar alıcılar yalnız tek çekim görür.",
+          "draftNeedsFix": "Önizlemeyi görmek için kuraldaki hataları düzeltin.",
+          "offered": "Sunulur",
+          "notOffered": "Sunulmaz",
+          "monthlyValue": "{count} x {amount}",
+          "defaultRule": "Varsayılan (alıcı öder)",
+          "draftRule": "Taslak kural",
+          "columns": {
+            "count": "Taksit",
+            "offered": "Durum",
+            "monthly": "Aylık",
+            "total": "Toplam çekim",
+            "fee": "Vade farkı",
+            "share": "Platform payı",
+            "platformCost": "Platform maliyeti",
+            "rule": "Kural"
+          }
+        },
+        "rules": {
+          "title": "Taksit kuralları",
+          "description": "Bir kural, bir kullanıcı grubunun belirli taksit sayılarında vade farkının bir kısmını ya da tamamını platformun üstlenmesini sağlar veya o taksit sayılarını kapatır. Eşleşen kural yoksa vade farkını alıcı öder.",
+          "new": "Yeni kural",
+          "tabs": {
+            "current": "Geçerli",
+            "archived": "Arşiv"
+          },
+          "empty": "Henüz kural yok: bütün alıcılar vade farkını kendisi öder.",
+          "emptyArchived": "Arşivlenmiş kural yok.",
+          "loadFailed": "Taksit kuralları yüklenemedi",
+          "columns": {
+            "name": "Kural",
+            "segment": "Kullanıcı grubu",
+            "counts": "Taksit sayısı",
+            "effect": "Etki",
+            "priority": "Öncelik",
+            "validity": "Geçerlilik",
+            "created": "Oluşturma"
+          },
+          "version": "Sürüm {version}",
+          "nameVersion": "{name} (sürüm {version})",
+          "countRange": "{min}-{max} taksit",
+          "countSingle": "{count} taksit",
+          "effectNotOffered": "Sunulmaz",
+          "effectBuyerPays": "Alıcı öder",
+          "effectShare": "Platform payı {share}",
+          "until": "Bitiş {date}",
+          "openEnded": "Süresiz",
+          "status": {
+            "active": "Yürürlükte",
+            "scheduled": "Planlandı",
+            "expired": "Süresi doldu",
+            "archived": "Arşivlendi"
+          },
+          "actions": {
+            "newVersion": "Yeni sürüm",
+            "archive": "Arşivle"
+          },
+          "archiveConfirm": {
+            "title": "Kural arşivlensin mi?",
+            "description": "\"{name}\" kuralı yeni ödemelere uygulanmaz. Geçmiş ödemeler kullandıkları sürümü korur."
+          },
+          "archived": "Kural arşivlendi.",
+          "created": "Kural oluşturuldu.",
+          "versionCreated": "Kuralın yeni sürümü kaydedildi.",
+          "overlap": {
+            "title": "Çakışan kurallar",
+            "description": "Bu kural aynı öncelikteki şu kurallarla aynı alıcıya, aynı taksit sayısında, aynı anda uygulanabilir: {rules}. Hangisinin geçerli olacağını eşitlik kuralı belirler (belirli bir grup \"Herkes\"ten önce gelir, sonra en yeni kural). İstemiyorsanız önceliği değiştirin."
+          }
+        },
+        "form": {
+          "createTitle": "Yeni taksit kuralı",
+          "versionTitle": "Yeni sürüm: {name} (sürüm {version})",
+          "versionHint": "Kaydettiğinizde bu sürüm arşivlenir ve yerine yeni sürüm geçer. Geçmiş ödemeler eski sürümü korur.",
+          "name": "Kural adı",
+          "segment": "Kullanıcı grubu",
+          "minCount": "En az taksit",
+          "maxCount": "En çok taksit",
+          "allowed": "Bu taksit sayılarını sun",
+          "allowedHint": "İşaretli değilse bu taksit sayıları bu gruba hiç sunulmaz.",
+          "share": "Platform payı (%)",
+          "shareHint": "Vade farkının platformun üstlendiği kısmı: 0 ise alıcı öder, 100 ise vade farksız.",
+          "priority": "Öncelik",
+          "priorityHint": "Bir taksit sayısına birden çok kural uyuyorsa yüksek öncelikli kural geçerli olur.",
+          "validFrom": "Başlangıç",
+          "validUntil": "Bitiş (isteğe bağlı)",
+          "timeZoneHint": "Saatler İstanbul saatidir.",
+          "validUntilHint": "Boş bırakılırsa süresiz. Bitiş anı dahil değildir.",
+          "timeLabel": "{field} saati",
+          "submitCreate": "Kuralı oluştur",
+          "submitVersion": "Yeni sürümü kaydet"
         }
       }
     },
@@ -7858,7 +8087,8 @@
           "commissionRule": "Komisyon kuralı",
           "commissionRuleUnnamed": "Adsız kural",
           "preparingDeadline": "Kargoya verme son tarihi",
-          "preparingExtended": "Süre bir kez uzatıldı ({date}); ilk son tarih {original}"
+          "preparingExtended": "Süre bir kez uzatıldı ({date}); ilk son tarih {original}",
+          "installmentFeeShare": "Vade farkı payı"
         },
         "buckets": {
           "all": "Tümü",
@@ -10217,6 +10447,11 @@
           "name": "Güven skoru laboratuvarı",
           "description": "Satıcı güven skorunu açıkla, yeniden hesapla ve aday ağırlıkları dene. Hiçbir şey kaydedilmez.",
           "keywords": "güven skoru, satıcı skoru, ağırlık, simülasyon, laboratuvar"
+        },
+        "installments": {
+          "name": "Taksit",
+          "description": "Taksit ayarlarını, kullanıcı grubu kurallarını ve fiyat önizlemesini yönetin",
+          "keywords": "taksit,vade farkı,installment,paytr"
         }
       }
     },
@@ -11730,9 +11965,6 @@
         "sellerAtFault": "İade/iptalde kusur satıcıda olduğu için kalan tutar satıcıya ödenmez"
       },
       "holdResidualNotSettleable": "Bu ödemede kapatılacak satıcı kusurlu kalan tutar yok (tutulmuyor, iadeyle dondurulmuş, sipariş kapanmamış, kusur satıcıda değil ya da kalan tutar yok)",
-      "installmentInfoFetchFailed": "Taksit bilgisi alınamadı",
-      "installmentInfoUnavailable": "Taksit bilgileri alınamadı",
-      "installmentResponseInvalid": "Taksit bilgisi alınamadı",
       "loginRequired": "Oturum açmanız gerekiyor",
       "loginRequiredForOrder": "Bu sipariş için giriş yapmanız gerekiyor",
       "loginRequiredForPayment": "Bu ödeme için giriş yapmanız gerekiyor",
@@ -11787,7 +12019,17 @@
       "paytrReportEmptyResponse": "PayTR rapor geçersiz/boş yanıt ({url})",
       "paytrReportRequestFailed": "PayTR rapor isteği başarısız: {reason}",
       "paytrReturnedTransferQueryFailed": "PayTR geri dönen transfer sorgusu başarısız: {reason}",
-      "paytrSendFromAccountFailed": "PayTR hesaptan gönder başarısız: {reason}"
+      "paytrSendFromAccountFailed": "PayTR hesaptan gönder başarısız: {reason}",
+      "installmentNotOffered": "Seçtiğiniz taksit bu kart ve tutar için kullanılamıyor.",
+      "installmentPricingChanged": "Taksit tutarı güncellendi. Lütfen yeni tutarı kontrol edip tekrar deneyin.",
+      "installmentUnavailable": "Taksit şu an kullanılamıyor. Tek çekim ile devam edebilirsiniz.",
+      "installmentOptionsInvalidRequest": "Taksit seçenekleri için bir kart (kart numarasının ilk haneleri ya da kayıtlı kart) ve bir ödeme ya da tutar gönderilmelidir.",
+      "installmentOptionsTooManyRequests": "Taksit seçenekleri çok sık istendi. Lütfen biraz sonra tekrar deneyin.",
+      "paymentAmountOutOfDate": "Ödeme tutarı güncellendi. Lütfen güncel tutarı kontrol edip tekrar deneyin.",
+      "installmentMail": {
+        "label": "Taksit",
+        "summary": "{count} taksit: aylık {monthly} TL, vade farkı {fee} TL, toplam {total} TL"
+      }
     },
     "product": {
       "alreadyLiked": "Bu ürünü zaten beğendiniz",
@@ -12347,6 +12589,32 @@
         "revokeGrantOnly": "İadesiz iptal yalnız ücretsiz tanımlar içindir",
         "grantListingNotActive": "Yalnız yayındaki ilanlara öne çıkarma tanımlanabilir",
         "stopActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış öne çıkarma durdurulabilir"
+      },
+      "installments": {
+        "useDedicatedEndpoint": "Bu ayar Finans > Taksit ekranından değiştirilir.",
+        "minAmount": {
+          "notANumber": "Asgari tutar bir sayı olmalıdır.",
+          "outOfRange": "Asgari tutar {min} ile {max} TL arasında olmalıdır.",
+          "tooManyDecimals": "Asgari tutar en fazla {decimals} ondalık basamak içerebilir."
+        },
+        "rule": {
+          "nameRequired": "Kural adı zorunludur.",
+          "nameTooLong": "Kural adı çok uzun.",
+          "segmentInvalid": "Geçersiz kullanıcı grubu.",
+          "countRange": "Taksit aralığı 2 ile 12 arasında olmalı; en az taksit, en çok taksitten büyük olamaz.",
+          "shareRange": "Platform payı yüzde 0 ile 100 arasında olmalıdır.",
+          "sharePrecision": "Platform payı en fazla iki ondalık basamak içerebilir.",
+          "shareWithoutAllowed": "Kapatılan taksitlerde platform payı 0 olmalıdır.",
+          "priorityRange": "Öncelik -1000 ile 1000 arasında bir tam sayı olmalıdır.",
+          "validFromInvalid": "Başlangıç zamanı geçersiz.",
+          "validUntilInvalid": "Bitiş zamanı geçersiz.",
+          "validUntilNotAfterFrom": "Bitiş zamanı başlangıçtan sonra olmalıdır.",
+          "notFound": "Taksit kuralı bulunamadı.",
+          "notCurrent": "Bu kural sürümü artık güncel değil (değiştirilmiş ya da kaldırılmış). Listeyi yenileyip tekrar deneyin."
+        },
+        "preview": {
+          "familyInvalid": "Bilinmeyen kart ailesi."
+        }
       }
     },
     "advertisement": {
@@ -13454,7 +13722,7 @@
     "paymentOptions": {
       "page": {
         "odemeSecenekleriTarodan": "Ödeme Seçenekleri · Tarodan",
-        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Tarodan üzerinde kabul edilen ödeme yöntemleri, güvenli ödeme altyapısı ve taksit seçenekleri hakkında bilgi alın."
+        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Tarodan üzerinde kabul edilen ödeme yöntemleri ve güvenli ödeme altyapısı hakkında bilgi alın."
       }
     },
     "sell": {

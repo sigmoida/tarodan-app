@@ -4,6 +4,7 @@ import { usersApi } from "./users";
 import { catalogApi } from "./catalog";
 import { operationsApi } from "./operations";
 import { financeApi } from "./finance";
+import { installmentsApi } from "./installments";
 import { payoutExportsApi } from "./payout-exports";
 import { marketingApi } from "./marketing";
 import { systemApi } from "./system";
@@ -34,6 +35,7 @@ export const adminApi = {
   ...catalogApi,
   ...operationsApi,
   ...financeApi,
+  ...installmentsApi,
   ...payoutExportsApi,
   ...marketingApi,
   ...systemApi,

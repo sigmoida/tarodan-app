@@ -1,9 +1,10 @@
 /** @format */
 
 import { Badge } from "@tarodan/ui";
+import type { InstallmentOption } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
-import { formatTL } from "@/lib/format";
+import { formatPriceNumber, formatTL } from "@/lib/format";
 
 /** Takas ödemesinin kalemleri (API `pricing` alanı). */
 export interface TradePricingLines {
@@ -24,9 +25,15 @@ export interface TradePricingLines {
 export default function AmountSummaryCard({
   amount,
   pricing,
+  installment,
 }: {
   amount?: number;
   pricing?: TradePricingLines | null;
+  /**
+   * The chosen installment (count above 1): the amount due becomes its total
+   * C and the installment fee gets its own line. Amounts are the server's.
+   */
+  installment?: InstallmentOption | null;
 }) {
   const t = useTranslations();
   // Hizmet bedeli ve kargo yapısal kalemlerdir: 0 olsalar da gösterilirler ki
@@ -39,6 +46,7 @@ export default function AmountSummaryCard({
         [t("trade.cashDifferenceLine"), pricing.cashDifference, false],
       ].filter(([, value, always]) => always || (value as number) > 0)
     : [];
+  const due = installment ? installment.totalAmount : amount;
 
   return (
     <SectionCard className="p-0" bodyClassName="">
@@ -48,7 +56,9 @@ export default function AmountSummaryCard({
             {t("page.payment.amountsummarycard.odenecekTutar")}
           </p>
           <p className="mt-1 text-3xl font-bold tracking-tight text-heading tabular-nums sm:text-4xl">
-            {formatTL(amount)}{" "}
+            {/* The number alone: the unit is its own smaller span (formatTL
+                would print "TL" twice). */}
+            {formatPriceNumber(due)}{" "}
             <span className="text-2xl font-semibold text-muted">
               {t("page.payment.amountsummarycard.tl")}
             </span>
@@ -58,6 +68,34 @@ export default function AmountSummaryCard({
           {t("page.payment.amountsummarycard.odemeBekleniyor")}
         </Badge>
       </div>
+      {installment && (
+        <div
+          className="space-y-1 border-t border-border px-6 py-4"
+          data-testid="installment-summary"
+        >
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted">
+              {t("payment.installments.count", { count: installment.count })}
+            </span>
+            <span className="font-medium text-body tabular-nums">
+              {t("payment.installments.monthly", {
+                count: installment.count,
+                amount: formatTL(installment.monthlyAmount),
+              })}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted">
+              {t("payment.summary.installmentFee")}
+            </span>
+            <span className="font-medium text-body tabular-nums">
+              {installment.feeAmount > 0
+                ? formatTL(installment.feeAmount)
+                : t("payment.installments.noFee")}
+            </span>
+          </div>
+        </div>
+      )}
       {lines.length > 0 && (
         <div className="space-y-1 border-t border-border px-6 py-4">
           {lines.map(([label, value]) => (

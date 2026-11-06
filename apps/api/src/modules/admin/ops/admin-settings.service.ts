@@ -5,7 +5,11 @@ import {
   resetAdminSessionTimeoutCache,
 } from "../../security/helpers/admin-session-timeout";
 import { MembershipTierType, SellerType } from "@prisma/client";
-import { isHeroSettingKey, isTimingSettingKey } from "@tarodan/types";
+import {
+  isHeroSettingKey,
+  isInstallmentSettingKey,
+  isTimingSettingKey,
+} from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "../dto";
@@ -133,6 +137,14 @@ export class AdminSettingsService {
     if (isHeroSettingKey(dto.key)) {
       throw new BadRequestException(
         i18nMessage("server.hero.useDedicatedEndpoint"),
+      );
+    }
+    // Installment keys (kill switch, minimum amount) are money configuration:
+    // validated, super_admin only and audited on PATCH
+    // /admin/installments/settings, never written here.
+    if (isInstallmentSettingKey(dto.key)) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.installments.useDedicatedEndpoint"),
       );
     }
     // İlan fiyat sınırı: boş (kural yok) ya da 0'dan küçük olmayan sayı. Aksi

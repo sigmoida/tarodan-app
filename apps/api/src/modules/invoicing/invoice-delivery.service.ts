@@ -20,6 +20,7 @@ import {
 } from "./invoice/invoice-line-description";
 import { resolveInvoiceParties } from "./invoice/invoice-parties";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
+import { assertCutVatRateInput } from "./invoice/invoice-vat-rate";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import {
   adminUrl,
@@ -103,7 +104,11 @@ export class InvoiceDeliveryService {
       categoryId,
       lineItems,
       sourceReference,
+      snapshotVatRate,
     } = opts;
+    // Outside the catch-all below: a wrong VAT input is a programming error
+    // that must fail the issuer (no stamp, retried), not a logged no-op.
+    assertCutVatRateInput(type, snapshotVatRate);
     try {
       const providerEnabled = this.provider.isEnabled();
       if (!providerEnabled) {
@@ -140,7 +145,10 @@ export class InvoiceDeliveryService {
       // Kalem listesi varsa belge ÇOK ORANLI olabilir; toplamlar satırlardan
       // gelir ve `vatRate` yalnız geriye-uyumluluk için (tek oranlı özet) tutulur.
       const hasLines = !!lineItems?.length;
-      const vatRate = await this.documents.resolveVatRate(type, categoryId);
+      const vatRate = await this.documents.resolveCutVatRate(type, {
+        categoryId,
+        snapshotVatRate,
+      });
       const amounts = hasLines
         ? invoiceTotalsFromLines(lineItems!)
         : this.documents.invoiceAmounts(type, grossAmount, vatRate);

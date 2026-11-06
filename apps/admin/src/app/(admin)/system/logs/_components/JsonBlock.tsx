@@ -1,32 +1,46 @@
 /** Frontend defense: mask sensitive keys (backend already masks — this is an extra layer). */
 import { useTranslations } from "next-intl";
 
-const REDACT_KEYS = new Set([
-  "password",
-  "passwordHash",
-  "passwordConfirm",
-  "newPassword",
-  "oldPassword",
-  "currentPassword",
-  "token",
-  "accessToken",
-  "refreshToken",
-  "resetToken",
-  "verifyToken",
-  "confirmToken",
-  "idToken",
-  "secret",
-  "apiKey",
-  "apiSecret",
-  "clientSecret",
-  "signingKey",
-  "creditCard",
-  "cardNumber",
-  "cvv",
-  "cvc",
-  "pin",
-  "otp",
-]);
+/** Lower case, alphanumerics only: `bin_number`, `binNumber`, `BIN` match alike. */
+const normalizeKey = (key: string) =>
+  key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const REDACT_KEYS = new Set(
+  [
+    "password",
+    "passwordHash",
+    "passwordConfirm",
+    "newPassword",
+    "oldPassword",
+    "currentPassword",
+    "token",
+    "accessToken",
+    "refreshToken",
+    "resetToken",
+    "verifyToken",
+    "confirmToken",
+    "idToken",
+    "secret",
+    "apiKey",
+    "apiSecret",
+    "clientSecret",
+    "signingKey",
+    "creditCard",
+    "cardNumber",
+    // Card BIN / IIN (first 6-8 card digits; docs/PCI_PAYMENT_PAGE.md).
+    "bin",
+    "bin6",
+    "bin8",
+    "binNumber",
+    "cardBin",
+    "installmentBin",
+    "iin",
+    "cvv",
+    "cvc",
+    "pin",
+    "otp",
+  ].map(normalizeKey),
+);
 
 function redactDisplay(obj: any, redactedLabel: string, depth = 0): any {
   if (depth > 5 || obj === null || obj === undefined || typeof obj !== "object")
@@ -36,7 +50,7 @@ function redactDisplay(obj: any, redactedLabel: string, depth = 0): any {
   return Object.fromEntries(
     Object.entries(obj).map(([k, v]) => [
       k,
-      REDACT_KEYS.has(k)
+      REDACT_KEYS.has(normalizeKey(k))
         ? redactedLabel
         : redactDisplay(v, redactedLabel, depth + 1),
     ]),

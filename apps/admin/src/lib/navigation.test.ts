@@ -74,6 +74,12 @@ describe("routePermission", () => {
     expect(routePermission("/finance/gib-report")).toBe("tax");
   });
 
+  it("guards the installments screen with the payments permission", () => {
+    // API: PERMISSION_MAP.installments = ["payments"]; the menu and the
+    // endpoints ask for the same key.
+    expect(routePermission("/finance/installments")).toBe("payments");
+  });
+
   it("matches a sub-path of a registered route (prefix match)", () => {
     expect(routePermission("/accounts/users/some-user-id")).toBe("users");
   });

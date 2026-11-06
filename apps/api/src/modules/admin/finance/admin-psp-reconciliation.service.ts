@@ -37,6 +37,10 @@ import type {
   PspLineFilter,
   PspStatementLinesQueryDto,
 } from "./dto/psp-reconciliation.dto";
+import {
+  chargedAmountOf,
+  paytrChargeExpectationsForPayments,
+} from "../../payment/helpers/charged-amount";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** `YYYY-MM-DD` gününün kendisi ve ±1 komşusu (oid kayması toleransı). */
@@ -150,6 +154,7 @@ export class AdminPspReconciliationService {
           select: {
             id: true,
             amount: true,
+            chargedAmount: true,
             paidAt: true,
             paytrMerchant: true,
             providerConversationId: true,
@@ -279,7 +284,9 @@ export class AdminPspReconciliationService {
       const day = trCalendarDate(payment.paidAt);
       const card = cardOf(day);
       card.ours.salesCount++;
-      card.ours.salesTotal += Number(payment.amount);
+      // PSP scale: what PayTR charged (an installment fee included), the
+      // figure the statement's sales total is compared with.
+      card.ours.salesTotal += Number(chargedAmountOf(payment));
       const oids = paymentOids(payment);
       if (
         coveredFor(day, payment.paytrMerchant) &&
@@ -509,6 +516,7 @@ export class AdminPspReconciliationService {
             select: {
               id: true,
               amount: true,
+              chargedAmount: true,
               order: { select: { orderNumber: true } },
               checkoutGroup: { select: { groupNumber: true } },
               tradeCashPayment: {
@@ -530,6 +538,18 @@ export class AdminPspReconciliationService {
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
+    // What PayTR had to charge for each sale line's oid (its charge
+    // attempt's C, PSP scale, ADR 0019): one query for the payments of the
+    // page's sale lines, none when the page has no sale line.
+    const salePaymentIds = new Set(
+      rows
+        .filter((r) => r.type === PaytrStatementLineType.sale)
+        .map((r) => r.paymentId),
+    );
+    const expectedOf = await paytrChargeExpectationsForPayments(
+      this.prisma,
+      payments.filter((p) => salePaymentIds.has(p.id)),
+    );
 
     return {
       data: rows.map((row) => {
@@ -544,7 +564,16 @@ export class AdminPspReconciliationService {
           payment: payment
             ? {
                 id: payment.id,
+                // Goods scale (T): the order totals.
                 amount: payment.amount,
+                // PSP scale: what PayTR had to charge for this sale line's
+                // oid (its attempt's C, else the payment's charged amount),
+                // the figure the matcher compares the line with. Null on
+                // refund lines: those match a refund attempt, not a charge.
+                chargedAmount:
+                  row.type === PaytrStatementLineType.sale
+                    ? expectedOf(payment, row.merchantOid)
+                    : null,
                 orderNumber: payment.order?.orderNumber ?? null,
                 groupNumber: payment.checkoutGroup?.groupNumber ?? null,
                 tradeNumber:

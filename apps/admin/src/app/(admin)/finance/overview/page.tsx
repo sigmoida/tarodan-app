@@ -15,16 +15,18 @@ import { useTranslations } from "next-intl";
 import { HealthStrip } from "./_components/HealthStrip";
 import { ReconciliationSectionView } from "./_components/ReconciliationSection";
 import { ComparisonSectionView } from "./_components/ComparisonSection";
+import { InstallmentSummarySection } from "./_components/InstallmentSummarySection";
 import type { FinanceOverview } from "./_lib/types";
 
 /**
- * Finans Özeti — "para nerede?" sorusuna SAĞLAMASI olan cevap.
+ * Finance overview: the answer to "where is the money?", with a proof.
  *
- * Her bölümde sol toplam sağdaki bileşenlerin toplamına eşit olmak zorundadır;
- * fark 0 değilse kırmızı. Bölümler: ciro nereye gitti (tüm zaman) → satıcı
- * hakedişi nerede (anlık) → takas karşı taraf (anlık) → platform gelirinden
- * Tarodan hak edişine (şelale) → alıcı iadeleri (kırılım) → PayTR karşılaştırması.
- * Aylık kırılım ve trend bu ekranın işi değil; dashboard/analiz ekranlarında.
+ * In every section the total on the left must equal the sum of the
+ * components on the right; a non-zero difference is red. Sections: where the
+ * turnover went (all time) -> where the seller share is (now) -> trade
+ * counterpart (now) -> platform revenue to Tarodan net (waterfall) -> buyer
+ * refunds (breakdown) -> installments by count × segment -> PayTR comparison.
+ * Monthly breakdowns and trends belong to the dashboard and analytics screens.
  */
 export default function FinanceOverviewPage() {
   const t = useTranslations();
@@ -87,6 +89,12 @@ export default function FinanceOverviewPage() {
             />
           ))}
           {isLoading && !data && <PageLoading />}
+          {data?.installments && (
+            <InstallmentSummarySection
+              summary={data.installments}
+              syncEnabled={data.syncEnabled}
+            />
+          )}
           {data && <ComparisonSectionView comparison={data.comparison} />}
           {diagnosticItems.length > 0 && (
             <Alert

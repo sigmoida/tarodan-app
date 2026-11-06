@@ -32,6 +32,10 @@ import { paginate, resolveOrderBy } from "../../../common/list";
 import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
 import { i18nMessage } from "../../i18n";
 import { assertNotBoostOrderRefund } from "./boost/boost-refund-policy";
+import {
+  ADMIN_PAYMENT_INSTALLMENT_INCLUDE,
+  adminPaymentInstallmentOf,
+} from "./admin-payment-installment-view";
 
 /**
  * Ödeme yönetimi (liste, detay, istatistik, manuel iade, zorla iptal) —
@@ -375,13 +379,17 @@ export class AdminPaymentService {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       include: {
+        // Only what the detail shows: a raw user row would carry tokens and
+        // hashes (the response interceptor is the last line, not the first).
         order: {
           include: {
-            buyer: true,
-            seller: true,
-            product: true,
+            buyer: { select: { id: true, displayName: true, email: true } },
+            seller: { select: { id: true, displayName: true, email: true } },
+            product: { select: { id: true, title: true } },
           },
         },
+        // Installment block: captured attempt's pricing + every signed form.
+        ...ADMIN_PAYMENT_INSTALLMENT_INCLUDE,
         // Sepet ödemesi: kapsanan siparişler + grup alıcısı (R3 — ödeme→grup yönü).
         checkoutGroup: {
           include: {
@@ -611,6 +619,7 @@ export class AdminPaymentService {
             ),
           }
         : null,
+      installment: adminPaymentInstallmentOf(payment),
       refundedTotal: attempts
         .filter((a) => a.status === "succeeded" || a.status === "finalized")
         .reduce((sum, a) => sum + Number(a.amount), 0),

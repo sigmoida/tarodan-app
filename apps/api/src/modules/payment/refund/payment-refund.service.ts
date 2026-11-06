@@ -48,6 +48,7 @@ import {
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { groupOrderRefundLimit } from "../helpers/group-refund-limit";
+import { chargedAmountOf, refundGoodsPartOf } from "../helpers/charged-amount";
 import { holdRefundedAmountAfter } from "../helpers/hold-consumption";
 import { asPaymentMetadata } from "../helpers/payment-metadata.types";
 import {
@@ -449,8 +450,13 @@ export class PaymentRefundService {
 
   private async notifyRefundOutcome(
     orderId: string,
-    amountToRefund: number,
-    payment: Pick<Payment, "id" | "amount" | "provider">,
+    amounts: {
+      /** Goods scale: what the seller sees. */
+      goods: number;
+      /** PSP scale: the cash back to the buyer's card (goods + fee share). */
+      cash: number;
+    },
+    payment: Pick<Payment, "id" | "amount" | "chargedAmount" | "provider">,
     providerRefundId: string | undefined,
     skipRefundEvent: boolean | undefined,
     /** Bu iadeyle kesinleşen yönetici iptalinin kodu (siparişe yazıldıysa). */
@@ -463,7 +469,7 @@ export class PaymentRefundService {
         .notifyOrderCancelledByPlatform({
           orderId,
           reasonCode: adminReasonCode,
-          refundAmount: amountToRefund,
+          refundAmount: amounts.cash,
         })
         .catch((error: unknown) =>
           this.logger.error(
@@ -488,7 +494,7 @@ export class PaymentRefundService {
           // denmeli. Alıcı + satıcıya iptal bildirimi + order-cancelled maili; refunded ATLA.
           await this.notificationService.notifyOrderCancelledParties(
             order,
-            amountToRefund,
+            amounts.cash,
           );
           this.logger.log(
             `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
@@ -504,8 +510,12 @@ export class PaymentRefundService {
             sellerId: order.sellerId,
             sellerEmail: order.seller.email,
             sellerName: publicName(order.seller),
-            refundAmount: amountToRefund,
+            // The seller's e-mail stays on the goods scale; the buyer's
+            // e-mail and push show the cash back against the charged total.
+            refundAmount: amounts.goods,
             totalAmount: Number(payment.amount),
+            buyerRefundAmount: amounts.cash,
+            buyerTotalAmount: Number(chargedAmountOf(payment)),
             provider: payment.provider,
             providerRefundId,
           });
@@ -659,10 +669,13 @@ export class PaymentRefundService {
       where: { idempotencyKey },
     });
     if (priorAttempt?.status === RefundAttemptStatus.finalized) {
+      // The caller's amount is the goods part; the attempt holds the PSP
+      // amount (goods + installment fee share).
       if (
         priorAttempt.paymentId !== payment.id ||
         priorAttempt.orderId !== orderId ||
-        Math.abs(Number(priorAttempt.amount) - amountToRefund) > MONEY_EPSILON
+        Math.abs(Number(refundGoodsPartOf(priorAttempt)) - amountToRefund) >
+          MONEY_EPSILON
       ) {
         throw new BadRequestException(
           i18nMessage("server.payment.refundInitiationFailed"),
@@ -672,6 +685,8 @@ export class PaymentRefundService {
         success: true,
         paymentId: payment.id,
         refundAmount: amountToRefund,
+        installmentFeeRefunded: Number(priorAttempt.installmentFeeAmount),
+        cashRefunded: Number(priorAttempt.amount),
         providerRefundId: priorAttempt.providerRefundId ?? undefined,
         idempotent: true,
         // Siparişi bu çağrı kapatmadı (önceki sonlandırma kapattı).
@@ -732,11 +747,19 @@ export class PaymentRefundService {
       paytrOid,
       opts.claimGuard,
     );
+    // Two scales (ADR 0019): `amountToRefund` is the goods part every cap,
+    // the hold, the commission and the ledger ratio read; PayTR gets the
+    // attempt's `amount`, that goods part plus the installment fee share the
+    // claim priced (0 without a fee, D7).
+    const cashToRefund = Number(refundAttempt.attempt.amount);
+    const feeToRefund = Number(refundAttempt.attempt.installmentFeeAmount);
     if (refundAttempt.action === "done") {
       return {
         success: true,
         paymentId: payment.id,
         refundAmount: amountToRefund,
+        installmentFeeRefunded: feeToRefund,
+        cashRefunded: cashToRefund,
         providerRefundId: refundAttempt.attempt.providerRefundId ?? undefined,
         idempotent: true,
         // Siparişi bu çağrı kapatmadı (önceki sonlandırma kapattı).
@@ -828,11 +851,11 @@ export class PaymentRefundService {
           };
         } else if (isTestLaneRefund) {
           this.logger.log(
-            `Test lane refund: PayTR skipped payment=${payment.id} order=${orderId} amount=${amountToRefund} attempt=${refundAttempt.attempt.id}`,
+            `Test lane refund: PayTR skipped payment=${payment.id} order=${orderId} amount=${cashToRefund} attempt=${refundAttempt.attempt.id}`,
           );
           refundResult = testLaneRefundResult(
             refundAttempt.attempt.id,
-            amountToRefund,
+            cashToRefund,
           );
         } else {
           const bypassEnabled =
@@ -840,25 +863,26 @@ export class PaymentRefundService {
             this.configService.get("PAYMENT_BYPASS") === "true";
           if (bypassEnabled) {
             this.logger.warn(
-              `PAYMENT_BYPASS: PayTR refund atlandı payment=${payment.id} amount=${amountToRefund}`,
+              `PAYMENT_BYPASS: PayTR refund skipped payment=${payment.id} amount=${cashToRefund}`,
             );
             refundResult = {
               status: "success",
               err_msg: null,
-              return_amount: amountToRefund,
+              return_amount: cashToRefund,
               bypass: true,
             };
           } else {
             try {
-              // İade, ödemenin ALINDIĞI mağazaya gider (kaydın paytrMerchant'ı).
+              // The refund goes to the store that TOOK the payment (the
+              // record's paytrMerchant), for the PSP amount: goods + fee share.
               refundResult = {
                 ...(await this.paymentProviders
                   .resolve(payment.provider, payment.paytrMerchant)
-                  // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
-                  // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
+                  // reference_no = attempt id: PayTR echoes it in the status
+                  // inquiry, so reconciliation can match refund <-> attempt.
                   .createRefund(
                     paytrOid,
-                    amountToRefund,
+                    cashToRefund,
                     refundAttempt.attempt.id,
                   )),
               };
@@ -939,11 +963,12 @@ export class PaymentRefundService {
               typeof refundResult.status === "string"
                 ? refundResult.status
                 : "success",
-            amount: amountToRefund,
-            totalAmount: amountToRefund,
+            amount: cashToRefund,
+            totalAmount: cashToRefund,
             raw: {
               ...refundResult,
               refundAttemptId: refundAttempt.attempt.id,
+              installmentFeeAmount: feeToRefund,
             },
           });
         }
@@ -1188,6 +1213,9 @@ export class PaymentRefundService {
               commission: Number(ledgerOrder.commissionAmount ?? 0),
               withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
               refundAmount: amountToRefund,
+              // Read from the attempt in this transaction: the fee share
+              // PayTR gave back with this refund.
+              installmentFeeRefund: Number(freshAttempt.installmentFeeAmount),
             });
           }
 
@@ -1391,13 +1419,18 @@ export class PaymentRefundService {
           }
 
           this.logger.log(
-            `Refund processed for payment ${payment.id}: ${amountToRefund} TRY`,
+            `Refund processed for payment ${payment.id} order ${orderId}: ${cashToRefund} TRY ` +
+              `(goods ${amountToRefund}, installment fee ${feeToRefund}) attempt=${freshAttempt.id}`,
           );
 
           const refundResponse = {
             success: true,
             paymentId: payment.id,
             refundAmount: amountToRefund,
+            // What the buyer gets back: the goods part plus the installment
+            // fee share (equal to `refundAmount` for a single payment).
+            installmentFeeRefunded: feeToRefund,
+            cashRefunded: cashToRefund,
             providerRefundId:
               providerRefundIdOf(refundResult) ||
               freshAttempt.providerRefundId ||
@@ -1459,9 +1492,11 @@ export class PaymentRefundService {
           // etti) Sürat iptalini TEKRAR yapma — onu kazanan çağrı zaten yaptı.
           if (!response) return response;
           // 11.2d: iade bildirimleri POST-COMMIT (tx dışında, best-effort — para geri döndü).
+          // The buyer is told the cash that goes back to the card (with
+          // the installment fee share); the seller the goods amount.
           await this.notifyRefundOutcome(
             orderId,
-            amountToRefund,
+            { goods: amountToRefund, cash: cashToRefund },
             payment,
             response.providerRefundId,
             opts?.skipRefundEvent || boostRefund,
@@ -1472,7 +1507,7 @@ export class PaymentRefundService {
           // admin cancellations all pass here; a post-delivery return (`iade`)
           // is not a cancellation. A boost refund is the staff's own action.
           if (orderClosed && !boostRefund) {
-            void this.notifyStaffOrderCancelled(orderId, amountToRefund);
+            void this.notifyStaffOrderCancelled(orderId, cashToRefund);
           }
           if (shipmentCancellationRequired) {
             // Para commit'inden sonra hızlı yol; aynı iş outbox'ta kalıcıdır.

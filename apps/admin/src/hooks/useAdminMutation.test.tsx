@@ -19,7 +19,7 @@ function Probe({
   successMessage,
 }: {
   fn: () => Promise<unknown>;
-  successMessage?: string;
+  successMessage?: string | ((data: unknown) => string | undefined);
 }) {
   const m = useAdminMutation(fn, { successMessage });
   return (
@@ -87,6 +87,48 @@ describe("useAdminMutation toasts", () => {
     expect(h.toast.success).toHaveBeenCalledTimes(2);
     const [a, b] = ids(h.toast.success);
     expect(a).toBe(b);
+    view.unmount();
+  });
+
+  it("builds the success toast from the response when given a function", async () => {
+    let n = 0;
+    const view = mount(
+      <Probe
+        fn={() => Promise.resolve(++n)}
+        successMessage={(data) => (data === 1 ? `done ${data}` : undefined)}
+      />,
+    );
+    await submitTwice();
+    // The second response builds no message: no toast for it.
+    expect(h.toast.success).toHaveBeenCalledTimes(1);
+    expect(h.toast.success.mock.calls[0][0]).toBe("done 1");
+    view.unmount();
+  });
+
+  it("keeps a write successful when the toast builder throws", async () => {
+    const onSuccess = vi.fn();
+    function Thrower() {
+      const m = useAdminMutation(() => Promise.resolve({}), {
+        successMessage: () => {
+          throw new TypeError("unexpected shape");
+        },
+        onSuccess,
+      });
+      return (
+        <Button type="button" onClick={() => m.mutate()}>
+          go
+        </Button>
+      );
+    }
+    const view = mount(<Thrower />);
+    await act(async () => {
+      button("go").click();
+    });
+    await flush();
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(h.toast.success).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
     view.unmount();
   });
 });

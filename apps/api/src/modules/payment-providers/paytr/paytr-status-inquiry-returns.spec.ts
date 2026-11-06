@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
@@ -109,5 +110,154 @@ describe("PayTRService.queryPaymentStatus — returns + kesinti alanları", () =
     expect(r.providerFeeTl).toBeUndefined();
     expect(r.providerNetTl).toBeUndefined();
     expect(r.returns).toEqual([]);
+  });
+  // Regression: the parser read `installment_count`, which durum-sorgu does
+  // not send, so a payment recovered by inquiry never stored its count.
+  // Durum Sorgu (https://dev.paytr.com/durum-sorgu) documents `taksit`
+  // (0, 2-12), `kart_marka`, `masked_pan` and `odeme_tipi` (KART | EFT).
+  it("reads taksit, kart_marka, masked_pan and odeme_tipi", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "1066,50",
+          payment_amount: "1000,00",
+          currency: "TL",
+          taksit: "6",
+          kart_marka: "WORLD",
+          masked_pan: "455359******6747",
+          odeme_tipi: "KART",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(6);
+    expect(r.cardBrand).toBe("WORLD");
+    expect(r.maskedPan).toBe("455359******6747");
+    expect(r.paymentType).toBe("card");
+    expect(r.paymentTotalTl).toBeCloseTo(1066.5);
+    expect(r.paymentAmountTl).toBeCloseTo(1000);
+  });
+
+  it("reads a single payment as taksit 0", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "100,00",
+          payment_amount: "100,00",
+          taksit: 0,
+          odeme_tipi: "EFT",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(0);
+    expect(r.paymentType).toBe("eft");
+  });
+
+  it("prefers the documented taksit over a callback-style installment_count", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "100,00",
+          taksit: "0",
+          installment_count: "6",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(0);
+  });
+
+  it("falls back to installment_count when taksit is absent", async () => {
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "100,00",
+          installment_count: "1",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.installmentCount).toBe(1);
+  });
+
+  it.each([["13"], ["abc"], ["2.5"], [""], [-1]])(
+    "leaves installmentCount undefined for an invalid taksit %p",
+    async (taksit) => {
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({
+            status: "success",
+            payment_total: "100,00",
+            taksit,
+          }),
+      });
+
+      const r = await service.queryPaymentStatus("ORDER123");
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.installmentCount).toBeUndefined();
+      expect(r.cardBrand).toBeUndefined();
+      expect(r.maskedPan).toBeUndefined();
+    },
+  );
+  // The answer carries card data (`masked_pan`): a parse warning must not
+  // log the answer itself.
+  it("does not log the answer when payment_total cannot be parsed", async () => {
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    fetchSpy.mockResolvedValue({
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          payment_total: "n/a",
+          masked_pan: "455359******6747",
+        }),
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(false);
+    const logged = warn.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(logged).toContain("ORDER123");
+    expect(logged).not.toContain("455359");
+    warn.mockRestore();
+  });
+
+  it("masks digit runs when the answer is not JSON", async () => {
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    fetchSpy.mockResolvedValue({
+      status: 200,
+      text: async () => '{"status":"success","masked_pan":"455359******6747"',
+    });
+
+    const r = await service.queryPaymentStatus("ORDER123");
+
+    expect(r.ok).toBe(false);
+    const logged = error.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(logged).toContain("ORDER123");
+    expect(logged).not.toContain("455359");
+    expect(logged).not.toContain("6747");
+    error.mockRestore();
   });
 });

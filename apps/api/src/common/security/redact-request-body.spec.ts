@@ -96,6 +96,64 @@ describe("redactRequestBody", () => {
     });
   });
 
+  describe("card BIN (installment pricing)", () => {
+    const BIN = "45467112";
+
+    it("masks a top-level and a nested installment BIN, keeps the rest", () => {
+      const options = redactRequestBody({
+        bin: BIN,
+        paymentId: "pay-1",
+      }) as Record<string, unknown>;
+      const directForm = redactRequestBody({
+        paymentId: "pay-1",
+        installment: { count: 3, bin: BIN, expectedTotal: 1066.38 },
+      }) as { installment: Record<string, unknown> };
+
+      expect(options).toEqual({ bin: "[REDACTED]", paymentId: "pay-1" });
+      expect(directForm.installment).toEqual({
+        count: 3,
+        bin: "[REDACTED]",
+        expectedTotal: 1066.38,
+      });
+    });
+
+    it("masks the other card-derived key spellings and a numeric BIN", () => {
+      const text = JSON.stringify(
+        redactRequestBody({
+          bin6: "454671",
+          bin8: BIN,
+          cardBin: BIN,
+          binNumber: BIN,
+          bin_number: BIN,
+          installmentBin: BIN,
+          iin: BIN,
+          nested: { bin: 45467112 },
+        }),
+      );
+
+      expect(text).not.toContain("454671");
+    });
+
+    it("masks a BIN in a JSON string body and in a truncated one", () => {
+      const json = redactRequestBody(
+        JSON.stringify({ installment: { count: 2, bin: BIN } }),
+      );
+      const truncated = redactRequestBody(
+        `{"paymentId":"pay-1","installment":{"count":2,"bin":"${BIN}"`,
+      );
+
+      expect(json).not.toContain(BIN);
+      expect(truncated).not.toContain(BIN);
+      expect(truncated).toContain("pay-1");
+    });
+
+    it("masks a BIN outside a request body too (logs, Sentry extras)", () => {
+      expect(
+        JSON.stringify(redactSensitive({ bin_number: BIN })),
+      ).not.toContain(BIN);
+    });
+  });
+
   it("does not touch a code outside a request body (error codes stay readable)", () => {
     const redacted = redactSensitive({
       code: "P2002",

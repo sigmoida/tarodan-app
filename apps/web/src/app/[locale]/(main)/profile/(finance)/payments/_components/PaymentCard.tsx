@@ -28,6 +28,8 @@ import {
   type PaymentActionCb,
 } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
+import InstallmentPaidLines from "@/components/payment/InstallmentPaidLines";
+import { paidInstallmentOf } from "@/lib/installments";
 import { statusConfig, statusLabel } from "@/lib/statusLabels";
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
@@ -205,6 +207,23 @@ export default function PaymentCard({
           />
         </div>
       </div>
+
+      {/* The payer's installment count, fee and charged total. */}
+      {paidInstallmentOf(payment) && (
+        <div className="mt-3 space-y-1 text-xs">
+          <InstallmentPaidLines
+            payment={payment}
+            renderRow={(row) => (
+              <div className="flex justify-between">
+                <span className="text-muted">{row.label}</span>
+                <span className="font-medium text-body tabular-nums">
+                  {row.value}
+                </span>
+              </div>
+            )}
+          />
+        </div>
+      )}
 
       {payment.failureReason && (
         <p className="mt-2 text-xs text-danger-600">{payment.failureReason}</p>

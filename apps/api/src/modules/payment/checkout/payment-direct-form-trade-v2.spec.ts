@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { PaymentStatus, TradeStatus } from "@prisma/client";
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * DIRECT-FORM TAKAS HEDEFİ (v2) — web kart formunun kullandığı yol.
@@ -37,6 +38,8 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
   ) => {
     const payments = new Map<string, any>();
     const prisma: any = {
+      // The claim transaction writes the form's charge attempt.
+      paymentChargeAttempt: { create: jest.fn().mockResolvedValue({}) },
       trade: { findUnique: jest.fn().mockResolvedValue(trade) },
       payment: {
         findUnique: jest.fn().mockResolvedValue(existingPayment),
@@ -79,6 +82,7 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
       {} as any,
       { ensureForPayment: gate } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     return { service, prisma, gate, lifecycle };
   };

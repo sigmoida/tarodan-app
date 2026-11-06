@@ -132,7 +132,8 @@
       "select": "Choose File",
       "replace": "Replace File",
       "remove": "Remove"
-    }
+    },
+    "today": "Today"
   },
   "boost": {
     "offer": {
@@ -3028,6 +3029,28 @@
         "retry": "Try again"
       },
       "cancelled": "The boost payment was cancelled."
+    },
+    "installments": {
+      "title": "Installment options",
+      "single": "Single payment",
+      "count": "{count} installments",
+      "monthly": "{count} x {amount}",
+      "total": "Total {amount}",
+      "fee": "Installment fee {amount}",
+      "noFee": "No installment fee",
+      "enterCard": "Enter your card number to see installment options.",
+      "loading": "Loading installment options",
+      "notEligible": "This card can only be used for a single payment.",
+      "notOffered": "Only a single payment is available for this payment.",
+      "belowMinimum": "Installments are available for payments of {amount} or more.",
+      "unavailable": "Installment options cannot be shown right now. You can pay in a single payment.",
+      "terms": "{count} installments: {monthly} per month, installment fee {fee}, total {total}.",
+      "refundNote": "A refund of an installment payment may reach your card in installments, depending on your bank."
+    },
+    "summary": {
+      "installments": "Installments",
+      "installmentFee": "Installment fee",
+      "chargedTotal": "Charged to card"
     }
   },
   "bankAccount": {
@@ -3347,7 +3370,7 @@
       "alisverisVeTakasRehberi": "Alışveriş ve Takas Rehberi",
       "nasilSiparisOlusturabilirim": "Nasıl sipariş oluşturabilirim?",
       "koleksiyonunuzaDahilEtmekIstediginizModelAraclari": "Koleksiyonunuza dahil etmek istediğiniz model araçları sepetinize ekleyerek alışverişe hemen başlayabilirsiniz. Sepetinize tıkladıktan sonra aktif indirimlerden yararlanabilir, varsa indirim kuponu kodunuzu ilgili alana girebilirsiniz.",
-      "odemeyeGecButonunaTikladiktanSonraTeslimat": "“Ödemeye geç” butonuna tıkladıktan sonra teslimat adresinizi kontrol edebilir; farklı bir adrese gönderim yapacaksanız yeni bir adres ekleyebilir veya mevcut bilgilerinizi güncelleyebilirsiniz. Ödeme adımında kart bilgilerinizi girdikten ve dilerseniz size uygun taksit seçeneğini seçtikten sonra “Alışverişi tamamla” butonuna basarak siparişinizi güvenle oluşturabilirsiniz.",
+      "odemeyeGecButonunaTikladiktanSonraTeslimat": "After clicking the “Proceed to payment” button, you can check your delivery address; if you will ship to a different address, you can add a new one or update your existing details. On the payment step, after entering your card details, you can place your order securely by pressing the “Complete purchase” button.",
       "takasIslemleriniNasilYapiyoruz": "Takas işlemlerini nasıl yapıyoruz?",
       "heyecanVericiBirDigerDetayIse": "Heyecan verici bir diğer detay ise: koleksiyonlar arası takas da yapılabiliyor! Takas sürecinde her iki taraf da model araçlarını Tarodan deposuna gönderiyor. Uzman ekibimiz depoda gerekli kontrolleri sağlıyor; ürünler ilanla tamamen eşleşiyorsa takas işlemini güvenle başlatıyoruz. Eğer beklenmeyen kusurlu veya yanlış bir ürünle karşılaşırsak hemen taraflara bilgi veriyor, onayınızla süreci düzenliyor veya ürünleri güvenle sizlere iade ediyoruz. Böylece garaj değiştirmek tamamen güvence altında ilerliyor!",
       "siparisiminVeyaTakasiminDurumunuNasilTakip": "Siparişimin veya takasımın durumunu nasıl takip edebilirim?",
@@ -3658,7 +3681,10 @@
       "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
       "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
       "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
-      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz."
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz.",
+      "installmentTermsField": "For an installment payment: the number of installments, the monthly installment amount, the installment fee (VAT included) and the total amount charged to the card",
+      "installmentPaymentTerms": "A credit card payment in installments is possible only with the options offered on the payment screen for the Buyer's card and the payment amount; a single payment can always be chosen and carries no installment fee. If the Buyer chooses installments, the number of installments, the monthly installment amount, the installment fee and the total amount charged to the card are shown on the payment screen before the payment is confirmed. The installment fee is the price of paying in installments: it is added to the total amount payable as a separate line, collected by the Platform and invoiced to the Buyer on a separate document, VAT included. How the installments appear on the card statement depends on the issuing bank.",
+      "installmentRefundTerms": "If an order paid in installments is withdrawn from, returned or cancelled, the installment fee is refunded to the Buyer in proportion to the amount refunded; when the whole order is refunded, the whole installment fee is refunded. Depending on the issuing bank, the refund may reach the Buyer's card in installments."
     },
     "terms": {
       "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
@@ -4174,7 +4200,8 @@
       "security": "Security",
       "securityDesc": "Your card details are encrypted with 256-bit SSL. We do not store your card number on our payment page.",
       "installments": "Installments",
-      "installmentsDesc": "Installment options are shown at checkout according to bank promotions."
+      "installmentsDesc": "Card payments are currently taken as a single payment.",
+      "installmentsDescEnabled": "Installment options for eligible credit cards are shown on the payment screen once you enter your card number."
     },
     "returns": {
       "title": "Returns & Exchanges",
@@ -7015,6 +7042,7 @@
           "buyerCommission": "Buyer Commission",
           "buyerServiceFee": "Buyer Protection Fee",
           "buyerShipping": "Shipping Fee (Buyer Share)",
+          "buyerInstallmentFee": "Installment Fee",
           "sellerCommission": "Seller Commission",
           "sellerPlatformFee": "Platform Service Fee",
           "sellerShipping": "Shipping Fee (Seller Share)",
@@ -7196,7 +7224,40 @@
         },
         "cartInfo": "Cart Details",
         "refundedTotal": "Refunded",
-        "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request."
+        "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request.",
+        "installment": {
+          "title": "Installments",
+          "single": "Single payment",
+          "notCaptured": "Not captured",
+          "goodsAmount": "Amount before installment fee",
+          "chargedAmount": "Charged to the card",
+          "card": "Card",
+          "cardTypes": {
+            "credit": "Credit card",
+            "debit": "Debit card"
+          },
+          "businessCard": "Business card",
+          "platformCost": "Expected platform cost",
+          "noPricing": "This payment has no pricing record: the user group, rule, platform share and card cannot be shown.",
+          "attempts": {
+            "title": "Charge attempts",
+            "description": "Every PayTR form signed for this payment, newest first. The payment is booked from the applied attempt only; an attempt captured but not applied is a second charge to resolve separately.",
+            "columns": {
+              "oid": "PayTR order no",
+              "count": "Installments",
+              "charged": "Charged amount",
+              "createdAt": "Created"
+            },
+            "applied": "Applied to the payment",
+            "capturedNotApplied": "Captured, not applied"
+          }
+        },
+        "refundInstallment": {
+          "amountLabel": "Goods amount to refund, before the installment fee (leave empty for a full refund)",
+          "noticeTitle": "The installment fee is refunded too",
+          "notice": "The amount you enter is the goods amount before the installment fee. The buyer also gets the proportional share of the installment fee back; the refund that closes the payment gives back all of the fee that is left.",
+          "started": "Refund initiated: the buyer gets {cash} back ({fee} installment fee included)."
+        }
       },
       "psp": {
         "title": "PayTR Reconciliation",
@@ -7264,7 +7325,8 @@
           "resolved": "Line marked as resolved",
           "resolveTitle": "Resolve statement line",
           "resolveDescription": "{oid} · {amount} — the line leaves the work list and no longer counts on the day card. Note why (recorded in the audit log).",
-          "resolveNotePlaceholder": "e.g. Verified in the PayTR panel; test transaction."
+          "resolveNotePlaceholder": "e.g. Verified in the PayTR panel; test transaction.",
+          "chargedAmount": "Our charged amount"
         },
         "settlements": {
           "empty": "No settlement records yet.",
@@ -7510,7 +7572,8 @@
               "serviceVat": "Service VAT",
               "shipping": "Shipping (to carrier)",
               "withholding": "Withholding tax",
-              "shippingDeficit": "Shipping deficit (hold clamped)"
+              "shippingDeficit": "Shipping deficit (hold clamped)",
+              "installmentFee": "Installment fee (VAT included)"
             }
           },
           "sellerShare": {
@@ -7544,7 +7607,9 @@
               "tradeFeeReversed": "Trade full refunds (fee reversed)",
               "virtualRefundsNet": "Membership / boost refunds",
               "platformAbsorbed": "Refund items absorbed by the platform",
+              "installmentFeeIncome": "Installment fee income (excl. VAT)",
               "pspFee": "PayTR fee",
+              "installmentPlatformCost": "Installment campaign cost",
               "tarodanNet": "Tarodan net"
             }
           },
@@ -7557,6 +7622,7 @@
               "buyerFees": "Buyer fees",
               "buyerVat": "Buyer VAT",
               "returnShippingCharged": "Return shipping charged to buyer",
+              "installmentFee": "Installment fee",
               "unclassified": "Unclassified (legacy policy / manual / trade)"
             }
           }
@@ -7583,6 +7649,169 @@
           "ordersWithoutHold": "Paid orders without a hold",
           "productTax": "Product VAT is not zero (code inconsistency)",
           "commissionLedgerDrift": "Order commission vs commission ledger drift"
+        },
+        "installments": {
+          "title": "Installments",
+          "description": "Installment payments by installment count and buyer segment: the installment fee the buyers paid, the share given back with refunds and the installment cost the platform absorbs under the rules.",
+          "columns": {
+            "payments": "Payments",
+            "feeCollected": "Installment fee collected (incl. VAT)",
+            "feeRefunded": "Installment fee refunded",
+            "platformCostBooked": "Booked platform cost"
+          },
+          "empty": "No installment payments yet."
+        }
+      },
+      "installments": {
+        "title": "Installments",
+        "subtitle": "The installment master switch, the minimum amount, the PayTR rates, the installment rules per user group and the price preview.",
+        "readOnly": "You can only view this screen. Only a super admin can change the installment settings and rules.",
+        "error": {
+          "title": "The installment settings could not be loaded",
+          "description": "Check the connection and try again."
+        },
+        "segments": {
+          "all": "Everyone",
+          "guest": "Guest"
+        },
+        "general": {
+          "title": "General",
+          "enabledLabel": "Installment payments",
+          "enabledOn": "On",
+          "enabledOff": "Off",
+          "enabledHint": "While it is off, buyers see a single payment only. This master switch is the last step of a release: the mobile version that supports installments must be live in the stores first.",
+          "enableConfirm": {
+            "title": "Turn on installment payments?",
+            "description": "Buyers start to see installment options for eligible credit cards. Release rule: flags are turned on last. Before you turn it on, confirm that the mobile version that supports installments is live in the stores and that the release checklist is complete.",
+            "staleRates": "There is no fresh PayTR rate snapshot: until the rates are fetched, buyers still see a single payment only.",
+            "confirm": "Turn on installments"
+          },
+          "disableConfirm": {
+            "title": "Turn off installment payments?",
+            "description": "From now on buyers are offered a single payment only and no new installment payment is accepted.",
+            "confirm": "Turn off installments"
+          },
+          "enabledSaved": "Installment payments are on.",
+          "disabledSaved": "Installment payments are off.",
+          "minAmountLabel": "Minimum amount (TL)",
+          "minAmountHint": "Installments are offered when the goods total is at least this amount. Default: {amount}.",
+          "minAmountSave": "Save amount",
+          "minAmountSaved": "The minimum amount was saved."
+        },
+        "rates": {
+          "title": "PayTR rates",
+          "status": "Status",
+          "fresh": "Fresh",
+          "stale": "Stale",
+          "staleHint": "The latest rate snapshot is not fresh: until a new one is fetched, buyers see a single payment only. The preview uses the latest snapshot.",
+          "fetchedAt": "Fetched at",
+          "maxCount": "Maximum installments (non-business cards)",
+          "families": "Card families",
+          "none": {
+            "title": "No PayTR rates have been fetched yet",
+            "description": "Until the first rate snapshot is fetched, buyers see a single payment only and the price preview cannot be calculated."
+          }
+        },
+        "preview": {
+          "title": "Price preview",
+          "description": "The installment options a buyer would see for a user group, a goods total and a card family (with the latest rate snapshot and the live rules).",
+          "draftDescription": "Before you save: this draft rule is applied as if it were live now.",
+          "segment": "User group",
+          "amount": "Goods total (TL)",
+          "family": "Card family",
+          "failed": "The preview could not be calculated",
+          "unavailable": "The preview cannot be calculated because there is no rate snapshot.",
+          "cardNotEligible": "PayTR offers no installments for this card family.",
+          "staleRates": "The preview uses a rate snapshot that is not fresh ({fetchedAt}). Until a new one is fetched, buyers see a single payment only.",
+          "draftNeedsFix": "Fix the errors in the rule to see the preview.",
+          "offered": "Offered",
+          "notOffered": "Not offered",
+          "monthlyValue": "{count} x {amount}",
+          "defaultRule": "Default (buyer pays)",
+          "draftRule": "Draft rule",
+          "columns": {
+            "count": "Installments",
+            "offered": "Status",
+            "monthly": "Monthly",
+            "total": "Charged total",
+            "fee": "Installment fee",
+            "share": "Platform share",
+            "platformCost": "Platform cost",
+            "rule": "Rule"
+          }
+        },
+        "rules": {
+          "title": "Installment rules",
+          "description": "A rule makes the platform bear part or all of the installment fee for some installment counts of a user group, or turns those counts off. When no rule matches, the buyer pays the installment fee.",
+          "new": "New rule",
+          "tabs": {
+            "current": "Current",
+            "archived": "Archive"
+          },
+          "empty": "No rules yet: every buyer pays the installment fee.",
+          "emptyArchived": "No archived rules.",
+          "loadFailed": "The installment rules could not be loaded",
+          "columns": {
+            "name": "Rule",
+            "segment": "User group",
+            "counts": "Installment counts",
+            "effect": "Effect",
+            "priority": "Priority",
+            "validity": "Validity",
+            "created": "Created"
+          },
+          "version": "Version {version}",
+          "nameVersion": "{name} (version {version})",
+          "countRange": "{min}-{max} installments",
+          "countSingle": "{count} installments",
+          "effectNotOffered": "Not offered",
+          "effectBuyerPays": "Buyer pays",
+          "effectShare": "Platform share {share}",
+          "until": "Until {date}",
+          "openEnded": "Open-ended",
+          "status": {
+            "active": "Active",
+            "scheduled": "Scheduled",
+            "expired": "Expired",
+            "archived": "Archived"
+          },
+          "actions": {
+            "newVersion": "New version",
+            "archive": "Archive"
+          },
+          "archiveConfirm": {
+            "title": "Archive the rule?",
+            "description": "The rule \"{name}\" no longer applies to new payments. Past payments keep the version they used."
+          },
+          "archived": "The rule was archived.",
+          "created": "The rule was created.",
+          "versionCreated": "The new version of the rule was saved.",
+          "overlap": {
+            "title": "Overlapping rules",
+            "description": "This rule can apply to the same buyer, for the same count, at the same time as these rules of the same priority: {rules}. The tie-break decides which one applies (a specific group before \"Everyone\", then the newest rule). Change the priority if that is not what you want."
+          }
+        },
+        "form": {
+          "createTitle": "New installment rule",
+          "versionTitle": "New version: {name} (version {version})",
+          "versionHint": "When you save, this version is archived and the new version takes its place. Past payments keep the old version.",
+          "name": "Rule name",
+          "segment": "User group",
+          "minCount": "From installments",
+          "maxCount": "To installments",
+          "allowed": "Offer these installment counts",
+          "allowedHint": "When unchecked, these counts are not offered to the group at all.",
+          "share": "Platform share (%)",
+          "shareHint": "The part of the installment fee the platform bears: 0 means the buyer pays, 100 means no installment fee.",
+          "priority": "Priority",
+          "priorityHint": "When several rules match a count, the rule with the higher priority applies.",
+          "validFrom": "Starts",
+          "validUntil": "Ends (optional)",
+          "timeZoneHint": "Times are Istanbul time.",
+          "validUntilHint": "Leave it empty for no end. The end time itself is not included.",
+          "timeLabel": "{field} time",
+          "submitCreate": "Create rule",
+          "submitVersion": "Save new version"
         }
       }
     },
@@ -7858,7 +8087,8 @@
           "commissionRule": "Commission rule",
           "commissionRuleUnnamed": "Unnamed rule",
           "preparingDeadline": "Ship by",
-          "preparingExtended": "Deadline extended once ({date}); original deadline {original}"
+          "preparingExtended": "Deadline extended once ({date}); original deadline {original}",
+          "installmentFeeShare": "Installment fee share"
         },
         "buckets": {
           "all": "All",
@@ -10217,6 +10447,11 @@
           "name": "Seller trust lab",
           "description": "Explain and recompute seller trust scores and try candidate weights. Nothing is saved.",
           "keywords": "trust score, seller score, weights, simulation, lab"
+        },
+        "installments": {
+          "name": "Installments",
+          "description": "Manage the installment settings, the user group rules and the price preview",
+          "keywords": "installment,installments,taksit,paytr"
         }
       }
     },
@@ -11730,9 +11965,6 @@
         "sellerAtFault": "The seller was at fault in the refund/cancellation, so the remaining amount is not paid to the seller"
       },
       "holdResidualNotSettleable": "This payment has no seller-fault remainder to settle (it is not held, is frozen by a refund, its order is not closed, the seller was not at fault or nothing is left)",
-      "installmentInfoFetchFailed": "Installment information could not be fetched",
-      "installmentInfoUnavailable": "Installment information could not be retrieved",
-      "installmentResponseInvalid": "The installment response is invalid or empty",
       "loginRequired": "You need to log in",
       "loginRequiredForOrder": "You need to log in for this order",
       "loginRequiredForPayment": "You need to log in for this payment",
@@ -11787,7 +12019,17 @@
       "paytrReportEmptyResponse": "PayTR report returned an invalid or empty response ({url})",
       "paytrReportRequestFailed": "PayTR report request failed: {reason}",
       "paytrReturnedTransferQueryFailed": "PayTR returned-transfer query failed: {reason}",
-      "paytrSendFromAccountFailed": "PayTR send-from-account failed: {reason}"
+      "paytrSendFromAccountFailed": "PayTR send-from-account failed: {reason}",
+      "installmentNotOffered": "The selected installment option is not available for this card and amount.",
+      "installmentPricingChanged": "The installment amount has changed. Please check the new amount and try again.",
+      "installmentUnavailable": "Installments are unavailable right now. You can continue with a single payment.",
+      "installmentOptionsInvalidRequest": "Send one card (the first card digits or a saved card) and one payment or amount to get installment options.",
+      "installmentOptionsTooManyRequests": "Installment options were requested too often. Please try again shortly.",
+      "paymentAmountOutOfDate": "The payment amount has changed. Please check the current amount and try again.",
+      "installmentMail": {
+        "label": "Installments",
+        "summary": "{count} installments: {monthly} TL per month, installment fee {fee} TL, total {total} TL"
+      }
     },
     "product": {
       "alreadyLiked": "You have already liked this product",
@@ -12347,6 +12589,32 @@
         "revokeGrantOnly": "Only free grants can be cancelled without a refund",
         "grantListingNotActive": "A boost can only be granted to a live listing",
         "stopActiveOrPausedOnly": "Only an active or paused boost can be stopped"
+      },
+      "installments": {
+        "useDedicatedEndpoint": "This setting is managed on Finance > Installments.",
+        "minAmount": {
+          "notANumber": "The minimum amount must be a number.",
+          "outOfRange": "The minimum amount must be between {min} and {max} TL.",
+          "tooManyDecimals": "The minimum amount can have at most {decimals} decimal places."
+        },
+        "rule": {
+          "nameRequired": "The rule name is required.",
+          "nameTooLong": "The rule name is too long.",
+          "segmentInvalid": "Unknown user group.",
+          "countRange": "The installment range must be within 2 to 12, and the lowest count cannot exceed the highest.",
+          "shareRange": "The platform share must be between 0 and 100 percent.",
+          "sharePrecision": "The platform share can have at most two decimal places.",
+          "shareWithoutAllowed": "The platform share must be 0 for installments that are turned off.",
+          "priorityRange": "The priority must be a whole number between -1000 and 1000.",
+          "validFromInvalid": "The start time is not valid.",
+          "validUntilInvalid": "The end time is not valid.",
+          "validUntilNotAfterFrom": "The end time must be after the start time.",
+          "notFound": "Installment rule not found.",
+          "notCurrent": "This rule version is no longer current (it was changed or removed). Refresh the list and try again."
+        },
+        "preview": {
+          "familyInvalid": "Unknown card family."
+        }
       }
     },
     "advertisement": {
@@ -13454,7 +13722,7 @@
     "paymentOptions": {
       "page": {
         "odemeSecenekleriTarodan": "Ödeme Seçenekleri · Tarodan",
-        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Tarodan üzerinde kabul edilen ödeme yöntemleri, güvenli ödeme altyapısı ve taksit seçenekleri hakkında bilgi alın."
+        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Learn about the payment methods accepted on Tarodan and the secure payment infrastructure."
       }
     },
     "sell": {

@@ -35,7 +35,7 @@ describe("PaymentFulfillmentService.claimPaymentCompleted — processing kabul (
     return { service, tx, captured };
   };
 
-  it("CAS where'i hem pending hem processing içerir", async () => {
+  it("the CAS where holds both pending and processing", async () => {
     const { service, tx, captured } = makeService();
     const payment = {
       id: "pay-1",
@@ -45,7 +45,9 @@ describe("PaymentFulfillmentService.claimPaymentCompleted — processing kabul (
 
     const ok = await (service as any).claimPaymentCompleted(tx, payment, {});
 
-    expect(ok).toBe(true);
+    // Captured without an oid: no charge attempt, no installment fee.
+    expect(ok).toMatchObject({ attemptId: null });
+    expect(ok.feeAmount.toFixed(2)).toBe("0.00");
     expect(tx.payment.updateMany).toHaveBeenCalledTimes(1);
     expect(captured.where.id).toBe("pay-1");
     expect(captured.where.status.in).toEqual(
@@ -53,7 +55,7 @@ describe("PaymentFulfillmentService.claimPaymentCompleted — processing kabul (
     );
   });
 
-  it("count=0 ise false döner (zaten completed — idempotent)", async () => {
+  it("returns null when count = 0 (already completed: idempotent)", async () => {
     const { service, tx } = makeService();
     tx.payment.updateMany.mockResolvedValue({ count: 0 });
     const payment = {
@@ -64,6 +66,6 @@ describe("PaymentFulfillmentService.claimPaymentCompleted — processing kabul (
 
     const ok = await (service as any).claimPaymentCompleted(tx, payment, {});
 
-    expect(ok).toBe(false);
+    expect(ok).toBeNull();
   });
 });

@@ -38,37 +38,6 @@ export interface PayTRBasketItem {
   quantity: number;
 }
 
-export interface PayTRPaymentRequest {
-  merchantOid: string;
-  email: string;
-  paymentAmount: number; // in kuruş
-  paymentType: "card" | "eft";
-  installmentCount: number;
-  currency: "TL" | "EUR" | "USD" | "GBP" | "RUB";
-  testMode: "0" | "1";
-  noInstallment: "0" | "1";
-  maxInstallment:
-    "0" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
-  userName: string;
-  userAddress: string;
-  userPhone: string;
-  merchantOkUrl: string;
-  merchantFailUrl: string;
-  userBasket: string; // Base64 encoded JSON array
-  debugOn: "0" | "1";
-  lang: "tr" | "en";
-  userIp: string;
-  timeoutLimit?: string;
-  cardType?: "bonus" | "axess" | "maximum" | "world" | "cardfinans" | "paraf";
-  syncMode?: "0" | "1";
-}
-
-export interface PayTRIframeResponse {
-  status: "success" | "failed";
-  reason?: string;
-  token?: string;
-}
-
 export interface PayTRCallbackData {
   merchant_oid: string;
   status: "success" | "failed";
@@ -80,7 +49,8 @@ export interface PayTRCallbackData {
   payment_type?: string;
   currency?: string;
   payment_amount?: string;
-  // Direkt API 2. adım (bildirim) dokümanı: PayTR taksit sayısını da bildirir.
+  // Direkt API 2. Adim (https://dev.paytr.com/direkt-api/direkt-api-2-adim):
+  // "Islemde yapilan taksit sayisi" (0 = single payment).
   installment_count?: string;
 }
 
@@ -103,10 +73,20 @@ export type PayTRStatusInquirySuccess = {
   paymentAmountTl: number;
   paymentDate?: string;
   currency: string;
-  /** Ödeme yöntemi (card/eft) — gözlemlenebilirlik/muhasebe için. */
+  /**
+   * Payment method, "card" | "eft" as in the callback's `payment_type`.
+   * Durum-sorgu documents it as `odeme_tipi` (KART | EFT), mapped here.
+   */
   paymentType?: string;
-  /** Taksit sayısı (0/1 = tek çekim). */
+  /** `taksit`: installment count, 0 = single payment, 2-12 (0/1 = single). */
   installmentCount?: number;
+  /** `kart_marka`: card brand/family as PayTR reports it (e.g. "WORLD", "BONUS"). */
+  cardBrand?: string;
+  /**
+   * `masked_pan`: first 6 + last 4 digits, masked. Card data: never log it,
+   * never put it in Sentry; store only where a field is meant for it.
+   */
+  maskedPan?: string;
   /** PayTR'nin bu işlemden kestiği komisyon (TL) — `kesinti_tutari`. PSP ücret mutabakatı için. */
   providerFeeTl?: number;
   /** Kesinti sonrası kalan tutar (TL) — `net_tutar`. */
@@ -183,6 +163,23 @@ import {
   networkErrorReason,
 } from "./paytr-fetch-retry.util";
 import { isNothingLeftToRefund } from "./paytr-refund-rejection";
+import {
+  isPaytrCardFamily,
+  isPaytrInstallmentCount,
+  parsePaytrInstallmentRates,
+  parsePaytrInstallmentCount,
+  parsePaytrSingleRate,
+  type PaytrBinLookupResult,
+  type PaytrCardFamily,
+  type PaytrInstallmentRatesResult,
+} from "./paytr-installments";
+import {
+  isPaytrSuccess,
+  isPlainRecord,
+  paytrYesNo,
+  textOf,
+} from "./paytr-response.util";
+import { errorMessage } from "../../../common/helpers/error-message";
 
 // =============================================================================
 // PAYTR SERVICE
@@ -275,7 +272,7 @@ export class PayTRService implements IPaymentProvider {
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
   }
-  private parsePaytrJson<T = any>(rawText: string): T | null {
+  private parsePaytrJson<T = unknown>(rawText: string): T | null {
     return this.paytr.parsePaytrJson<T>(rawText);
   }
 
@@ -329,8 +326,9 @@ export class PayTRService implements IPaymentProvider {
       try {
         data = JSON.parse(rawText) as Record<string, unknown>;
       } catch {
+        // Digit runs masked: a garbled answer may still hold `masked_pan`.
         this.logger.error(
-          `PayTR durum-sorgu JSON değil: ${rawText.slice(0, 200)}`,
+          `PayTR durum-sorgu oid=${merchantOid}: answer is not JSON: ${rawText.slice(0, 200).replace(/\d{4,}/g, "#")}`,
         );
         return { ok: false, errMsg: "Invalid JSON from PayTR" };
       }
@@ -354,8 +352,9 @@ export class PayTRService implements IPaymentProvider {
       );
 
       if (paymentTotalTl === null) {
+        // Field names only: the answer carries card data (`masked_pan`).
         this.logger.warn(
-          `PayTR durum-sorgu payment_total parse edilemedi: ${JSON.stringify(data)}`,
+          `PayTR durum-sorgu oid=${merchantOid}: payment_total not parseable (fields: ${Object.keys(data).join(", ")})`,
         );
         return { ok: false, errMsg: "Could not parse payment_total" };
       }
@@ -369,16 +368,13 @@ export class PayTRService implements IPaymentProvider {
 
       const currency = String(data.currency ?? data.Currency ?? "TL");
 
-      const paymentType =
-        (data.payment_type as string | undefined) ??
-        (data.PaymentType as string | undefined);
-      const installmentRaw =
-        (data.installment_count as string | number | undefined) ??
-        (data.InstallmentCount as string | number | undefined);
-      const installmentCount =
-        installmentRaw != null && installmentRaw !== ""
-          ? Number.parseInt(String(installmentRaw), 10)
-          : undefined;
+      const paymentType = statusInquiryPaymentType(data);
+      // Durum Sorgu (https://dev.paytr.com/durum-sorgu) documents the count
+      // as `taksit` ("0, 2-12"). `installment_count` is the callback's name
+      // (Direkt API 2. Adim) and stays only as a fallback.
+      const installmentCount = parsePaytrInstallmentCount(
+        data.taksit ?? data.installment_count ?? data.InstallmentCount,
+      );
 
       // PSP kesintisi (virgüllü gelebilir: "2,35") — ücret mutabakatı için.
       const providerFeeTl = PayTRService.parsePaytrMoneyString(
@@ -388,19 +384,24 @@ export class PayTRService implements IPaymentProvider {
         data.net_tutar != null ? String(data.net_tutar) : undefined,
       );
 
-      // İade listesi — reference_no eşlemesi için normalize edilir.
-      const returnsRaw = Array.isArray(data.returns) ? data.returns : [];
-      const returns = returnsRaw.map((r: any) => ({
-        amountTl: PayTRService.parsePaytrMoneyString(
-          r?.return_amount != null ? String(r.return_amount) : undefined,
-        ),
-        referenceNo:
-          r?.reference_no != null && String(r.reference_no) !== ""
-            ? String(r.reference_no)
-            : undefined,
-        date: r?.return_date != null ? String(r.return_date) : undefined,
-        type: r?.return_type != null ? String(r.return_type) : undefined,
-      }));
+      // Refunds, normalized for the reference_no match.
+      const returnsRaw: unknown[] = Array.isArray(data.returns)
+        ? data.returns
+        : [];
+      const returns = returnsRaw.map((entry) => {
+        const r = isPlainRecord(entry) ? entry : {};
+        return {
+          amountTl: PayTRService.parsePaytrMoneyString(
+            r.return_amount != null ? String(r.return_amount) : undefined,
+          ),
+          referenceNo:
+            r.reference_no != null && String(r.reference_no) !== ""
+              ? String(r.reference_no)
+              : undefined,
+          date: r.return_date != null ? String(r.return_date) : undefined,
+          type: r.return_type != null ? String(r.return_type) : undefined,
+        };
+      });
 
       return {
         ok: true,
@@ -408,20 +409,23 @@ export class PayTRService implements IPaymentProvider {
         paymentAmountTl: amountTl,
         paymentDate,
         currency,
-        paymentType: paymentType != null ? String(paymentType) : undefined,
-        installmentCount: Number.isFinite(installmentCount as number)
-          ? installmentCount
-          : undefined,
+        paymentType,
+        installmentCount,
+        cardBrand: textOf(data.kart_marka),
+        maskedPan: textOf(data.masked_pan),
         providerFeeTl: providerFeeTl ?? undefined,
         providerNetTl: providerNetTl ?? undefined,
         returns,
         raw: data,
       };
-    } catch (error: any) {
-      this.logger.error(`PayTR durum-sorgu hatası: ${error?.message}`);
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      this.logger.error(
+        `PayTR durum-sorgu oid=${merchantOid} failed: ${message}`,
+      );
       return {
         ok: false,
-        errMsg: error?.message || "PayTR status inquiry error",
+        errMsg: message || "PayTR status inquiry error",
       };
     }
   }
@@ -463,10 +467,8 @@ export class PayTRService implements IPaymentProvider {
     paymentAmount?: number;
     testMode?: boolean;
   } {
-    const installment =
-      callback.installment_count != null && callback.installment_count !== ""
-        ? parseInt(callback.installment_count, 10)
-        : undefined;
+    // Same validation as the status inquiry's `taksit` (0-12, digits only).
+    const installment = parsePaytrInstallmentCount(callback.installment_count);
     // Direkt API 2. adım (bildirim) dokümanı: CALLBACK'te payment_amount ×100 (KURUŞ)
     // gelir (örn. 34.56 TL → "3456"), total_amount ile AYNI birim. Kuruş → TL: /100.
     // DİKKAT: Step 1 İSTEĞİNDE payment_amount ondalık TL'dir ("100.99") — bu parse
@@ -486,9 +488,7 @@ export class PayTRService implements IPaymentProvider {
       errorCode: callback.failed_reason_code,
       errorMessage: callback.failed_reason_msg,
       paymentType: callback.payment_type,
-      installmentCount: Number.isFinite(installment as number)
-        ? installment
-        : undefined,
+      installmentCount: installment,
       currency: callback.currency,
       paymentAmount,
       testMode: callback.test_mode === "1",
@@ -654,37 +654,42 @@ export class PayTRService implements IPaymentProvider {
 
   // ==========================================================================
   // BIN LOOKUP + INSTALLMENT RATES
-  // https://dev.paytr.com/en/direkt-api/bin-sorgulama-servisi
-  // https://dev.paytr.com/en/direkt-api/taksit-sorgulama
+  // https://dev.paytr.com/direkt-api/bin-sorgulama-servisi
+  // https://dev.paytr.com/direkt-api/taksit-sorgulama
   // ==========================================================================
 
   /**
-   * BIN sorgulama: kartın ilk 6/8 hanesinden banka/şema/tip bilgisini döndürür.
-   * Dokümana göre endpoint /odeme/api/bin-detail; hash_str = bin_number + merchant_id
-   * + merchant_salt (HMAC key = merchant_key). PAN saklanmaz — yalnız BIN gönderilir.
+   * BIN lookup (`POST /odeme/api/bin-detail`): bank, scheme, type and card
+   * family of the first 6 or 8 card digits ("Maksimum dogrulama icin 8 hane
+   * kullanin"). Token, from the doc samples: base64(HMAC-SHA256(bin_number +
+   * merchant_id + merchant_salt, merchant_key)). Only the BIN is sent; it is
+   * never logged.
    *
-   * DÜZELTME: Eski getInstallmentOptions bu endpoint'i (a) YANLIŞ hash sırasıyla
-   * (merchant_id + bin + amount + salt) ve (b) YANLIŞ yanıt şemasıyla (taksit1..12 —
-   * bin-detail taksit tablosu DÖNDÜRMEZ; o /odeme/taksit-oranlari'dır) çağırıyordu.
+   * `status` per the doc: "success"; "failed" when the BIN is not defined
+   * (e.g. a foreign card), a stable answer the caller may cache; "error"
+   * when the query had a problem (also network errors here), not cacheable.
+   * Never throws.
    */
-  async lookupBin(binNumber: string): Promise<{
-    ok: boolean;
-    bank?: string;
-    bankCode?: number;
-    schema?: string; // VISA | MASTERCARD | AMEX | TROY | OTHER
-    cardType?: string; // credit | debit
-    brand?: string; // axess | bonus | ... | none
-    businessCard?: boolean;
-    allowNon3d?: boolean;
-    errMsg?: string;
-  }> {
+  async lookupBin(
+    binNumber: string,
+    options?: {
+      /**
+       * Abort after this many ms (the buyer's path uses 3 s); default: the
+       * global PayTR HTTP timeout. A timeout is an `error` outcome.
+       */
+      timeoutMs?: number;
+    },
+  ): Promise<PaytrBinLookupResult> {
     if (!this.isConfigured) {
-      return { ok: false, errMsg: "PayTR not configured" };
+      return { ok: false, outcome: "error", errMsg: "PayTR not configured" };
     }
-    const bin = (binNumber || "").replace(/\D/g, "").slice(0, 8);
-    if (bin.length < 6) return { ok: false, errMsg: "bin_number too short" };
+    const digits = (binNumber ?? "").replace(/\D/g, "");
+    if (digits.length < 6) {
+      return { ok: false, outcome: "error", errMsg: "bin_number too short" };
+    }
+    // The doc takes 6 or 8 digits; 7 is sent as 6.
+    const bin = digits.length >= 8 ? digits.slice(0, 8) : digits.slice(0, 6);
 
-    // Doküman: hash_str = bin_number + merchant_id + merchant_salt
     const paytrToken = this.creds.signWithSalt(bin + this.merchantId);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -698,58 +703,86 @@ export class PayTRService implements IPaymentProvider {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: form.toString(),
-          signal: AbortSignal.timeout(this.httpTimeoutMs),
+          signal: AbortSignal.timeout(options?.timeoutMs ?? this.httpTimeoutMs),
         },
       );
-      const data = this.parsePaytrJson<any>(await response.text());
-      if (!data || data.status !== "success") {
-        return { ok: false, errMsg: data?.err_msg || "BIN lookup failed" };
+      const data = this.parsePaytrJson<Record<string, unknown>>(
+        await response.text(),
+      );
+      if (!isPlainRecord(data)) {
+        return { ok: false, outcome: "error", errMsg: "Invalid BIN answer" };
       }
+      if (!isPaytrSuccess(data.status)) {
+        const failed = textOf(data.status)?.toLowerCase() === "failed";
+        return {
+          ok: false,
+          outcome: failed ? "failed" : "error",
+          errMsg:
+            textOf(data.err_msg) ??
+            (failed ? "BIN not defined" : "BIN lookup failed"),
+        };
+      }
+      const brand = textOf(data.brand)?.toLowerCase();
       return {
         ok: true,
-        bank: data.bank != null ? String(data.bank) : undefined,
-        bankCode: Number.isFinite(Number(data.bankCode))
-          ? Number(data.bankCode)
-          : undefined,
-        schema: data.schema != null ? String(data.schema) : undefined,
-        cardType: data.cardType != null ? String(data.cardType) : undefined,
-        brand: data.brand != null ? String(data.brand) : undefined,
-        businessCard:
-          data.businessCard != null
-            ? String(data.businessCard).toLowerCase() === "y"
-            : undefined,
-        allowNon3d:
-          data.allow_non3d != null
-            ? String(data.allow_non3d).toLowerCase() === "y"
-            : undefined,
+        outcome: "success",
+        bank: textOf(data.bank),
+        // Kept as text: the doc's example "0010" has leading zeros.
+        bankCode: textOf(data.bankCode),
+        schema: textOf(data.schema)?.toUpperCase(),
+        cardType: textOf(data.cardType)?.toLowerCase(),
+        brand,
+        cardFamily: isPaytrCardFamily(brand) ? brand : undefined,
+        businessCard: paytrYesNo(data.businessCard),
+        allowNon3d: paytrYesNo(data.allow_non3d),
       };
-    } catch (error: any) {
-      this.logger.error(`PayTR BIN lookup hata: ${error?.message}`);
-      return { ok: false, errMsg: error?.message || "BIN lookup error" };
+    } catch (error: unknown) {
+      // warn, not error: the caller decides what an unavailable BIN means
+      // (the installment options fall back to a single payment).
+      const message = errorMessage(error);
+      this.logger.warn(`PayTR BIN lookup failed: ${message}`);
+      return {
+        ok: false,
+        outcome: "error",
+        errMsg: message || "BIN lookup error",
+      };
     }
   }
 
   /**
-   * Taksit oranları: mağazanın kart-tipi bazlı taksit oran tablosunu döndürür.
-   * Dokümana göre endpoint /odeme/taksit-oranlari (bin-detail DEĞİL); hash_str =
-   * merchant_id + request_id + merchant_salt (HMAC key = merchant_key). request_id
-   * ≤ 32 karakter; çağıran benzersiz bir değer üretmeli.
+   * The store's installment rate table (`POST /odeme/taksit-oranlari`, not
+   * bin-detail). Doc: https://dev.paytr.com/direkt-api/taksit-sorgulama.
+   * Token: base64(HMAC-SHA256(merchant_id + request_id + merchant_salt,
+   * merchant_key)). `request_id` is at most 32 characters and is echoed in
+   * the answer; the caller makes it unique (the snapshot id).
+   *
+   * The answer's rates are in `oranlar` (per card family, per count), parsed
+   * by `parsePaytrInstallmentRates`; `max_inst_non_bus` is the store's
+   * maximum count for non-business cards. "Oranlar gunluk olarak
+   * degisebilir": the caller stores a snapshot with `raw` and prices from it.
+   * Where `single_ratio=1` / `abroad_ratio=1` put their rates is not
+   * documented; they stay in `raw` until the staging capture (hub plan S0)
+   * shows the field, rather than being guessed (an echoed "1" flag must not
+   * be read as a 1% rate).
+   * Never throws: a failure is `{ ok: false }`.
    */
   async getInstallmentRates(
     requestId: string,
-    options?: { singleRatio?: boolean; abroadRatio?: boolean },
-  ): Promise<{
-    ok: boolean;
-    requestId?: string;
-    maxInstallment?: number;
-    rates?: Record<string, unknown>;
-    errMsg?: string;
-  }> {
+    options?: {
+      singleRatio?: boolean;
+      abroadRatio?: boolean;
+      /** Abort after this many ms; default: the global PayTR HTTP timeout. */
+      timeoutMs?: number;
+    },
+  ): Promise<PaytrInstallmentRatesResult> {
     if (!this.isConfigured) {
       return { ok: false, errMsg: "PayTR not configured" };
     }
-    const reqId = (requestId || "").slice(0, 32);
-    // Doküman: hash_str = merchant_id + request_id + merchant_salt
+    const reqId = (requestId ?? "").trim();
+    // Never truncate: a cut id would not match the snapshot that asked for it.
+    if (reqId.length === 0 || reqId.length > 32) {
+      return { ok: false, errMsg: "request_id must be 1-32 characters" };
+    }
     const paytrToken = this.creds.signWithSalt(this.merchantId + reqId);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -765,27 +798,48 @@ export class PayTRService implements IPaymentProvider {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: form.toString(),
-          signal: AbortSignal.timeout(this.httpTimeoutMs),
+          signal: AbortSignal.timeout(options?.timeoutMs ?? this.httpTimeoutMs),
         },
       );
-      const data = this.parsePaytrJson<any>(await response.text());
-      if (!data || data.status !== "success") {
+      const data = this.parsePaytrJson<Record<string, unknown>>(
+        await response.text(),
+      );
+      if (!isPlainRecord(data) || !isPaytrSuccess(data.status)) {
         return {
           ok: false,
-          errMsg: data?.err_msg || "Installment rates unavailable",
+          errMsg: textOf(data?.err_msg) ?? "Installment rates unavailable",
         };
+      }
+      const echoedId = textOf(data.request_id);
+      if (echoedId !== undefined && echoedId !== reqId) {
+        this.logger.warn(
+          `PayTR taksit-oranlari request_id mismatch: sent=${reqId} got=${echoedId}`,
+        );
+        return { ok: false, errMsg: "request_id mismatch" };
+      }
+      const { rates, ignored } = parsePaytrInstallmentRates(data.oranlar);
+      if (ignored.length > 0) {
+        this.logger.warn(
+          `PayTR taksit-oranlari request_id=${reqId}: ${ignored.length} entries not understood: ${ignored.slice(0, 20).join(", ")}`,
+        );
       }
       return {
         ok: true,
-        requestId: data.request_id != null ? String(data.request_id) : reqId,
-        maxInstallment: Number.isFinite(Number(data.max_inst_non_bus))
-          ? Number(data.max_inst_non_bus)
-          : undefined,
-        rates: (data.rates as Record<string, unknown>) ?? undefined,
+        requestId: reqId,
+        maxInstallmentNonBusiness: parsePaytrInstallmentCount(
+          data.max_inst_non_bus,
+        ),
+        singleRatePct: parsePaytrSingleRate(data),
+        rates,
+        ignored,
+        raw: data,
       };
-    } catch (error: any) {
-      this.logger.error(`PayTR taksit-oranları hata: ${error?.message}`);
-      return { ok: false, errMsg: error?.message || "Installment rates error" };
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      this.logger.error(
+        `PayTR taksit-oranlari request_id=${reqId} failed: ${message}`,
+      );
+      return { ok: false, errMsg: message || "Installment rates error" };
     }
   }
 
@@ -805,7 +859,18 @@ export class PayTRService implements IPaymentProvider {
     buyer: PayTRBuyer,
     basketItems: PayTRBasketItem[],
     options?: {
+      /**
+       * Installments: an integer 2-12 (signed as `installment_count`).
+       * Absent, 0 or 1 is a single payment ("0"); anything else throws.
+       */
       installmentCount?: number;
+      /**
+       * `card_type` (Direkt API 1. Adim, optional, "Taksitli islemlerde
+       * kullanmak uzere"): the card family from the BIN lookup's `brand`.
+       * Sent only with an installment count, never on a single payment,
+       * and not part of the token, so it cannot change the signed amount.
+       */
+      cardType?: PaytrCardFamily;
       /**
        * The query of BOTH return URLs, e.g. "paymentId=...&type=boost"
        * (`paymentReturnQuery`): the success page verifies the payment with it,
@@ -847,12 +912,7 @@ export class PayTRService implements IPaymentProvider {
     // ×100). chargeRecurring de aynı /odeme'yi ONDALIK TL ile çağırır — tutarlı.
     const paymentAmountStr = amount.toFixed(2); // ONDALIK TL
     const paymentType = "card";
-    // Tek çekim için '0' gönderilir (Direkt API kuralı)
-    const installmentCount = String(
-      options?.installmentCount && options.installmentCount > 1
-        ? options.installmentCount
-        : 0,
-    );
+    const { installmentCount, cardType } = directFormInstallment(options);
     const currency = "TL";
     const testMode = this.resolveTestMode(options?.testMode);
     const testModeStr = testMode ? "1" : "0";
@@ -916,6 +976,7 @@ export class PayTRService implements IPaymentProvider {
       debug_on: testMode ? "1" : "0",
       client_lang: "tr",
     });
+    if (cardType) formData.set("card_type", cardType);
 
     if (options?.savedCard) {
       formData.set("utoken", options.savedCard.utoken);
@@ -1062,14 +1123,15 @@ export class PayTRService implements IPaymentProvider {
         tryAgain: data.try_again,
         raw: data,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = errorMessage(error);
       this.logger.error(
-        `PayTR recurring hata oid=${params.merchantOid}: ${error?.message}`,
+        `PayTR recurring failed oid=${params.merchantOid}: ${message}`,
       );
-      // Ağ/timeout → geçici kabul et, tekrar denenebilir.
+      // Network error or timeout: treated as temporary, may be retried.
       return {
         status: "failed",
-        reason: error?.message || "bağlantı hatası",
+        reason: message || "bağlantı hatası",
         tryAgain: true,
       };
     }
@@ -1114,20 +1176,23 @@ export class PayTRService implements IPaymentProvider {
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       const rawText = await response.text();
-      const data = this.parsePaytrJson<any>(rawText);
-      // Hata: {status:'error', err_msg}. Eşleşme yoksa boş JSON. Başarı: kart dizisi.
-      if (!data || data.status === "error") {
-        if (data?.status === "error")
+      const data = this.parsePaytrJson<
+        | PaytrCapiCardRaw[]
+        | { status?: string; err_msg?: string; cards?: PaytrCapiCardRaw[] }
+      >(rawText);
+      // Error: {status:'error', err_msg}. No match: empty JSON. Success: a card array.
+      if (!data || (!Array.isArray(data) && data.status === "error")) {
+        if (data && !Array.isArray(data))
           this.logger.warn(`PayTR capi/list error: ${data.err_msg}`);
         return [];
       }
-      const cards = Array.isArray(data)
+      const cards: PaytrCapiCardRaw[] = Array.isArray(data)
         ? data
         : Array.isArray(data.cards)
           ? data.cards
           : [];
       return cards
-        .map((c: any) => ({
+        .map((c) => ({
           ctoken: c.ctoken,
           last4: c.last_4,
           requireCvv: String(c.require_cvv) === "1",
@@ -1142,9 +1207,11 @@ export class PayTRService implements IPaymentProvider {
               ? String(c.businessCard).toLowerCase() === "y"
               : undefined,
         }))
-        .filter((c: any) => !!c.ctoken);
-    } catch (error: any) {
-      this.logger.error(`PayTR capi/list hata: ${error?.message}`);
+        .filter((c): c is typeof c & { ctoken: string } => !!c.ctoken);
+    } catch (error: unknown) {
+      this.logger.error(
+        `PayTR capi/list failed merchant=${this.merchant}: ${errorMessage(error)}`,
+      );
       return [];
     }
   }
@@ -1181,9 +1248,10 @@ export class PayTRService implements IPaymentProvider {
         rawText,
       );
       return { status: data?.status || "error", reason: data?.err_msg };
-    } catch (error: any) {
-      this.logger.error(`PayTR capi/delete hata: ${error?.message}`);
-      return { status: "error", reason: error?.message };
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      this.logger.error(`PayTR capi/delete failed: ${message}`);
+      return { status: "error", reason: message };
     }
   }
 
@@ -1251,4 +1319,61 @@ export class PayTRService implements IPaymentProvider {
   getSettlementDetail(params: { date: string }) {
     return this.reports.getSettlementDetail(params, this.merchant);
   }
+}
+
+/**
+ * Payment method of a durum-sorgu answer in the callback's vocabulary
+ * ("card" | "eft"). The doc field is `odeme_tipi` (KART | EFT); an explicit
+ * `payment_type` wins when PayTR sends one.
+ */
+function statusInquiryPaymentType(
+  data: Record<string, unknown>,
+): string | undefined {
+  const explicit = textOf(data.payment_type ?? data.PaymentType);
+  if (explicit !== undefined) return explicit;
+  const method = textOf(data.odeme_tipi)?.toUpperCase();
+  if (method === undefined) return undefined;
+  if (method === "KART") return "card";
+  if (method === "EFT") return "eft";
+  return method.toLowerCase();
+}
+
+/**
+ * `installment_count` and `card_type` of a Direct API form (Direkt API 1.
+ * Adim: "0" single payment, 2-12 installments). Absent, 0 and 1 stay a
+ * single payment exactly as before; a count outside 2-12 or a card type
+ * outside PayTR's list is a programming error and throws (fail closed: no
+ * form is signed). `card_type` is only meaningful for installments, so a
+ * single payment never sends it.
+ */
+function directFormInstallment(options?: {
+  installmentCount?: number;
+  cardType?: string;
+}): { installmentCount: string; cardType?: PaytrCardFamily } {
+  const count = options?.installmentCount;
+  if (count === undefined || count === 0 || count === 1) {
+    return { installmentCount: "0" };
+  }
+  if (!isPaytrInstallmentCount(count)) {
+    throw new Error(`PayTR installment_count must be 0 or 2-12, got ${count}`);
+  }
+  const cardType = options?.cardType;
+  if (cardType !== undefined && !isPaytrCardFamily(cardType)) {
+    throw new Error(`PayTR card_type is not a card family: ${cardType}`);
+  }
+  return { installmentCount: String(count), cardType };
+}
+
+/** One card of a `capi/list` answer, as PayTR sends it. */
+interface PaytrCapiCardRaw {
+  ctoken?: string;
+  last_4: string;
+  require_cvv?: string | number;
+  month?: string;
+  year?: string;
+  c_brand?: string;
+  c_type?: string;
+  schema?: string;
+  c_bank?: string;
+  businessCard?: string;
 }

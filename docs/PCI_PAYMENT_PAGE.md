@@ -21,7 +21,8 @@ yüklenen her script kart verisine erişebilecek konumdadır** (kapsam). Bu, say
 6.4.3 kapsamına sokar. Iframe API'ye geçiş kapsamı daraltırdı; Direkt API'de
 kalma kararı bilinçlidir (bkz. §6).
 
-Mevcut kod tarafı korumalar (`_hooks/useCardPayment.ts`):
+Code-side protections (`apps/web/src/hooks/useCardPayment.ts`, shared by
+`/cart/payment` and `/payment/[id]`):
 
 - **Hedef doğrulaması** — form action'ı `https` + `www.paytr.com` + `/odeme`
   olmadıkça POST edilmez; API ele geçirilse bile kart başka origin'e gönderilemez.
@@ -30,6 +31,15 @@ Mevcut kod tarafı korumalar (`_hooks/useCardPayment.ts`):
 - **Tokenizasyon** — kayıtlı kartlar PayTR'de saklanır (`utoken`/`ctoken`); PAN
   bizde hiçbir yerde tutulmaz.
 - **3DS** — kullanıcı checkout'u her zaman 3D Secure (`non_3d = "0"`).
+- **Installment BIN (2026-11, ADR 0019)** — to price installments the form
+  sends the **first 8 digits** of a new card (`installmentBinOf`, never
+  more; the API refuses anything but `^\d{6,8}$` and rejects raw card fields)
+  to our own API, `POST /payments/installment-options` (same origin, already
+  in `connect-src`; no new script). A saved card sends only its id. The BIN
+  is not a PAN and is never logged: the options query never throws to the
+  global query error reporter (its key holds the BIN), and the client sends
+  no Sentry event for it. The number, expiry and CVV still go only into the
+  form posted to PayTR.
 
 ---
 
@@ -113,11 +123,13 @@ yoktur — yani zorlayıcı politika çalışan sayfayı bozmaz.
 
 ### Hangi rotalar zorlayıcı?
 
-`/payment/*` — kart formu (`[id]`) ve 3DS dönüş sayfaları (`success`, `fail`).
-Kart alanlarını işleyen kod **yalnız** `payment/[id]/_hooks/useCardPayment.ts` +
-`_components/CardPaymentForm.tsx` içindedir; `/cart/payment` (checkout özeti),
-`/payment-options` ve `/profile/payment-methods` kart verisi toplamaz ve
-salt-rapor modunda kalır.
+`/cart/payment` (the single-page checkout: address, card and pay) and
+`/payment/*`: the card form (`[id]`) and the 3DS return pages (`success`,
+`fail`); `isPaymentPath` in `cspPolicy.mjs`. The code that handles card fields
+lives **only** in `apps/web/src/hooks/useCardPayment.ts` and
+`apps/web/src/components/payment/` (`CardPaymentSection`, `NewCardFields`,
+`SavedCardList`, `InstallmentOptions`). `/payment-options` and
+`/profile/payment-methods` collect no card data and stay report-only.
 
 ### Ödeme profili farkları
 

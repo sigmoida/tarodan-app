@@ -193,6 +193,53 @@ describe("bildirim üreticileri hedef kitleyi taşır", () => {
       );
     });
 
+    it("an installment refund: the buyer sees the cash back with the vade farkı, the seller the goods amount (ADR 0019)", async () => {
+      const push = { add: jest.fn().mockResolvedValue(undefined) };
+      const email = { add: jest.fn().mockResolvedValue(undefined) };
+      const service = new EventService(
+        email as never,
+        push as never,
+        { add: jest.fn() } as never,
+        {} as never,
+        { emit: jest.fn() } as never,
+      );
+      await service.emitPaymentRefunded({
+        paymentId: "p1",
+        orderId: "o1",
+        orderNumber: "ORD-1",
+        buyerId: "u-buyer",
+        buyerEmail: "b@x.com",
+        buyerName: "B",
+        sellerId: "u-seller",
+        sellerEmail: "s@x.com",
+        sellerName: "S",
+        refundAmount: 400,
+        totalAmount: 1000,
+        buyerRefundAmount: 426.55,
+        buyerTotalAmount: 1066.38,
+        provider: "paytr",
+      });
+
+      const mails = Object.fromEntries(
+        email.add.mock.calls.map((call) => [
+          call[1].template,
+          call[1].templateData,
+        ]),
+      );
+      expect(mails["payment-refunded"]).toMatchObject({
+        refundAmount: 426.55,
+        totalAmount: 1066.38,
+      });
+      expect(mails["payment-refunded-seller"]).toMatchObject({
+        refundAmount: 400,
+        totalAmount: 1000,
+      });
+      const buyerPush = push.add.mock.calls.find(
+        (call) => call[1].userId === "u-buyer",
+      );
+      expect(JSON.stringify(buyerPush?.[1])).toContain("426.55");
+    });
+
     /**
      * Sepet ödemesi tek `checkoutGroupId` gönderiyordu; hedef üretilemiyor,
      * bildirim linksiz kalıyordu. Temsilci sipariş artık payload'da.

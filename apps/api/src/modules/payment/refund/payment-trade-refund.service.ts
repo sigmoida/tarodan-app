@@ -279,6 +279,19 @@ export class PaymentTradeRefundService {
         i18nMessage("server.payment.paytrRefundFailed"),
       );
     }
+    // Trades never take installments (D6, refused at signing): a trade cash
+    // payment with an installment fee would need the fee in the refund, and
+    // this path refunds the goods scale only. Fail closed for a person.
+    if (payment.installmentFeeAmount.gt(0)) {
+      this.logger.error(
+        `TRADE_REFUND_INSTALLMENT_FEE: trade cash payment ${payment.id} (trade ${tradeId}) ` +
+          `carries an installment fee ${payment.installmentFeeAmount.toFixed(2)}; ` +
+          `automatic refund refused, manual review required`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.payment.paytrRefundFailed"),
+      );
+    }
     const refundAttempt = await this.attempts.claimTradeRefundAttempt(
       payment.id,
       tradeId,

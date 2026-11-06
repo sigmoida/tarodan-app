@@ -6,6 +6,7 @@ import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
 import { formatTL } from "@/lib/format";
+import InstallmentPaidLines from "@/components/payment/InstallmentPaidLines";
 
 interface PaymentDetailsCardProps {
   payment: any;
@@ -49,6 +50,11 @@ export default function PaymentDetailsCard({
         <Row label={`${t("payment.amountLabel")}:`}>
           {formatTL(payment.amount)}
         </Row>
+        {/* Installment count, fee and the amount charged (payer only). */}
+        <InstallmentPaidLines
+          payment={payment}
+          renderRow={(row) => <Row label={`${row.label}:`}>{row.value}</Row>}
+        />
         <div className="flex justify-between">
           <span className="text-muted">{t("common.status")}:</span>
           <Badge variant={isCompleted ? "success" : "warning"}>

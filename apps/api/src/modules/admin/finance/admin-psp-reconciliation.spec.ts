@@ -3,6 +3,7 @@ import {
   PaytrMerchant,
   PaytrStatementLineType,
   PaymentStatus,
+  Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
@@ -32,6 +33,12 @@ function makePrisma(opts: {
   linesList?: any[];
   linesCount?: number;
   paymentRows?: any[];
+  /** The charge attempts of the listed lines' oids (installment forms). */
+  attempts?: Array<{
+    paymentId: string;
+    merchantOid: string;
+    chargedAmount: Prisma.Decimal;
+  }>;
   line?: any;
   lineCount?: number;
   /** getMissingPayments: dökümü gelmiş mağazalar (varsayılan: lineCount>0 ise pazaryeri). */
@@ -86,6 +93,9 @@ function makePrisma(opts: {
     },
     refundAttempt: {
       findMany: jest.fn().mockResolvedValue(opts.refunds ?? []),
+    },
+    paymentChargeAttempt: {
+      findMany: jest.fn().mockResolvedValue(opts.attempts ?? []),
     },
     paytrSettlement: {
       findMany: jest.fn().mockResolvedValue(opts.settlements ?? []),
@@ -210,6 +220,29 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
     expect(day.missingInPaytr).toBe(1);
     expect(day.salesDiff).toBeCloseTo(25);
     expect(day.tolerance).toBe(0.05);
+  });
+
+  it("sums an installment payment at what PayTR charged (C), not its goods total (ADR 0019)", async () => {
+    const prisma = makePrisma({
+      lines: [SALE({ amount: 1066.38 })],
+      payments: [
+        {
+          id: "pay-3x",
+          amount: 1000,
+          chargedAmount: 1066.38,
+          paidAt: new Date("2026-07-31T10:00:00Z"),
+          providerConversationId: "ORD1",
+          status: PaymentStatus.completed,
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getReconciliationSummary(7);
+    const day = result.days.find((d) => d.date === "2026-07-31");
+
+    expect(day?.ours).toMatchObject({ salesCount: 1, salesTotal: 1066.38 });
+    expect(day?.salesDiff).toBeCloseTo(0);
   });
 
   it("counts a payment as missing only when ITS merchant's statement covers the day", async () => {
@@ -531,6 +564,189 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
       payment: expect.objectContaining({ orderNumber: "ORD-10001" }),
       membershipPayment: null,
     });
+  });
+
+  it("shows the amount PayTR had to charge for the line's oid next to the goods total (ADR 0019)", async () => {
+    // Plan 4.4: an installment form of a 1,000.00 TL cart signed at C
+    // 1,066.38; PayTR's line shows 1,066.38.
+    const prisma = makePrisma({
+      linesList: [
+        {
+          id: "line-1",
+          merchantOid: "GRP1I",
+          type: PaytrStatementLineType.sale,
+          amount: 1066.38,
+          matchStatus: PaytrMatchStatus.matched,
+          paymentId: "pay-1",
+          membershipPaymentId: null,
+          transactionDate: DAY,
+        },
+        {
+          id: "line-2",
+          merchantOid: "ORD2",
+          type: PaytrStatementLineType.sale,
+          amount: 250,
+          matchStatus: PaytrMatchStatus.matched,
+          paymentId: "pay-2",
+          membershipPaymentId: null,
+          transactionDate: DAY,
+        },
+      ],
+      linesCount: 2,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: new Prisma.Decimal("1000.00"),
+          chargedAmount: new Prisma.Decimal("1066.38"),
+          order: null,
+          checkoutGroup: { groupNumber: "GRP-1" },
+          tradeCashPayment: null,
+        },
+        {
+          id: "pay-2",
+          amount: new Prisma.Decimal("250.00"),
+          chargedAmount: null,
+          order: { orderNumber: "ORD-2" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+      attempts: [
+        {
+          paymentId: "pay-1",
+          merchantOid: "GRP1I",
+          chargedAmount: new Prisma.Decimal("1066.38"),
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({ status: "matched" });
+
+    const payments = result.data.map(
+      (row) =>
+        (
+          row as {
+            payment: { amount: Prisma.Decimal; chargedAmount: Prisma.Decimal };
+          }
+        ).payment,
+    );
+    expect(
+      payments.map((p) => [p.amount.toFixed(2), p.chargedAmount.toFixed(2)]),
+    ).toEqual([
+      ["1000.00", "1066.38"],
+      // A legacy single payment: the charged amount is the goods total.
+      ["250.00", "250.00"],
+    ]);
+    expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { paymentId: { in: ["pay-1", "pay-2"] } },
+      }),
+    );
+  });
+
+  it("shows next to a sale line the amount its oid signed, never another payment's attempt; null on refund lines", async () => {
+    const line = (id: string, oid: string, type: PaytrStatementLineType) => ({
+      id,
+      merchantOid: oid,
+      type,
+      amount: 1062.4,
+      matchStatus: PaytrMatchStatus.matched,
+      paymentId: "pay-1",
+      membershipPaymentId: null,
+      transactionDate: DAY,
+    });
+    const prisma = makePrisma({
+      linesList: [
+        line("l-inst", "OID-INST", PaytrStatementLineType.sale),
+        line("l-legacy", "OID-LEGACY", PaytrStatementLineType.sale),
+        line("l-foreign", "OID-FOREIGN", PaytrStatementLineType.sale),
+        line("l-refund", "OID-INST", PaytrStatementLineType.refund),
+      ],
+      linesCount: 4,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: new Prisma.Decimal("1000.00"),
+          chargedAmount: new Prisma.Decimal("1062.40"),
+          order: { orderNumber: "ORD-10001" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+      attempts: [
+        // A superseded 2-count form of the same payment.
+        {
+          paymentId: "pay-1",
+          merchantOid: "OID-INST",
+          chargedAmount: new Prisma.Decimal("1040.50"),
+        },
+        // The same oid text signed by ANOTHER payment: never this line's C.
+        {
+          paymentId: "pay-2",
+          merchantOid: "OID-FOREIGN",
+          chargedAmount: new Prisma.Decimal("7.00"),
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({});
+    const charged = Object.fromEntries(
+      (
+        result.data as Array<{
+          id: string;
+          payment: { chargedAmount: Prisma.Decimal | null } | null;
+        }>
+      ).map((l) => [l.id, l.payment?.chargedAmount?.toFixed(2) ?? null]),
+    );
+
+    // The oid's own attempt; without one the payment's charged amount.
+    expect(charged).toEqual({
+      "l-inst": "1040.50",
+      "l-legacy": "1062.40",
+      "l-foreign": "1062.40",
+      // Refund lines match a refund attempt, not a charge.
+      "l-refund": null,
+    });
+  });
+
+  it("reads no charge attempts for a page of refund lines", async () => {
+    const prisma = makePrisma({
+      linesList: [
+        {
+          id: "l-refund",
+          merchantOid: "OID-1",
+          type: PaytrStatementLineType.refund,
+          amount: 421.74,
+          matchStatus: PaytrMatchStatus.matched,
+          paymentId: "pay-1",
+          membershipPaymentId: null,
+          transactionDate: DAY,
+        },
+      ],
+      linesCount: 1,
+      paymentRows: [
+        {
+          id: "pay-1",
+          amount: new Prisma.Decimal("1000.00"),
+          chargedAmount: new Prisma.Decimal("1054.35"),
+          order: { orderNumber: "ORD-1" },
+          checkoutGroup: null,
+          tradeCashPayment: null,
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getStatementLines({});
+
+    expect(prisma.paymentChargeAttempt.findMany).not.toHaveBeenCalled();
+    expect(
+      (result.data as Array<{ payment: { chargedAmount: unknown } }>)[0].payment
+        .chargedAmount,
+    ).toBeNull();
   });
 
   it("filters by an explicit status and can include resolved rows", async () => {

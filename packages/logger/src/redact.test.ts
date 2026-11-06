@@ -65,6 +65,59 @@ describe("isSensitiveKey", () => {
   });
 });
 
+describe("card BIN (installment pricing)", () => {
+  const BIN = "45467112";
+
+  it("treats every BIN key spelling as sensitive, whatever the case", () => {
+    for (const key of [
+      "bin",
+      "BIN",
+      "bin6",
+      "bin8",
+      "binNumber",
+      "bin_number",
+      "cardBin",
+      "card-bin",
+      "installmentBin",
+      "iin",
+      "IIN",
+    ]) {
+      expect(isSensitiveKey(key)).toBe(true);
+    }
+  });
+
+  it("keeps keys that only contain the letters readable", () => {
+    for (const key of ["binary", "cabin", "binId", "combine"]) {
+      expect(isSensitiveKey(key)).toBe(false);
+    }
+  });
+
+  it("masks a top-level and a nested installment BIN, keeps the rest", () => {
+    expect(redactSensitive({ bin: BIN, paymentId: "pay-1" })).toEqual({
+      bin: REDACTED,
+      paymentId: "pay-1",
+    });
+    expect(
+      redactSensitive({
+        paymentId: "pay-1",
+        installment: { count: 3, bin: BIN, expectedTotal: 1066.38 },
+      }),
+    ).toEqual({
+      paymentId: "pay-1",
+      installment: { count: 3, bin: REDACTED, expectedTotal: 1066.38 },
+    });
+  });
+
+  it("masks a numeric BIN and a BIN query parameter", () => {
+    expect(
+      JSON.stringify(redactSensitive({ nested: { bin: 45467112 } })),
+    ).not.toContain(BIN);
+    expect(redactUrlQuery(`/payments/installment-options?bin=${BIN}&n=1`)).toBe(
+      `/payments/installment-options?bin=${REDACTED}&n=1`,
+    );
+  });
+});
+
 describe("redactUrlQuery", () => {
   it("masks credential parameters and keeps the rest of the URL", () => {
     expect(

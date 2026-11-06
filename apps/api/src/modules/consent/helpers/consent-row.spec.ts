@@ -1,5 +1,8 @@
 import { ConsentAction, ConsentSource } from "@prisma/client";
-import { CONSENT_DOCUMENTS } from "@tarodan/types";
+import {
+  BASE_CONSENT_VERSION_CONTEXT,
+  CONSENT_DOCUMENTS,
+} from "@tarodan/types";
 import { toConsentRow } from "./consent-row";
 
 describe("toConsentRow", () => {
@@ -12,6 +15,7 @@ describe("toConsentRow", () => {
       },
       "203.0.113.7",
       "jest",
+      BASE_CONSENT_VERSION_CONTEXT,
     );
 
     expect(row).toMatchObject({
@@ -26,6 +30,26 @@ describe("toConsentRow", () => {
     });
   });
 
+  it.each([
+    [false, CONSENT_DOCUMENTS.distance_sales.version],
+    [true, CONSENT_DOCUMENTS.distance_sales.installmentVersion],
+  ])(
+    "stamps the distance sales version in force with installments %p",
+    (installmentsEnabled, version) => {
+      const row = toConsentRow(
+        {
+          document: "distance_sales",
+          source: ConsentSource.checkout,
+          subject: { userId: "u1" },
+        },
+        null,
+        null,
+        { installmentsEnabled },
+      );
+      expect(row.version).toBe(version);
+    },
+  );
+
   it("binds a trade consent to its cash payment, and nothing else to one", () => {
     const trade = toConsentRow(
       {
@@ -36,6 +60,7 @@ describe("toConsentRow", () => {
       },
       null,
       null,
+      BASE_CONSENT_VERSION_CONTEXT,
     );
     const cart = toConsentRow(
       {
@@ -46,6 +71,7 @@ describe("toConsentRow", () => {
       },
       null,
       null,
+      BASE_CONSENT_VERSION_CONTEXT,
     );
 
     expect(trade.tradeCashPaymentId).toBe("tcp-1");
@@ -61,6 +87,7 @@ describe("toConsentRow", () => {
       },
       null,
       null,
+      BASE_CONSENT_VERSION_CONTEXT,
     );
     expect(row.guestEmail).toBe("guest@example.com");
   });
@@ -71,6 +98,7 @@ describe("toConsentRow", () => {
         { document: "terms", source: ConsentSource.registration, subject: {} },
         null,
         null,
+        BASE_CONSENT_VERSION_CONTEXT,
       ),
     ).toThrow(/without a subject/);
   });
@@ -85,6 +113,7 @@ describe("toConsentRow", () => {
         },
         null,
         null,
+        BASE_CONSENT_VERSION_CONTEXT,
       ),
     ).toThrow(/Unknown consent document/);
   });

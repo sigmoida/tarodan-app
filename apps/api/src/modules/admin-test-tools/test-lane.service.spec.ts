@@ -19,7 +19,7 @@ describe("TestLaneService", () => {
         return { count };
       }),
     });
-    const tx: Record<string, any> = {
+    const tx = {
       ledgerEntry: { count: jest.fn(async () => 4) },
       refundAttempt: del("refundAttempt"),
       refundFinancialComponent: del("refundFinancialComponent"),
@@ -32,7 +32,14 @@ describe("TestLaneService", () => {
       invoice: del("invoice"),
       commissionLedger: del("commissionLedger"),
       paymentProviderEvent: del("paymentProviderEvent"),
-      payment: del("payment", 2),
+      payment: {
+        ...del("payment", 2),
+        updateMany: jest.fn(async () => {
+          calls.push("payment.clearChargeAttempt");
+          return { count: 1 };
+        }),
+      },
+      paymentChargeAttempt: del("paymentChargeAttempt"),
       order: del("order", 3),
       packageShippingSettlement: del("packageShippingSettlement"),
       orderPackage: del("orderPackage"),
@@ -40,36 +47,48 @@ describe("TestLaneService", () => {
       trade: del("trade", 1),
       offer: del("offer"),
       cartItem: del("cartItem"),
-      product: { updateMany: jest.fn(async () => ({ count: 1 })) },
+      product: {
+        updateMany: jest.fn(async (_args: unknown) => ({ count: 1 })),
+      },
       $executeRawUnsafe: jest.fn(async (sql: string) => {
         calls.push(`raw:${sql}`);
         return 0;
       }),
       user: {
-        create: jest.fn(async ({ data }: any) => ({
-          id: "u-new",
-          adminCode: "B000123",
-          email: data.email,
-          displayName: data.displayName,
-          isSeller: data.isSeller,
-          createdAt: new Date("2026-09-08"),
-        })),
+        create: jest.fn(
+          async ({
+            data,
+          }: {
+            data: { email: string; displayName: string; isSeller: boolean };
+          }) => ({
+            id: "u-new",
+            adminCode: "B000123",
+            email: data.email,
+            displayName: data.displayName,
+            isSeller: data.isSeller,
+            createdAt: new Date("2026-09-08"),
+          }),
+        ),
       },
-      address: { create: jest.fn(async () => ({})) },
+      address: { create: jest.fn(async (_args: { data: unknown }) => ({})) },
       consentRecord: {
         findMany: jest.fn(async () => []),
-        createMany: jest.fn(async () => ({ count: 3 })),
+        createMany: jest.fn(
+          async (_args: { data: Array<{ document: string }> }) => ({
+            count: 3,
+          }),
+        ),
       },
     };
-    const prisma: Record<string, any> = {
+    const prisma = {
       user: {
         findMany: jest.fn(async () => [{ id: "t1" }, { id: "t2" }]),
-        findFirst: jest.fn(async () => null),
+        findFirst: jest.fn(async (): Promise<{ id: string } | null> => null),
       },
       order: { findMany: jest.fn(async () => [{ id: "o1" }]) },
       payment: { findMany: jest.fn(async () => [{ id: "p1" }]) },
       orderPackage: { findMany: jest.fn(async () => [{ id: "k1" }]) },
-      $transaction: jest.fn((fn: any) => fn(tx)),
+      $transaction: jest.fn((fn: (client: typeof tx) => unknown) => fn(tx)),
     };
     const lanes = { invalidate: jest.fn() };
     const service = new TestLaneService(prisma as never, lanes as never);
@@ -116,7 +135,7 @@ describe("TestLaneService", () => {
       // Onay penceresi test hesabında kapatılamaz ekran olurdu; hesap yoksa onay
       // da yok (aynı transaction).
       const rows = tx.consentRecord.createMany.mock.calls[0][0].data;
-      expect(rows.map((r: any) => r.document).sort()).toEqual(
+      expect(rows.map((r: { document: string }) => r.document).sort()).toEqual(
         [...ACCOUNT_REQUIRED_CONSENTS].sort(),
       );
       for (const row of rows) {
@@ -166,6 +185,10 @@ describe("TestLaneService", () => {
         "invoice",
         "commissionLedger",
         "paymentProviderEvent",
+        // payments.charge_attempt_id -> attempt and attempt.payment_id ->
+        // payment are both Restrict: clear the pointer, then the attempts.
+        "payment.clearChargeAttempt",
+        "paymentChargeAttempt",
         "payment",
         "order",
         "orderPackage",
@@ -189,6 +212,18 @@ describe("TestLaneService", () => {
       });
       expect(tx.payment.deleteMany).toHaveBeenCalledWith({
         where: { isTest: true },
+      });
+      // Only test-lane payments, and only the attempts of test-lane payments.
+      expect(tx.payment.updateMany).toHaveBeenCalledWith({
+        where: { isTest: true, chargeAttemptId: { not: null } },
+        data: {
+          chargeAttemptId: null,
+          chargedAmount: null,
+          installmentFeeAmount: 0,
+        },
+      });
+      expect(tx.paymentChargeAttempt.deleteMany).toHaveBeenCalledWith({
+        where: { payment: { isTest: true } },
       });
       expect(tx.order.deleteMany).toHaveBeenCalledWith({
         where: { isTest: true },

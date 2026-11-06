@@ -1,5 +1,6 @@
 import { OrderOrigin, OrderStatus } from "@prisma/client";
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * The return URL query each direct-form target builds (the PayTR service
@@ -12,6 +13,8 @@ describe("PaymentInitiationService — direct-form return URL query", () => {
     group?: Record<string, unknown>;
   }) => {
     const prisma = {
+      // The claim transaction writes the form's charge attempt.
+      paymentChargeAttempt: { create: jest.fn().mockResolvedValue({}) },
       order: { findUnique: jest.fn().mockResolvedValue(opts.order ?? null) },
       checkoutGroup: {
         findUnique: jest.fn().mockResolvedValue(opts.group ?? null),
@@ -50,6 +53,7 @@ describe("PaymentInitiationService — direct-form return URL query", () => {
       {} as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never,
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never,
+      singlePaymentChargeStub() as never,
     );
     return service;
   };

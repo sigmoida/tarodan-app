@@ -4,6 +4,7 @@ import {
   isDigitalOrder,
   type DigitalOrderSignals,
   type OrderKind,
+  type PaymentInstallmentFields,
 } from "@tarodan/types";
 
 export interface Order {
@@ -209,13 +210,16 @@ export interface ServerOrderGroup {
   status: string;
   createdAt: string;
   viewerRole: "buyer" | "seller";
-  payment: {
-    id: string;
-    status: string;
-    amount: number;
-    provider?: string | null;
-    paidAt?: string | null;
-  } | null;
+  /** The group's ONE payment; the installment fields come only to the buyer. */
+  payment:
+    | (PaymentInstallmentFields & {
+        id: string;
+        status: string;
+        amount: number;
+        provider?: string | null;
+        paidAt?: string | null;
+      })
+    | null;
   packages: ServerPackageView[];
   orders: Order[];
 }

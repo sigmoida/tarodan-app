@@ -1,5 +1,5 @@
 import { PayoutService } from "./payout.service";
-import { OrderStatus, PayoutStatus } from "@prisma/client";
+import { OrderStatus, PayoutStatus, Prisma } from "@prisma/client";
 
 /**
  * BLOCKER: kısmi iade `pending` payout'u void eder ama satırdaki `netAmount`'u
@@ -66,7 +66,8 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
     id: "o1",
     status: OrderStatus.completed,
     orderNumber: "ORD-1",
-    totalAmount: 100,
+    totalAmount: new Prisma.Decimal(100),
+    installmentFeeAmount: new Prisma.Decimal(0),
   };
 
   it("kısmi iade sonrası retry: bayat netAmount değil, güncel hak edilen tutar transfer edilir", async () => {

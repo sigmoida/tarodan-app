@@ -12,6 +12,7 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { fmtTry } from "@/lib/format";
 import { DataTable } from "@/components/DataTable";
 import { col } from "@/components/table/columns";
+import { COL_WIDTH } from "@/components/table/widths";
 import { CellLink, Empty } from "@/components/table/cells";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import type { PspStatementLine } from "../_lib/types";
@@ -89,12 +90,16 @@ export function LinesTab() {
         t("admin.finance.psp.merchant.label"),
         (l: PspStatementLine) => <MerchantBadge merchant={l.paytrMerchant} />,
       ),
-      col.code("merchant_oid", (l: PspStatementLine) => l.merchantOid, {
-        minWidth: 260,
+      col.text("merchant_oid", (l: PspStatementLine) => l.merchantOid, {
+        minWidth: COL_WIDTH.paytrOid,
       }),
       col.money(
         t("admin.finance.psp.lines.amount"),
         (l: PspStatementLine) => l.amount,
+      ),
+      col.money(
+        t("admin.finance.psp.lines.chargedAmount"),
+        (l: PspStatementLine) => l.payment?.chargedAmount,
       ),
       col.money(
         t("admin.finance.psp.lines.fee"),

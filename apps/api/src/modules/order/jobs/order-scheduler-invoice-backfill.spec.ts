@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { OrderSchedulerService } from "./order-scheduler.service";
 
 /**
@@ -42,15 +43,15 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
     };
     const orderService = { emitDeliveryRevenueInvoices: jest.fn() };
     const service = new OrderSchedulerService(
-      prisma as any,
-      orderService as any,
-      { get: jest.fn() } as any,
-      {} as any,
+      prisma as never,
+      orderService as never,
+      { get: jest.fn() } as never,
+      {} as never,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
-      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
-      { createInAppNotification: jest.fn() } as any,
-      { get: jest.fn(), set: jest.fn() } as any,
-      { add: jest.fn() } as any,
+      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as never,
+      { createInAppNotification: jest.fn() } as never,
+      { get: jest.fn(), set: jest.fn() } as never,
+      { add: jest.fn() } as never,
     );
     return { service, prisma, orderService };
   };
@@ -85,6 +86,7 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
         id: "order-1",
         packageId: "pkg-1",
         buyerShippingAmount: 40,
+        installmentFeeAmount: new Prisma.Decimal(0),
         commissionLedger: {
           buyerFee: 30,
           sellerCommission: 100,
@@ -103,6 +105,88 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
     await service.runProcessDeliveredOrders();
 
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The buyer's installment fee document (ADR 0019 D4) is a package document
+   * like the others: an order whose package carries a fee is complete only
+   * with it, for Tarodan's own goods too (AS-F2). Without a fee it is never
+   * looked for.
+   */
+  describe("installment fee document", () => {
+    const packaged = (over: Record<string, unknown> = {}) => ({
+      id: "order-1",
+      packageId: "pkg-1",
+      buyerShippingAmount: 0,
+      sellerShippingAmount: 0,
+      installmentFeeAmount: new Prisma.Decimal("66.38"),
+      commissionLedger: {
+        buyerFee: 30,
+        sellerCommission: 100,
+        componentBreakdownComplete: true,
+        buyerCommissionAmount: 0,
+        buyerPlatformFeeAmount: 30,
+        sellerCommissionAmount: 100,
+        sellerPlatformFeeAmount: 0,
+      },
+      seller: { sellerType: "individual" },
+      ...over,
+    });
+    const feeDocs = [
+      { sourceId: "pkg-1", type: "buyer_service_fee" },
+      { sourceId: "pkg-1", type: "seller_commission" },
+    ];
+
+    it("re-issues an order whose package fee document is missing", async () => {
+      const { service, prisma, orderService } = makeService(
+        packaged(),
+        feeDocs,
+      );
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(orderService.emitDeliveryRevenueInvoices).toHaveBeenCalledWith(
+        "order-1",
+      );
+    });
+
+    it("stamps the order once the fee document exists", async () => {
+      const { service, prisma } = makeService(packaged(), [
+        ...feeDocs,
+        { sourceId: "pkg-1", type: "buyer_installment_fee" },
+      ]);
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "order-1" } }),
+      );
+    });
+
+    it("asks for it on a platform sale too", async () => {
+      const { service, prisma } = makeService(
+        packaged({ seller: { sellerType: "platform" } }),
+        [{ sourceId: "order-1", type: "platform_sale" }],
+      );
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it("does not look for it without a fee (single payment)", async () => {
+      const { service, prisma } = makeService(
+        packaged({ installmentFeeAmount: new Prisma.Decimal(0) }),
+        feeDocs,
+      );
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "order-1" } }),
+      );
+    });
   });
 
   /**
@@ -138,6 +222,14 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
    * — escrow ve iade uygunluğu da onu okur. Damgasız eski siparişte bugünkü
    * değerle `deliveredAt ≤ şimdi − N gün` kesilir.
    */
+  /** The completion query's window: stamped first, then legacy. */
+  interface CompletionWhere {
+    OR: Array<{
+      returnWindowEndsAt?: { lte: Date } | null;
+      deliveredAt?: { lte: Date };
+    }>;
+  }
+
   describe("iade penceresi kapanışı — damga ve süre kaynağı", () => {
     const NOW = new Date("2026-10-05T12:00:00.000Z");
     const DAY = 24 * 60 * 60 * 1000;
@@ -153,14 +245,17 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
             : null,
       );
       await service.runProcessDeliveredOrders();
-      const completionCall: any[] =
-        prisma.order.findMany.mock.calls.find(
-          (call: any[]) => call[0]?.where?.OR?.[1]?.deliveredAt?.lte,
-        ) ?? [];
+      const calls = prisma.order.findMany.mock.calls as unknown as Array<
+        [{ where: CompletionWhere }]
+      >;
+      const completionCall = calls.find(
+        (call) => call[0]?.where?.OR?.[1]?.deliveredAt?.lte,
+      );
+      if (!completionCall) throw new Error("no completion query");
       return completionCall[0].where;
     };
-    const legacyCutoffAge = (where: any) =>
-      (NOW.getTime() - (where.OR[1].deliveredAt.lte as Date).getTime()) / DAY;
+    const legacyCutoffAge = (where: CompletionWhere) =>
+      (NOW.getTime() - (where.OR[1].deliveredAt?.lte as Date).getTime()) / DAY;
 
     it("damgalı sipariş kendi pencere sonunda tamamlanır", async () => {
       const where = await completionWhere("30");

@@ -15,7 +15,16 @@ import { FiscalInvoiceType } from "@prisma/client";
  *  - `standard` → Kategorisi olmayan tüketici hizmetleri (üyelik, öne çıkarma).
  *                 Bölgenin varsayılan oranı, yoksa `ELOGO_VAT_RATE`.
  */
-export type InvoiceVatSource = "service" | "category" | "standard";
+export type InvoiceVatSource =
+  | "service"
+  | "category"
+  | "standard"
+  /**
+   * The rate was fixed when the charge was priced and is snapshotted on it
+   * (`PaymentChargeAttempt.feeVatRatePct`): the issuer passes it in. The
+   * generic resolver refuses this source instead of guessing a rate.
+   */
+  | "charge_snapshot";
 
 export const VAT_SOURCE_BY_TYPE: Record<FiscalInvoiceType, InvoiceVatSource> = {
   commission: "service",
@@ -37,7 +46,42 @@ export const VAT_SOURCE_BY_TYPE: Record<FiscalInvoiceType, InvoiceVatSource> = {
   penalty: "service",
   membership: "standard",
   boost: "standard",
+  // Installment fee (ADR 0019 D4): the VAT inside it was fixed when the
+  // charge was priced (`PaymentChargeAttempt.feeVatRatePct`), not by the
+  // service-fee toggle or a category.
+  buyer_installment_fee: "charge_snapshot",
   // İade faturası kaynak faturanın oranını AYNEN taşır (snapshot); bu değer
   // yalnız kaynak çözülemediğinde devreye girer.
   return_invoice: "standard",
 };
+
+/**
+ * The VAT input rule of a cut, synchronous: a `charge_snapshot` type needs
+ * the rate frozen on its charge (finite, not negative; 0 is valid), every
+ * other type resolves its own and refuses one. `InvoiceDeliveryService.cut`
+ * checks it BEFORE its swallow-everything guard, so a fee document without
+ * its rate fails the issuer (no stamp, retried) instead of being logged and
+ * lost.
+ */
+export function assertCutVatRateInput(
+  type: FiscalInvoiceType,
+  snapshotVatRate: number | undefined,
+): void {
+  if (VAT_SOURCE_BY_TYPE[type] === "charge_snapshot") {
+    if (
+      snapshotVatRate === undefined ||
+      !Number.isFinite(snapshotVatRate) ||
+      snapshotVatRate < 0
+    ) {
+      throw new Error(
+        `VAT rate of ${type} is snapshotted on the charge and was not passed`,
+      );
+    }
+    return;
+  }
+  if (snapshotVatRate !== undefined) {
+    throw new Error(
+      `${type} resolves its own VAT rate; a charge snapshot rate is not accepted`,
+    );
+  }
+}

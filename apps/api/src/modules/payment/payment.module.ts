@@ -38,6 +38,11 @@ import { OrderFulfillmentListener } from "./fulfillment/order-fulfillment.listen
 import { EscrowHoldService } from "./fulfillment/escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment/fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./fulfillment/virtual-order-fulfillment.service";
+import { InstallmentSettingsModule } from "./installments/installment-settings.module";
+import { InstallmentRatesService } from "./installments/installment-rates.service";
+import { InstallmentRulesService } from "./installments/installment-rules.service";
+import { InstallmentOptionsService } from "./installments/installment-options.service";
+import { InstallmentChargeService } from "./installments/installment-charge.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -78,6 +83,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     DiscountModule,
     // Ödeme formu kapısı: mesafeli satış onayı (consent_records).
     ConsentModule,
+    // The installment switch and minimum (also read by consent).
+    InstallmentSettingsModule,
     // Staging: refund sweeps leave rows copied from production alone.
     UatProductionCopyModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
@@ -129,6 +136,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,
     RawBodyMiddleware,
+    InstallmentRatesService,
+    InstallmentRulesService,
+    InstallmentOptionsService,
+    InstallmentChargeService,
   ],
   exports: [
     PaymentService,
@@ -139,6 +150,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     // Admin PSP mutabakat ekranı: tek satır yeniden eşleme + senkron durumu.
     PaytrReportMatchingService,
     PaytrSyncStateService,
+    // Admin Finance > Installments: settings, rule versions, preview.
+    InstallmentSettingsModule,
+    InstallmentRatesService,
+    InstallmentRulesService,
   ],
 })
 export class PaymentModule implements NestModule {

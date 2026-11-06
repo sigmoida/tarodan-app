@@ -236,6 +236,10 @@ export const typeFilterOptions = (t: T) => [
     label: t("admin.finance.invoices.types.buyerShipping"),
   },
   {
+    value: "buyer_installment_fee",
+    label: t("admin.finance.invoices.types.buyerInstallmentFee"),
+  },
+  {
     value: "seller_commission",
     label: t("admin.finance.invoices.types.sellerCommission"),
   },

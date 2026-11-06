@@ -113,6 +113,10 @@ export * from "./legal-consent";
 // On/off platform settings: the one "is it on" rule (API and admin toggles)
 export * from "./platform-setting";
 
+// Installment payments: buyer options, segments, settings and the rule
+// validator (API, web, admin, mobile)
+export * from "./installments";
+
 // GIB listing/seller report: row contract + legal-name source catalog (API + admin)
 export * from "./gib-report";
 

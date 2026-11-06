@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { OrderOrigin, OrderStatus } from "@prisma/client";
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * ÇEKİM ↔ İPTAL DIŞLAMASI (claim tarafı). Alıcı ödeme formunu gönderdiğinde
@@ -32,6 +33,8 @@ describe("PaymentInitiationService — claim iptal edilmiş siparişte başlamaz
   const makeService = (lockedStatus: OrderStatus) => {
     const calls: string[] = [];
     const prisma: any = {
+      // The claim transaction writes the form's charge attempt.
+      paymentChargeAttempt: { create: jest.fn().mockResolvedValue({}) },
       // Düz ön okuma: hâlâ ödenebilir görünüyor.
       order: { findUnique: jest.fn().mockResolvedValue(order) },
       payment: {
@@ -76,6 +79,7 @@ describe("PaymentInitiationService — claim iptal edilmiş siparişte başlamaz
       {} as never,
       { ensureForPayment: jest.fn().mockResolvedValue("record") } as never,
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     return { service, prisma, calls };
   };

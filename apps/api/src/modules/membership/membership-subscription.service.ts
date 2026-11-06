@@ -59,6 +59,7 @@ import {
   OUTBOX_SAVED_CARD_PROVIDER_DELETE,
   type SavedCardProviderDeletePayload,
 } from "../outbox/outbox.types";
+import { paytrAmountMatches } from "../payment/helpers/charged-amount";
 
 /**
  * Oto-yenileme cron'u SAATLİK çalışır; çekim dönem DOLMADAN yapılmalı ki üyelik
@@ -1270,9 +1271,10 @@ export class MembershipSubscriptionService {
         const inquiry = await this.paymentProviders
           .resolve(attempt.provider, attempt.paytrMerchant)
           .queryPaymentStatus(merchantOid);
+        // A renewal is never an installment charge: PayTR charged its amount.
         if (
           inquiry.ok &&
-          Math.abs(inquiry.paymentTotalTl - Number(attempt.amount)) <= tolerance
+          paytrAmountMatches(inquiry.paymentTotalTl, attempt.amount, tolerance)
         ) {
           await this.virtualOrder.completeRecurringMembershipPayment(
             attempt.id,

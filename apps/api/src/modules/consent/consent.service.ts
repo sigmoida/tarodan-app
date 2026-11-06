@@ -1,17 +1,28 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { ConsentAction, ConsentSource, Prisma } from "@prisma/client";
 import {
   ACCOUNT_REQUIRED_CONSENTS,
+  BASE_CONSENT_VERSION_CONTEXT,
   CONSENT_DOCUMENT_KEYS,
   CONSENT_DOCUMENTS,
   OPTIONAL_COOKIE_CATEGORIES,
+  consentVersionFollowsInstallments,
+  currentConsentVersion,
   isConsentDocumentKey,
   type ConsentDocumentStatus,
+  type ConsentVersionContext,
   type OptionalCookieCategory,
   type PendingConsent,
 } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
+import { InstallmentSettingsService } from "../payment/installments/installment-settings.service";
+import { SentryService } from "../sentry/sentry.service";
 import { getRequestClientInfo } from "../../common/context/request-context";
 import {
   findGrantedAccountConsents,
@@ -27,8 +38,15 @@ import {
 // buradan yeniden dışa açılır ki mevcut import'lar değişmesin.
 export type { ConsentEntry, ConsentSubject } from "./helpers/consent-row";
 
-/** Yazım için gereken en dar istemci: PrismaService ya da bir transaction. */
-export type ConsentWriter = Pick<Prisma.TransactionClient, "consentRecord">;
+/**
+ * The narrowest client a write needs: PrismaService or a transaction. It also
+ * reads `platformSetting`: the version of some documents follows the
+ * installment switch, read in the same transaction as the write.
+ */
+export type ConsentWriter = Pick<
+  Prisma.TransactionClient,
+  "consentRecord" | "platformSetting"
+>;
 
 export type CookiePreferenceInput = Record<OptionalCookieCategory, boolean>;
 
@@ -42,28 +60,75 @@ interface ConsentStatusRow {
 }
 
 /**
- * Hukuki onay kayıtlarının TEK yazım ve okuma noktası.
+ * The ONE place that writes and reads legal consent records.
  *
- * Sürüm ve kanıt (IP, kullanıcı ajanı) burada damgalanır: çağıran yalnız
- * "kim, hangi belge, nereden" der. Sürüm `@tarodan/types` CONSENT_DOCUMENTS'ten,
- * kanıt istek bağlamından gelir — istemci ikisini de söyleyemez. Tablo
- * ekleme-yalnızdır; bu serviste güncelleme ya da silme metodu bilinçli olarak
- * YOKTUR (DB tetikleyicisi de zorlar).
+ * The version and the evidence (IP, user agent) are stamped here: the caller
+ * only says who, which document and from where. The version is the one in
+ * force (`currentConsentVersion` of `@tarodan/types`: the distance sales text
+ * carries its installment clause only while installments are on), the
+ * evidence comes from the request context; the client can say neither. The
+ * table is append-only; this service deliberately has NO update or delete
+ * method (a DB trigger enforces it too).
  */
 @Injectable()
 export class ConsentService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ConsentService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly installmentSettings: InstallmentSettingsService,
+    @Optional() private readonly sentry?: SentryService,
+  ) {}
 
   async record(
     entries: readonly ConsentEntry[],
     db: ConsentWriter = this.prisma,
   ): Promise<number> {
     if (entries.length === 0) return 0;
+    // An unknown key is refused by `toConsentRow` with its own message.
+    const versionContext = entries.some(
+      (entry) =>
+        isConsentDocumentKey(entry.document) &&
+        consentVersionFollowsInstallments(entry.document),
+    )
+      ? await this.versionContext(db)
+      : BASE_CONSENT_VERSION_CONTEXT;
     const { ipAddress, userAgent } = getRequestClientInfo();
     const { count } = await db.consentRecord.createMany({
-      data: entries.map((entry) => toConsentRow(entry, ipAddress, userAgent)),
+      data: entries.map((entry) =>
+        toConsentRow(entry, ipAddress, userAgent, versionContext),
+      ),
     });
     return count;
+  }
+
+  /**
+   * What the versions in force depend on: the installment switch, read at
+   * once (no cache, like the options and signing calls), so a record follows
+   * the switch the moment the admin flips it. A write reads it through its
+   * own client: in the checkout transaction no second connection is taken
+   * (and a failed read there fails the checkout instead of recording a
+   * version). A failed read outside a transaction is the base text
+   * (installments off), the fail-closed reading of the payment side, and is
+   * reported to Sentry: the recorded version may then not be the text shown.
+   */
+  async versionContext(
+    db: Pick<ConsentWriter, "platformSetting"> = this.prisma,
+  ): Promise<ConsentVersionContext> {
+    try {
+      const { enabled } = await this.installmentSettings.read(db);
+      return { installmentsEnabled: enabled };
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `Installment switch unreadable, consent versions read as installments off: ${failure.message}`,
+      );
+      this.sentry?.captureException(failure, {
+        flow: "consent.version_context",
+        fallback: "installments_off",
+      });
+      return BASE_CONSENT_VERSION_CONTEXT;
+    }
   }
 
   /**
@@ -211,12 +276,15 @@ export class ConsentService {
    * consent out and show it as missing.
    */
   async getStatus(userId: string): Promise<ConsentDocumentStatus[]> {
-    const rows = await this.prisma.$queryRaw<ConsentStatusRow[]>`
-      SELECT DISTINCT ON (document)
-        document, version, action, source, created_at AS "createdAt"
-      FROM consent_records
-      WHERE user_id = ${userId}
-      ORDER BY document, created_at DESC`;
+    const [rows, versionContext] = await Promise.all([
+      this.prisma.$queryRaw<ConsentStatusRow[]>`
+        SELECT DISTINCT ON (document)
+          document, version, action, source, created_at AS "createdAt"
+        FROM consent_records
+        WHERE user_id = ${userId}
+        ORDER BY document, created_at DESC`,
+      this.versionContext(),
+    ]);
     const latest = latestByDocument(rows);
     const pending = new Set(
       computePendingConsents(rows).map((p) => p.document),
@@ -227,7 +295,7 @@ export class ConsentService {
       const row = latest.get(document);
       return {
         document,
-        currentVersion: definition.version,
+        currentVersion: currentConsentVersion(document, versionContext),
         requiredForAccount: definition.requiredForAccount,
         pending: pending.has(document),
         latest: row

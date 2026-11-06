@@ -41,6 +41,17 @@ const SENSITIVE_KEYS = new Set<string>([
   "creditcard",
   "cardnumber",
   "pan",
+  // Card BIN / IIN (first 6-8 card digits; installment pricing sends it, and
+  // PayTR's BIN lookup takes `bin_number`). Digits of the card number are
+  // never logged (docs/PCI_PAYMENT_PAGE.md); the card pass below misses them
+  // because a BIN is shorter than 13 digits. Same keys as the API list.
+  "bin",
+  "bin6",
+  "bin8",
+  "binnumber",
+  "cardbin",
+  "installmentbin",
+  "iin",
   "cvv",
   "cvc",
   "cardholdername",

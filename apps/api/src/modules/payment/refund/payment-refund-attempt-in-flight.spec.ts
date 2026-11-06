@@ -1,4 +1,4 @@
-import { RefundAttemptStatus } from "@prisma/client";
+import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import {
   RefundAttemptInFlightException,
   RefundPendingReconciliationException,
@@ -28,7 +28,8 @@ describe("PaymentRefundAttemptService: an attempt in flight", () => {
                 id: "attempt-1",
                 paymentId: "pay-1",
                 orderId: "order-1",
-                amount: 59,
+                amount: new Prisma.Decimal(59),
+                installmentFeeAmount: new Prisma.Decimal(0),
                 ...rows.byKey,
               }
             : null,

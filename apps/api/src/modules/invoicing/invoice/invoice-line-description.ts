@@ -22,8 +22,19 @@ export const LINE_DESCRIPTION: Record<string, string> = {
   trade_shipping: "Takas kargo bedeli",
   platform_sale: "Ürün/hizmet bedeli",
   penalty: "Ceza bedeli (kargo)",
+  // Installment fee (vade farkı, ADR 0019 D4). Turkish on purpose: it is the
+  // line text of the e-document. A change of wording is a change here only.
+  buyer_installment_fee: "Taksit vade farkı",
   return_invoice: "İade faturası",
 };
+
+/**
+ * Line of the return invoice that reverses part of an installment fee
+ * document (named like the refund component lines, "İade edilen ...").
+ * Not in `LINE_DESCRIPTION`: that map is keyed by document type and the
+ * description search turns its keys into types.
+ */
+export const INSTALLMENT_FEE_RETURN_LINE_NAME = "İade edilen taksit vade farkı";
 
 /**
  * Belgede yazan açıklama. Kesim anındaki snapshot varsa O geçerlidir — belge

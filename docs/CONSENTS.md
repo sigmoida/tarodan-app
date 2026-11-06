@@ -15,11 +15,15 @@ records** and the **Consents** section of the user file.
 | `terms`                  | `2026-08-05`       | yes                      | registration form / re-consent prompt             |
 | `privacy`                | `2026-08-04`       | yes                      | registration form / re-consent prompt             |
 | `kvkk`                   | `2026-08-04`       | yes (separate box)       | registration form / re-consent prompt             |
-| `distance_sales`         | `2026-08-03`       | no (per order)           | cart checkout + payment form (`direct-form`)      |
+| `distance_sales`         | `2026-08-03` (*)   | no (per order)           | cart checkout + payment form (`direct-form`)      |
 | `cookies`                | `2026-08-02`       | no                       | cookie banner / cookie preferences panel          |
 | `marketing`              | `2026-10-05`       | no                       | registration, notification settings, unsubscribe  |
 | `platform_service_sales` | `2026-10-21-draft` | no (per order)           | boost purchase dialog (`POST .../boost/initiate`) |
 | `withdrawal_waiver`      | `2026-10-21-draft` | no (per order)           | boost purchase dialog (`POST .../boost/initiate`) |
+
+(*) While installments are on (`installments_enabled`), its
+`installmentVersion` `2026-11-06-draft` (see "Versions that follow the
+installment switch").
 
 A version is the day the text changed (`YYYY-MM-DD`). **When a text changes,
 update its version here**: when a required document's version changes, every
@@ -42,6 +46,52 @@ drafts (tarodan-ops plan `2026-10-21-listing-boost`, decisions D15 and D17).
 The release that sells boost with these consents (API task LB3, web task LB6)
 must not go to production before legal has signed both texts off and their
 versions have lost the `-draft` suffix.
+
+### Versions that follow the installment switch
+
+The distance sales text has installment clauses (tarodan-ops plan
+`2026-11-03-installment-payments`, AS-L1: the installment line among the
+price items, the installment payment terms, the installment fee refund
+terms). They are part of the text, and of the recorded version, **only while
+installments are on**:
+
+| `installments_enabled`     | Text (web `/distance-sales`, mobile WebView `/app/distance-sales`) | Recorded `consent_records.version`        |
+| -------------------------- | ------------------------------------------------------------------ | ----------------------------------------- |
+| off, no row, or unreadable | the text before the clauses                                        | `version` (`2026-08-03`)                  |
+| on                         | the text with the clauses                                          | `installmentVersion` (`2026-11-06-draft`) |
+
+- One resolver: `currentConsentVersion(document, { installmentsEnabled })` in
+  `@tarodan/types`. The API stamps a row with it (`ConsentService.record`
+  reads the switch through `InstallmentSettingsService`, with no cache, only
+  when an entry follows it, through the writer's own client: in the checkout
+  transaction a failed read fails the checkout). The admin "current version"
+  flag and the user file compare with it too, so after a flip the earlier
+  per-order rows show as not current. A failed read outside a transaction
+  (payment form) is "off" (the base version), the same fail-closed reading as
+  the payment side, and is reported to Sentry
+  (`flow: consent.version_context`).
+- The web reads the switch on the server (`getInstallmentsConfig`, the
+  `GET /payments/config` answer cached for 5 minutes; an unreachable API is
+  off). The client sends no version (the consent contract: only "I accept"),
+  so for up to about 5 minutes after the switch flips, the page can still show
+  the previous text while the API already records the new version. Flip the
+  switch at a quiet hour; the checkout and pay screens only offer installments
+  after their own config refresh.
+- A document required for every account never follows the switch (contract
+  spec): flipping it would send every member to the re-consent gate.
+- Known limits (hub backlog): the payment gate accepts an existing checkout
+  consent whatever its version, so a cart consented under one setting and paid
+  after a flip is not consented again (the pay screen still shows the
+  installment terms next to an installment choice); a failed config fetch
+  during a page regeneration caches the text without the clauses for one
+  revalidation period.
+
+**Turning installments on is blocked:** the installment version is a draft.
+`installments_enabled` must not be turned on in production before legal has
+signed the clauses off and `installmentVersion` is a date without the
+`-draft` suffix. A release may carry the code and the draft text: while the
+switch is off, nobody sees the clauses and every consent is recorded against
+the `2026-08-03` text.
 
 The old `DISTANCE_SALES_CONSENT_VERSION` constant joined this catalogue. The
 old `checkout_groups.distance_sales_accepted_at/_version` columns are no longer

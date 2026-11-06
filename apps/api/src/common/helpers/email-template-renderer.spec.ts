@@ -336,3 +336,52 @@ describe("email template renderer", () => {
     expect(content).not.toContain("tarodan-logo.jpg");
   });
 });
+
+/**
+ * The buyer's payment e-mails state the installment terms when the payment
+ * was split (ADR 0019, plan 6.6; AS-L1), and the paid amount is what the
+ * card was charged.
+ */
+describe("order-paid e-mails with installments", () => {
+  const installment = {
+    label: "Taksit",
+    summary:
+      "3 taksit: aylık 355,46 TL, vade farkı 66,38 TL, toplam 1.066,38 TL",
+    chargedAmount: 1066.38,
+  };
+
+  it("order-paid shows the charged total and the installment line", () => {
+    const html = renderEmailTemplate("order-paid", {
+      orderNumber: "ORD-1",
+      productTitle: "Model car",
+      totalAmount: 1000,
+      installment,
+    });
+    expect(html).toContain("1.066,38 TL");
+    expect(html).toContain(
+      "3 taksit: aylık 355,46 TL, vade farkı 66,38 TL, toplam 1.066,38 TL",
+    );
+  });
+
+  it("order-paid-group adds the installment line under the cart total", () => {
+    const html = renderEmailTemplate("order-paid-group", {
+      groupNumber: "GRP-1",
+      items: [{ productTitle: "Model car", totalAmount: 1000 }],
+      groupTotal: 1000,
+      installment,
+    });
+    expect(html).toContain("Taksit");
+    expect(html).toContain("vade farkı 66,38 TL");
+  });
+
+  it("a single payment keeps today's e-mail", () => {
+    const html = renderEmailTemplate("order-paid", {
+      orderNumber: "ORD-1",
+      productTitle: "Model car",
+      totalAmount: 1000,
+      installment: null,
+    });
+    expect(html).toContain("1.000,00 TL");
+    expect(html).not.toContain("vade farkı");
+  });
+});

@@ -1,7 +1,9 @@
+import { Logger } from "@nestjs/common";
 import {
   PaytrMatchStatus,
   PaytrStatementLineType,
   PaymentStatus,
+  Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PaytrReportMatchingService } from "./paytr-report-matching.service";
@@ -54,6 +56,11 @@ function makePrisma(opts: {
   items?: any[];
 }) {
   return {
+    // Forms signed before charge attempts: every oid falls back to `amount`.
+    paymentChargeAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     paytrStatementLine: {
       findMany: jest.fn().mockImplementation((args: any) => {
         if (args?.distinct) {
@@ -140,6 +147,171 @@ describe("PaytrReportMatchingService.matchStatementLines", () => {
         }),
       }),
     );
+  });
+
+  it("matches an installment sale line at the C its oid was signed for (PSP scale)", async () => {
+    const prisma = makePrisma({
+      lines: [makeLine({ amount: 106.64 })],
+      payment: { id: "pay-1", amount: 100, chargedAmount: null },
+    });
+    prisma.paymentChargeAttempt.findFirst.mockResolvedValue({
+      chargedAmount: new Prisma.Decimal("106.64"),
+    });
+    const service = new PaytrReportMatchingService(prisma as never);
+
+    const r = await service.matchStatementLines();
+
+    expect(r.matched).toBe(1);
+    expect(prisma.paymentChargeAttempt.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { merchantOid: "ORD1", paymentId: "pay-1" },
+      }),
+    );
+  });
+
+  it("flags an installment sale line that shows T where C was charged", async () => {
+    const prisma = makePrisma({
+      lines: [makeLine({ amount: 100 })],
+      payment: { id: "pay-1", amount: 100, chargedAmount: null },
+    });
+    prisma.paymentChargeAttempt.findFirst.mockResolvedValue({
+      chargedAmount: new Prisma.Decimal("106.64"),
+    });
+    const errorLog = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const service = new PaytrReportMatchingService(prisma as never);
+
+    const r = await service.matchStatementLines();
+
+    expect(r.mismatched).toBe(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining("PAYTR_STATEMENT_MISMATCH"),
+    );
+    errorLog.mockRestore();
+  });
+
+  describe("the card PayTR charged against the attempt (plan 5.6)", () => {
+    const attempt = {
+      id: "att-1",
+      chargedAmount: new Prisma.Decimal("106.64"),
+      installmentCount: 3,
+      cardFamily: "world",
+      bin6: "454671",
+      installmentRatePct: new Prisma.Decimal("8.000"),
+    };
+    async function run(line: Record<string, unknown>) {
+      const prisma = makePrisma({
+        lines: [makeLine({ amount: 106.64, ...line })],
+        payment: { id: "pay-1", amount: 100, chargedAmount: null },
+      });
+      prisma.paymentChargeAttempt.findFirst.mockResolvedValue(attempt);
+      const errorLog = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      const warnLog = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      const r = await new PaytrReportMatchingService(
+        prisma as never,
+      ).matchStatementLines();
+      const logs = {
+        errors: errorLog.mock.calls.map((c) => String(c[0])),
+        warnings: warnLog.mock.calls.map((c) => String(c[0])),
+      };
+      errorLog.mockRestore();
+      warnLog.mockRestore();
+      return { r, prisma, ...logs };
+    }
+
+    it("matches and alarms INSTALLMENT_CARD_MISMATCH when another card family and BIN paid (no card digits logged)", async () => {
+      const { r, prisma, errors } = await run({
+        cardBrand: "BONUS",
+        maskedPan: "540667******5403",
+        feeRate: new Prisma.Decimal("8.00"),
+      });
+
+      // The money is collected and the count is right: still matched.
+      expect(r.matched).toBe(1);
+      expect(updateData(prisma, "line-1")).toEqual([
+        expect.objectContaining({ matchStatus: PaytrMatchStatus.matched }),
+      ]);
+      const alarm = errors.find((e) =>
+        e.startsWith("INSTALLMENT_CARD_MISMATCH"),
+      );
+      expect(alarm).toMatch(/line line-1 oid=ORD1 payment pay-1 attempt att-1/);
+      expect(alarm).toMatch(/family, bin differs/);
+      expect(alarm).not.toMatch(/540667|5403|454671/);
+    });
+
+    it("warns INSTALLMENT_RATE_DRIFT when the deduction rate is far from the priced one", async () => {
+      const { errors, warnings } = await run({
+        cardBrand: "WORLD",
+        maskedPan: "454671******1234",
+        feeRate: new Prisma.Decimal("9.10"),
+      });
+
+      expect(errors.filter((e) => e.includes("INSTALLMENT_"))).toEqual([]);
+      expect(warnings).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(
+            /^INSTALLMENT_RATE_DRIFT: sale line line-1 .*1\.10 points/,
+          ),
+        ]),
+      );
+    });
+
+    it("a failing card check never stops the run: the line stays matched, a warning is logged", async () => {
+      const prisma = makePrisma({
+        lines: [makeLine({ amount: 100, cardBrand: "BONUS" })],
+        payment: { id: "pay-1", amount: 100, chargedAmount: null },
+      });
+      // The amount lookup answers; the card lookup that follows fails.
+      prisma.paymentChargeAttempt.findFirst
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error("db timeout"));
+      const warnLog = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+
+      const r = await new PaytrReportMatchingService(
+        prisma as never,
+      ).matchStatementLines();
+
+      expect(r.matched).toBe(1);
+      expect(warnLog).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Installment card check failed for sale line line-1",
+        ),
+      );
+      warnLog.mockRestore();
+    });
+
+    it("does not look up the attempt for a line PayTR reports as a single payment", async () => {
+      const prisma = makePrisma({
+        lines: [makeLine({ amount: 100, installment: 0 })],
+        payment: { id: "pay-1", amount: 100, chargedAmount: null },
+      });
+
+      await new PaytrReportMatchingService(
+        prisma as never,
+      ).matchStatementLines();
+
+      // Only the amount lookup (expectedPaytrChargeFor), no card lookup.
+      expect(prisma.paymentChargeAttempt.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it("says nothing when the quoted card paid at the priced rate", async () => {
+      const { errors, warnings } = await run({
+        cardBrand: "WORLD",
+        maskedPan: "454671******1234",
+        feeRate: new Prisma.Decimal("8.00"),
+      });
+
+      expect(
+        [...errors, ...warnings].filter((e) => e.includes("INSTALLMENT_")),
+      ).toEqual([]);
+    });
   });
 
   it("selects only unmatched, unresolved lines not attempted in the last day, newest-first", async () => {

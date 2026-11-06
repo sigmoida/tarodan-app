@@ -56,6 +56,9 @@ const TABLES_TO_TRUNCATE = [
   "shipments",
   "invoices",
   "payment_holds",
+  // Installment charge attempts reference payments, rules and rate snapshots
+  // (Restrict); the TRUNCATE below ignores their row guards.
+  "payment_charge_attempts",
   "payments",
   "orders",
   "offers",
@@ -112,6 +115,8 @@ const TABLES_TO_TRUNCATE = [
   "commission_rule_shipping_shares",
   "commission_rules",
   "commission_rule_sets",
+  "installment_rules",
+  "installment_rate_snapshots",
   "tax_rules",
   "tax_rates",
   "tax_regions",

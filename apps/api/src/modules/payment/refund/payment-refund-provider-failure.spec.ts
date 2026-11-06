@@ -3,6 +3,7 @@ import {
   OrderStatus,
   PaymentStatus,
   PaytrMerchant,
+  Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
@@ -55,14 +56,21 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
       paymentId: "pay-1",
       orderId: ORDER_ID,
       idempotencyKey: `full-refund:pay-1:${ORDER_ID}`,
-      amount: PAID,
+      amount: new Prisma.Decimal(PAID),
+      installmentFeeAmount: new Prisma.Decimal(0),
       status: RefundAttemptStatus.prepared,
       providerRefundId: null,
       providerResponse: null,
     };
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
-      payment: { findUnique: jest.fn().mockResolvedValue({ metadata: {} }) },
+      payment: {
+        findUnique: jest.fn().mockResolvedValue({
+          metadata: {},
+          amount: new Prisma.Decimal(PAID),
+          installmentFeeAmount: new Prisma.Decimal(0),
+        }),
+      },
       refundAttempt: {
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn().mockResolvedValue(null),

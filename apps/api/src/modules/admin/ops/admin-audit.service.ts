@@ -6,6 +6,60 @@ import { paginate, resolveOrderBy } from "../../../common/list";
 import { IDENTITY_LOG_KEYS } from "../../../common/security/redact-sensitive";
 
 /**
+ * Lower case, alphanumerics only, so `bin_number`, `binNumber` and `BIN` hit
+ * the same entry (the matching of redact-sensitive.ts).
+ */
+const normalizeAuditKey = (key: string) =>
+  key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Keys whose values never enter an audit row (exact match after
+ * {@link normalizeAuditKey}).
+ */
+const AUDIT_SENSITIVE_KEYS = new Set(
+  [
+    // Legal identity (first and last name, TCKN) and the bank TCKN never
+    // enter an audit row as values: audit_logs is not purged, so it would
+    // become a second permanent identity store. An identity correction
+    // writes only the masked value.
+    ...IDENTITY_LOG_KEYS,
+    "password",
+    "passwordHash",
+    "passwordConfirm",
+    "newPassword",
+    "oldPassword",
+    "currentPassword",
+    "token",
+    "accessToken",
+    "refreshToken",
+    "resetToken",
+    "verifyToken",
+    "confirmToken",
+    "idToken",
+    "secret",
+    "apiKey",
+    "apiSecret",
+    "clientSecret",
+    "signingKey",
+    "creditCard",
+    "cardNumber",
+    // Card BIN / IIN: digits of the card number are never stored
+    // (docs/PCI_PAYMENT_PAGE.md). Same BIN keys as redact-sensitive.ts.
+    "bin",
+    "bin6",
+    "bin8",
+    "binNumber",
+    "cardBin",
+    "installmentBin",
+    "iin",
+    "cvv",
+    "cvc",
+    "pin",
+    "otp",
+  ].map(normalizeAuditKey),
+);
+
+/**
  * Admin audit log yazımı + sorgulama — tüm Admin* alt-servislerinin ortak
  * bağımlılığı. Kritik para/politika işlemleri createRequiredAuditLog ile
  * fail-closed çalışır; düşük riskli işlemler createAuditLog ile eski best-effort
@@ -99,37 +153,6 @@ export class AdminAuditService {
   ) {
     const adminId = await this.resolveActiveAdminId(adminUserId, db);
 
-    const sensitiveKeys = new Set([
-      // Yasal kimlik (ad, soyad, TCKN) ve banka TCKN'si denetim kaydına değer
-      // olarak girmez: audit_logs purge edilmez, ikinci bir kalıcı kimlik
-      // deposu olurdu. Kimlik düzeltmesi yalnız maskeli değeri yazar.
-      ...IDENTITY_LOG_KEYS,
-      "password",
-      "passwordHash",
-      "passwordConfirm",
-      "newPassword",
-      "oldPassword",
-      "currentPassword",
-      "token",
-      "accessToken",
-      "refreshToken",
-      "resetToken",
-      "verifyToken",
-      "confirmToken",
-      "idToken",
-      "secret",
-      "apiKey",
-      "apiSecret",
-      "clientSecret",
-      "signingKey",
-      "creditCard",
-      "cardNumber",
-      "cvv",
-      "cvc",
-      "pin",
-      "otp",
-    ]);
-
     const redactSensitive = (obj: any): any => {
       if (obj === null || obj === undefined || typeof obj !== "object") {
         return obj;
@@ -138,7 +161,9 @@ export class AdminAuditService {
       return Object.fromEntries(
         Object.entries(obj).map(([key, value]) => [
           key,
-          sensitiveKeys.has(key) ? "[GİZLİ]" : redactSensitive(value),
+          AUDIT_SENSITIVE_KEYS.has(normalizeAuditKey(key))
+            ? "[GİZLİ]"
+            : redactSensitive(value),
         ]),
       );
     };

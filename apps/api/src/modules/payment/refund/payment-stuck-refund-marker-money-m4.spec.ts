@@ -1,5 +1,6 @@
 import {
   CancellationActor,
+  Prisma,
   RefundAttemptStatus,
   RefundRequestStatus,
 } from "@prisma/client";
@@ -11,7 +12,8 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     paymentId: "pay-1",
     orderId: "order-1",
     tradeId: null,
-    amount: 50,
+    amount: new Prisma.Decimal(50),
+    installmentFeeAmount: new Prisma.Decimal(0),
     idempotencyKey: "manual-refund-1",
     status: RefundAttemptStatus.prepared,
     ...overrides,
@@ -135,6 +137,27 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       recovered: 1,
       manualReview: 0,
     });
+  });
+
+  it("recovers an installment refund with its goods part; the attempt keeps the fee share", async () => {
+    // Plan 4.4: 400.00 of goods refunded with 26.55 of vade farkı, PayTR
+    // return_amount 426.55. processRefund caps and books the goods scale;
+    // it finishes the attempt with its own PSP amount.
+    const attempt = orderAttempt({
+      amount: new Prisma.Decimal("426.55"),
+      installmentFeeAmount: new Prisma.Decimal("26.55"),
+    });
+    const { service, paymentRefund } = makeService({
+      orderAttempts: [attempt],
+    });
+
+    await service.reconcileStuckRefundMarkers();
+
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith(
+      "order-1",
+      400,
+      expect.objectContaining({ idempotencyKey: "manual-refund-1" }),
+    );
   });
 
   it("finalizes the linked refund request after attempt recovery", async () => {
