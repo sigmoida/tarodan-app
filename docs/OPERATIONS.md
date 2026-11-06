@@ -717,6 +717,13 @@ the delivered-orders backfill retry as for every document.
   GROUP BY f.id;
   ```
 
+- `cancel_reason = 'refund_cancelling'` on a `buyer_installment_fee` row: a
+  refund is cancelling the e-Arşiv (the claim keeps concurrent refund
+  events from also cutting a return). It turns into `refund` when the cancel
+  settles; the outbox retries an unknown outcome. One older than an hour:
+  check its ETTN in the eLogo portal and hand it to a developer, never clear
+  it by hand.
+
 **A payment left pending by `CHARGE_ATTEMPT_BASE_MISMATCH ... left pending`.**
 The payment's amount moved after the form was signed and PayTR collected the
 attempt's `C`, which is below the new amount: the payment is not completed

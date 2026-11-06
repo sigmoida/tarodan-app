@@ -1425,6 +1425,11 @@ as its own document, `buyer_installment_fee` (D4; §8b):
   closes the document takes the exact rest of net and VAT. A full reversal of
   an e-Arşiv within 8 days cancels it; an unsent document is repriced. Once
   the payment's whole fee went back, every package of the payment is
-  reconciled (the closing refund can carry another package's shortfall).
+  reconciled (the closing refund can carry another package's shortfall),
+  each other package only for its own shortfall.
+- **Concurrency**: the return amount is decided inside the Serializable
+  transaction that cuts it, and a cancel runs only under a claim
+  (`cancelReason = refund_cancelling`) taken where no return exists, so two
+  refund events at once never reverse the document twice.
 - Amounts: `invoicing/invoice/installment-fee-basis.ts` (pure, pinned by its
   spec); reads: `InvoiceDocumentService.resolveInstallmentFeeBasis`.
