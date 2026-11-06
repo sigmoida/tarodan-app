@@ -145,6 +145,16 @@ export class CollectionService {
   }
 
   // ==========================================================================
+  // ITEM WRITE PERMISSION (delegate -> CollectionItemsService)
+  // ==========================================================================
+  async assertCanEditItems(
+    collectionId: string,
+    userId: string,
+  ): Promise<void> {
+    return this.items.assertCanEditItems(collectionId, userId);
+  }
+
+  // ==========================================================================
   // ADD ITEM TO COLLECTION (delegate → CollectionItemsService)
   // ==========================================================================
   async addItemToCollection(

@@ -305,8 +305,11 @@ export class CollectionController {
   ): Promise<CollectionItemResponseDto> {
     let imageUrl: string | undefined;
 
-    // If image file is provided, upload it
-    if (imageFile) {
+    // A multipart image is stored only for a custom item the caller may add;
+    // the permission is checked first so a refused request uploads nothing.
+    // Sent with a productId, the image is ignored, as before.
+    if (imageFile && !dto.productId) {
+      await this.collectionService.assertCanEditItems(id, req.user.id);
       await this.moderationAi.assertImageClean(imageFile, {
         entityType: "collection",
         entityId: id,

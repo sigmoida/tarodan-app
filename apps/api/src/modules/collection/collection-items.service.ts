@@ -33,17 +33,19 @@ export class CollectionItemsService {
     private readonly storage: StorageService,
   ) {}
 
-  // ==========================================================================
-  // ADD ITEM TO COLLECTION
-  // ==========================================================================
-  async addItemToCollection(
+  /**
+   * 404 when the collection does not exist, 403 when the caller is not its
+   * owner. Every item write checks this first; the controller also calls it
+   * before storing a multipart image, so a request that will be refused
+   * uploads nothing.
+   */
+  async assertCanEditItems(
     collectionId: string,
     userId: string,
-    dto: AddCollectionItemDto,
-    imageUrl?: string,
-  ): Promise<CollectionItemResponseDto> {
+  ): Promise<void> {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
+      select: { userId: true },
     });
 
     if (!collection) {
@@ -55,6 +57,18 @@ export class CollectionItemsService {
         i18nMessage("server.collection.editForbidden"),
       );
     }
+  }
+
+  // ==========================================================================
+  // ADD ITEM TO COLLECTION
+  // ==========================================================================
+  async addItemToCollection(
+    collectionId: string,
+    userId: string,
+    dto: AddCollectionItemDto,
+    imageUrl?: string,
+  ): Promise<CollectionItemResponseDto> {
+    await this.assertCanEditItems(collectionId, userId);
 
     // Validate: either productId or customTitle must be provided
     if (!dto.productId && !dto.customTitle) {
@@ -180,19 +194,7 @@ export class CollectionItemsService {
     itemId: string,
     userId: string,
   ): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException(i18nMessage("server.collection.notFound"));
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException(
-        i18nMessage("server.collection.editForbidden"),
-      );
-    }
+    await this.assertCanEditItems(collectionId, userId);
 
     const item = await this.prisma.collectionItem.findFirst({
       where: { id: itemId, collectionId },
@@ -217,19 +219,7 @@ export class CollectionItemsService {
     userId: string,
     dto: ReorderCollectionItemsDto,
   ): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException(i18nMessage("server.collection.notFound"));
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException(
-        i18nMessage("server.collection.editForbidden"),
-      );
-    }
+    await this.assertCanEditItems(collectionId, userId);
 
     // Every update is scoped to this collection. One id that is not an item of
     // it (another collection's item, a deleted one) fails the whole request

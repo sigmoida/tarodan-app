@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { CollectionController } from "./collection.controller";
 
 /**
@@ -14,6 +14,7 @@ const PUBLIC_URL = `https://amzn-tarodan.s3.eu-west-1.amazonaws.com/prod/collect
 function makeController(uploadResult: { key: string; url?: string }) {
   const collectionService = {
     addItemToCollection: jest.fn(async () => ({ id: "item" })),
+    assertCanEditItems: jest.fn(async () => undefined),
   };
   const mediaService = { upload: jest.fn(async () => uploadResult) };
   const moderationAi = { assertImageClean: jest.fn(async () => undefined) };
@@ -97,6 +98,47 @@ describe("CollectionController.addItemToCollection: multipart image", () => {
     });
     const dto = { customTitle: "T", customImageUrl: PUBLIC_URL };
     await controller.addItemToCollection(COLLECTION, req, dto, undefined);
+    expect(mediaService.upload).not.toHaveBeenCalled();
+    expect(collectionService.addItemToCollection).toHaveBeenCalledWith(
+      COLLECTION,
+      USER,
+      dto,
+      undefined,
+    );
+  });
+});
+
+describe("CollectionController.addItemToCollection: nothing is uploaded for a refused request", () => {
+  it("checks the caller may edit the collection before moderating or uploading", async () => {
+    const { controller, collectionService, mediaService, moderationAi } =
+      makeController({ key: "k", url: PUBLIC_URL });
+    collectionService.assertCanEditItems.mockRejectedValueOnce(
+      new ForbiddenException("not yours"),
+    );
+    await expect(
+      controller.addItemToCollection(
+        COLLECTION,
+        req,
+        { customTitle: "T" },
+        file,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(collectionService.assertCanEditItems).toHaveBeenCalledWith(
+      COLLECTION,
+      USER,
+    );
+    expect(moderationAi.assertImageClean).not.toHaveBeenCalled();
+    expect(mediaService.upload).not.toHaveBeenCalled();
+    expect(collectionService.addItemToCollection).not.toHaveBeenCalled();
+  });
+
+  it("ignores the image of a listing item (productId) without uploading it", async () => {
+    const { controller, collectionService, mediaService } = makeController({
+      key: "k",
+      url: PUBLIC_URL,
+    });
+    const dto = { productId: "44444444-4444-4444-8444-444444444444" };
+    await controller.addItemToCollection(COLLECTION, req, dto, file);
     expect(mediaService.upload).not.toHaveBeenCalled();
     expect(collectionService.addItemToCollection).toHaveBeenCalledWith(
       COLLECTION,
