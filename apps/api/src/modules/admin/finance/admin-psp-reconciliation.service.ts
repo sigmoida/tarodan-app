@@ -546,18 +546,23 @@ export class AdminPspReconciliationService {
         : [],
       saleOids.length
         ? this.prisma.paymentChargeAttempt.findMany({
-            where: { merchantOid: { in: saleOids } },
+            where: {
+              merchantOid: { in: saleOids },
+              paymentId: { in: paymentIds },
+            },
             select: { merchantOid: true, paymentId: true, chargedAmount: true },
           })
         : [],
     ]);
     const paymentById = new Map(payments.map((p) => [p.id, p]));
-    // Keyed by payment too: an oid's attempt of ANOTHER payment never counts.
-    const saleAttemptKey = (paymentId: string, oid: string) =>
-      `${paymentId}:${oid}`;
-    const saleAttemptByKey = new Map(
-      saleAttempts.map((a) => [saleAttemptKey(a.paymentId, a.merchantOid), a]),
+    // merchant_oid is unique; an oid's attempt of ANOTHER payment never counts.
+    const saleAttemptByOid = new Map(
+      saleAttempts.map((a) => [a.merchantOid, a]),
     );
+    const saleAttemptOf = (paymentId: string, oid: string) => {
+      const attempt = saleAttemptByOid.get(oid);
+      return attempt?.paymentId === paymentId ? attempt : null;
+    };
     const membershipById = new Map(memberships.map((m) => [m.id, m]));
 
     return {
@@ -579,9 +584,7 @@ export class AdminPspReconciliationService {
                   row.type === PaytrStatementLineType.sale
                     ? expectedPaytrChargeOf(
                         payment,
-                        saleAttemptByKey.get(
-                          saleAttemptKey(payment.id, row.merchantOid),
-                        ) ?? null,
+                        saleAttemptOf(payment.id, row.merchantOid),
                       )
                     : null,
                 orderNumber: payment.order?.orderNumber ?? null,

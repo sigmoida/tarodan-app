@@ -604,7 +604,10 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
     );
 
     expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledWith({
-      where: { merchantOid: { in: ["OID-INST", "OID-LEGACY", "OID-FOREIGN"] } },
+      where: {
+        merchantOid: { in: ["OID-INST", "OID-LEGACY", "OID-FOREIGN"] },
+        paymentId: { in: ["pay-1"] },
+      },
       select: { merchantOid: true, paymentId: true, chargedAmount: true },
     });
     // The oid's own attempt; without one the payment's charged amount.
