@@ -1,5 +1,5 @@
 import { PayoutService } from "./payout.service";
-import { OrderStatus, PayoutStatus } from "@prisma/client";
+import { OrderStatus, PayoutStatus, Prisma } from "@prisma/client";
 
 /**
  * İade/iptalle KAPANMIŞ siparişin hold kalıntısı (satıcının kargo payı
@@ -12,7 +12,8 @@ describe("PayoutService — residual hold on a closed order", () => {
     id: "o1",
     orderNumber: "ORD1",
     status: OrderStatus.cancelled,
-    totalAmount: 500,
+    totalAmount: new Prisma.Decimal(500),
+    installmentFeeAmount: new Prisma.Decimal(0),
     commissionAmount: 40,
     withholdingTaxAmount: 0,
   };
@@ -79,7 +80,10 @@ describe("PayoutService — residual hold on a closed order", () => {
   });
 
   it.each([
-    ["the seller was at fault", [{ faultParty: "seller", policyCode: "v2_seller_x" }]],
+    [
+      "the seller was at fault",
+      [{ faultParty: "seller", policyCode: "v2_seller_x" }],
+    ],
     [
       "a legacy seller-fault policy closed it",
       [{ faultParty: null, policyCode: "seller_fault_cancellation" }],
@@ -118,9 +122,11 @@ describe("PayoutService — residual hold on a closed order", () => {
         }),
       },
       order: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ status: OrderStatus.cancelled }),
+        findUnique: jest.fn().mockResolvedValue({
+          status: OrderStatus.cancelled,
+          totalAmount: new Prisma.Decimal(500),
+          installmentFeeAmount: new Prisma.Decimal(0),
+        }),
       },
       refundRequest: {
         findMany: jest

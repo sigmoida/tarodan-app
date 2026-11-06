@@ -48,6 +48,7 @@ import {
   type TransferTotalSnapshot,
 } from "./helpers/transfer-total";
 import { payoutCompletedLedgerInput } from "./helpers/payout-ledger";
+import { orderChargedTotalOf } from "../payment/helpers/charged-amount";
 import { manualSettlementOf } from "./helpers/payout-resolution-policy";
 import type {
   PaytrPlatformTransferResult,
@@ -712,6 +713,7 @@ export class PayoutService {
                 paidAt: true,
                 createdAt: true,
                 amount: true,
+                chargedAmount: true,
                 metadata: true,
               },
             },
@@ -722,7 +724,14 @@ export class PayoutService {
             tradeId: true,
             paidAt: true,
             totalAmount: true,
-            payment: { select: { id: true, amount: true, metadata: true } },
+            payment: {
+              select: {
+                id: true,
+                amount: true,
+                chargedAmount: true,
+                metadata: true,
+              },
+            },
           },
         },
       },
@@ -755,9 +764,15 @@ export class PayoutService {
           const orderId = refundTarget.orderId;
           const order = await this.prisma.order.findUnique({
             where: { id: orderId },
-            select: { status: true, totalAmount: true },
+            select: {
+              status: true,
+              totalAmount: true,
+              installmentFeeAmount: true,
+            },
           });
-          orderTotal = order?.totalAmount;
+          // PSP scale: the order's charged slice (goods + its installment
+          // fee share), what PayTR holds for it on the oid.
+          orderTotal = order ? orderChargedTotalOf(order) : undefined;
           if (
             !order ||
             (await this.orderPayoutBlock({ id: orderId, status: order.status }))
@@ -959,6 +974,7 @@ export class PayoutService {
             ? {
                 id: payout.paymentHold.paymentId,
                 amount: holdPayment.amount,
+                chargedAmount: holdPayment.chargedAmount,
                 metadata: holdPayment.metadata,
               }
             : (tradeCash?.payment ?? null),

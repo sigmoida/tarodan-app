@@ -1,4 +1,9 @@
-import { OrderStatus, PayoutStatus, RefundAttemptStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  PayoutStatus,
+  Prisma,
+  RefundAttemptStatus,
+} from "@prisma/client";
 import { PayoutService } from "../payout.service";
 
 /**
@@ -68,7 +73,10 @@ export interface FixturePayout {
 
 interface FixturePayment {
   id: string;
+  /** Goods scale (T). */
   amount: number;
+  /** PSP scale (C = T + F); null = legacy, read as `amount`. */
+  chargedAmount: number | null;
   metadata: Record<string, unknown> | null;
   paidAt: Date;
   createdAt: Date;
@@ -104,7 +112,12 @@ export class PayoutProcessorWorld {
   holds = new Map<string, FixtureHold>();
   orders = new Map<
     string,
-    { id: string; status: OrderStatus; totalAmount: number }
+    {
+      id: string;
+      status: OrderStatus;
+      totalAmount: Prisma.Decimal;
+      installmentFeeAmount: Prisma.Decimal;
+    }
   >();
   tradeCash = new Map<string, FixtureTradeCash>();
   refundAttempts: FixtureRefundAttempt[] = [];
@@ -120,10 +133,13 @@ export class PayoutProcessorWorld {
     id: string,
     amount: number,
     metadata: Record<string, unknown> | null = null,
+    /** An installment payment's charged total C (null = paid in one). */
+    chargedAmount: number | null = null,
   ) {
     this.payments.set(id, {
       id,
       amount,
+      chargedAmount,
       metadata,
       paidAt: THREE_DAYS_AGO,
       createdAt: THREE_DAYS_AGO,
@@ -136,6 +152,8 @@ export class PayoutProcessorWorld {
     paymentId: string;
     orderId: string;
     orderTotal: number;
+    /** The order's installment fee share F_o (0 = paid in one). */
+    orderFee?: number;
     holdAmount: number;
     holdRefunded?: number;
     merchantOid: string;
@@ -147,7 +165,8 @@ export class PayoutProcessorWorld {
     this.orders.set(input.orderId, {
       id: input.orderId,
       status: OrderStatus.completed,
-      totalAmount: input.orderTotal,
+      totalAmount: new Prisma.Decimal(input.orderTotal),
+      installmentFeeAmount: new Prisma.Decimal(input.orderFee ?? 0),
     });
     this.holds.set(holdId, {
       id: holdId,

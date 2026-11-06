@@ -153,6 +153,105 @@ describe("payout transfer total_amount", () => {
     expect(100 + 70 + 80).toBeLessThanOrEqual(300 - 50);
   });
 
+  describe("an installment cart (PSP scale, ADR 0019)", () => {
+    // Plan 4.4: a 1,000.00 TL cart of two sellers paid in 3 installments,
+    // C 1,066.38, F 66.38 split 39.83 / 26.55; seller nets 540 and 360 (10 %
+    // commission), the same as paid in one.
+    const cart = (
+      refunds: Array<{ orderId: string; amount: number }> = [],
+      refundedOrders: Record<string, number> = {},
+    ) => {
+      const world = new PayoutProcessorWorld();
+      world.addPayment("grp", 1000, { refundedOrders }, 1066.38);
+      for (const refund of refunds) {
+        world.refundAttempts.push({
+          paymentId: "grp",
+          orderId: refund.orderId,
+          tradeId: null,
+          amount: refund.amount,
+          status: RefundAttemptStatus.finalized,
+        });
+      }
+      world.addOrderPayout({
+        payoutId: "pBig",
+        paymentId: "grp",
+        orderId: "oBig",
+        orderTotal: 600,
+        orderFee: 39.83,
+        holdAmount: 540,
+        merchantOid: "GRPI1",
+        transId: "PYTINSTBIG",
+      });
+      world.addOrderPayout({
+        payoutId: "pSmall",
+        paymentId: "grp",
+        orderId: "oSmall",
+        orderTotal: 400,
+        orderFee: 26.55,
+        holdAmount: 360,
+        holdRefunded: refunds.length > 0 ? 144 : 0,
+        merchantOid: "GRPI1",
+        transId: "PYTINSTSMALL",
+      });
+      return world;
+    };
+    const sentOf = (
+      calls: Array<
+        [{ transId: string; totalAmount: number; submerchantAmount: number }]
+      >,
+    ) =>
+      calls.map(([arg]) => [
+        arg.transId,
+        arg.totalAmount,
+        arg.submerchantAmount,
+      ]);
+
+    it("sends each order's charged slice as total_amount; submerchant_amount stays the goods-scale net", async () => {
+      const world = cart();
+      const { service, createPlatformTransfer } = buildPayoutProcessor(world);
+
+      await service.processPendingPayouts();
+
+      expect(sentOf(createPlatformTransfer.mock.calls)).toEqual([
+        ["PYTINSTBIG", 639.83, 540],
+        ["PYTINSTSMALL", 426.55, 360],
+      ]);
+      // The two slices take exactly what PayTR charged for the oid.
+      expect(639.83 + 426.55).toBeCloseTo(1066.38, 2);
+    });
+
+    it("AS-P5: each slice's margin (total - net) carries the order's fee share on top of the platform fees", async () => {
+      const world = cart();
+      const { service, createPlatformTransfer } = buildPayoutProcessor(world);
+
+      await service.processPendingPayouts();
+
+      const margins = createPlatformTransfer.mock.calls.map(
+        ([arg]) =>
+          Math.round((arg.totalAmount - arg.submerchantAmount) * 100) / 100,
+      );
+      // 600 - 540 = 60 of platform fees + 39.83; 400 - 360 = 40 + 26.55.
+      expect(margins).toEqual([99.83, 66.55]);
+    });
+
+    it("a partial refund (160.00 of goods + 10.62 of fee) lowers the slice by the PSP refund", async () => {
+      // 160.00 of goods refunded on the small order with 10.62 of vade farkı:
+      // PayTR return_amount 170.62; the hold lost 144 (0.4 of 360).
+      const world = cart([{ orderId: "oSmall", amount: 170.62 }], {
+        oSmall: 160,
+      });
+      const { service, createPlatformTransfer } = buildPayoutProcessor(world);
+
+      await service.processPendingPayouts();
+
+      expect(sentOf(createPlatformTransfer.mock.calls)).toEqual([
+        ["PYTINSTBIG", 639.83, 540],
+        // 426.55 - 170.62 = 255.93 left for the slice; net 360 - 144 = 216.
+        ["PYTINSTSMALL", 255.93, 216],
+      ]);
+    });
+  });
+
   it("full refund with a residual of 40 and nothing left at PayTR: no call, manual decision, no seller e-mail", async () => {
     const world = new PayoutProcessorWorld();
     world.addPayment("pay-1", 322, { refundedOrders: { o1: 322 } });
