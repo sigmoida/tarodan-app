@@ -657,7 +657,7 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
         .set(authHeader(ayse))
         .send({ productId: product.id })
         .expect(403);
-      expect(res.body.message).toBe("Bu koleksiyona ekleme yetkiniz yok");
+      expect(res.body.message).toBe("Bu koleksiyonu düzenleme yetkiniz yok");
     });
 
     scenario("COL-025", async () => {
@@ -992,12 +992,12 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
         sortOrder: 0,
       });
 
-      // (1) ayse ahmet'in item'ını ahmet'in koleksiyonundan silmeye çalışır → sahip değil → 403.
+      // (1) ayse tries to remove ahmet's item from ahmet's collection -> not the owner -> 403.
       const del = await request(server())
         .delete(`/api/collections/${ahmetCol.id}/items/${ahmetItem.id}`)
         .set(authHeader(ayse))
         .expect(403);
-      expect(del.body.message).toBe("Bu koleksiyondan silme yetkiniz yok");
+      expect(del.body.message).toBe("Bu koleksiyonu düzenleme yetkiniz yok");
 
       // (2) ayse kendi koleksiyonunda ahmet'in itemId'sini reorder'lar → sahip kontrolü geçer → yabancı item değişir.
       const ayseCol = await seedCollection({ userId: ayse.id, name: "Ayse" });

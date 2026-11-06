@@ -48,7 +48,9 @@ export class CollectionItemsService {
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyona ekleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
     }
 
     // Validate: either productId or customTitle must be provided
@@ -178,7 +180,9 @@ export class CollectionItemsService {
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyondan silme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
     }
 
     const item = await this.prisma.collectionItem.findFirst({

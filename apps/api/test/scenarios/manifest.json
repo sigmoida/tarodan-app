@@ -5827,7 +5827,7 @@
       "tur": "Yetki (Authz)",
       "pri": "P0",
       "steps": "ayse token'ı ile POST /api/collections/{ahmet'in_collId}/items body { \"productId\": ... }.",
-      "exp": "HTTP 403 \"Bu koleksiyona ekleme yetkiniz yok\" (testte 401/403/404 kabul aralığı var, gerçek davranış 403).",
+      "exp": "HTTP 403 with server.collection.editForbidden (tr \"Bu koleksiyonu düzenleme yetkiniz yok\").",
       "gap": false,
       "gapRefs": []
     },
