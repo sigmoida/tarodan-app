@@ -7,11 +7,14 @@ import { useRouter } from "@/i18n/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import type { BoostPaymentSummary } from "@tarodan/types";
+import type { PaymentsInstallmentsConfig } from "@tarodan/types";
 import {
   paymentCapabilities,
   paymentsApi,
+  reinitiatePayment,
   type PaymentConfig,
 } from "@/lib/api";
+import { INSTALLMENTS_OFF, installmentsConfigOf } from "@/lib/installments";
 import { useAuthStore } from "@/stores/authStore";
 import { hasAuthMarker } from "@/lib/authMarker";
 import { useTranslations } from "next-intl";
@@ -53,6 +56,8 @@ export function usePaymentStatus() {
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [cardStorageEnabled, setCardStorageEnabled] = useState(false);
+  const [installmentsConfig, setInstallmentsConfig] =
+    useState<PaymentsInstallmentsConfig>(INSTALLMENTS_OFF);
   const [cancelling, setCancelling] = useState(false);
   const redirectingRef = useRef(false);
 
@@ -100,6 +105,7 @@ export function usePaymentStatus() {
         paymentCapabilities(cfg, paymentPurpose(loadedKind))
           .cardStorageEnabled && !isGuest,
       );
+      setInstallmentsConfig(installmentsConfigOf(cfg));
 
       if (loadedKind === "membership" && paymentData.status === "completed") {
         redirectingRef.current = true;
@@ -205,6 +211,45 @@ export function usePaymentStatus() {
     !!directTarget.checkoutGroupId ||
     !!directTarget.tradeId;
 
+  /**
+   * `direct-form` answered 409 `paymentAmountOutOfDate` (the server message
+   * is already shown): the payment's amount no longer matches its order,
+   * cart or trade total, and reading it again cannot fix that. The payment
+   * is initiated anew once (the server resets a pending row to the current
+   * total; nothing is charged) and the page reloads, or opens the new id.
+   * A membership or boost payment starts from its own screen; a failure
+   * goes back to the purchase's list. Same flow as mobile.
+   */
+  const handlePaymentOutdated = async () => {
+    if (kind !== "checkout") {
+      redirectingRef.current = true;
+      router.push(routes.exit);
+      return;
+    }
+    let next: string | null = null;
+    try {
+      next = await reinitiatePayment(
+        directTarget,
+        isGuestCheckout || urlHasGuest(),
+      );
+    } catch {
+      next = null;
+    }
+    if (!next) {
+      redirectingRef.current = true;
+      router.push(routes.exit);
+      return;
+    }
+    if (next !== paymentId) {
+      redirectingRef.current = true;
+      router.replace(
+        `/payment/${encodeURIComponent(next)}${window.location.search}`,
+      );
+      return;
+    }
+    await fetchPayment();
+  };
+
   const guestOk = isGuestCheckout || urlHasGuest();
   const phase: Phase =
     authLoading && !guestOk
@@ -222,8 +267,10 @@ export function usePaymentStatus() {
     phase,
     payment,
     cardStorageEnabled,
+    installmentsConfig,
     cancelling,
     handleCancel,
+    handlePaymentOutdated,
     retry: fetchPayment,
     directTarget,
     hasTarget,

@@ -3,6 +3,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { InstallmentOption } from "@tarodan/types";
+import { formatPriceNumber, formatTL } from "@/lib/format";
 
 /**
  * Sipariş özeti satırları — sepet ve checkout için TEK bileşen.
@@ -16,11 +18,7 @@ import { useTranslations } from "next-intl";
  * birebir versin.
  */
 
-const fmtTL = (n: number) =>
-  n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+const fmtTL = formatPriceNumber;
 
 /**
  * `POST /orders/quote` → `pricing.summary` ile AYNI şekil.
@@ -69,10 +67,17 @@ function Line({ label, value }: { label: string; value: string }) {
 export default function OrderSummaryLines({
   amounts,
   loading,
+  installment,
   children,
 }: {
   amounts: OrderSummaryAmounts | null;
   loading?: boolean;
+  /**
+   * The chosen installment (checkout, count above 1): an installment fee
+   * line before the total, and the total becomes the option's total C. Both
+   * are the server's (`POST /payments/installment-options`).
+   */
+  installment?: InstallmentOption | null;
   /** İndirim/kupon satırları — ürün ile kargo arasına girer. */
   children?: React.ReactNode;
 }) {
@@ -123,14 +128,35 @@ export default function OrderSummaryLines({
         </div>
       ))}
 
+      {installment && (
+        <Line
+          label={t("payment.summary.installmentFee")}
+          value={
+            installment.feeAmount > 0
+              ? formatTL(installment.feeAmount)
+              : t("payment.installments.noFee")
+          }
+        />
+      )}
+
       <hr />
 
       <div className="flex justify-between text-lg">
         <span className="font-semibold">{t("checkout.total")}</span>
         <span className="font-bold text-primary-500">
-          {amount(amounts?.total)}
+          {installment && !loading
+            ? formatTL(installment.totalAmount)
+            : amount(amounts?.total)}
         </span>
       </div>
+      {installment && (
+        <p className="text-right text-xs text-muted tabular-nums">
+          {t("payment.installments.monthly", {
+            count: installment.count,
+            amount: formatTL(installment.monthlyAmount),
+          })}
+        </p>
+      )}
 
       {(amounts?.feeDiscountTotal ?? 0) > 0 && (
         <div className="flex justify-between text-sm text-success-600">

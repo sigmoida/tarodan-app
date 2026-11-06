@@ -9,6 +9,7 @@ import type { useCardPayment } from "@/hooks/useCardPayment";
 import { NEW_CARD } from "./card";
 import SavedCardList from "./SavedCardList";
 import NewCardFields from "./NewCardFields";
+import InstallmentOptions from "./InstallmentOptions";
 
 export type CardPaymentState = ReturnType<typeof useCardPayment>;
 
@@ -47,6 +48,7 @@ export default function CardPaymentSection({
     setSaveCard,
     cardStorageEnabled,
     purpose,
+    installments,
   } = card;
 
   const usingNewCard = selected === NEW_CARD;
@@ -97,6 +99,15 @@ export default function CardPaymentSection({
             onSavedCvvChange={setSavedCvv}
           />
         </div>
+      )}
+
+      {/* Below the card fields: the choice is priced for the card above. */}
+      {installments.view && (
+        <InstallmentOptions
+          view={installments.view}
+          selectedCount={installments.selectedCount}
+          onSelect={installments.select}
+        />
       )}
 
       {children}

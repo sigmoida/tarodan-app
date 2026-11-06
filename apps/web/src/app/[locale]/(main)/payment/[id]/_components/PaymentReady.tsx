@@ -3,6 +3,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { PaymentsInstallmentsConfig } from "@tarodan/types";
 import { Link } from "@/i18n/navigation";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
@@ -10,7 +11,9 @@ import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
 import CardPaymentSection from "@/components/payment/CardPaymentSection";
 import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
+import InstallmentTerms from "@/components/payment/InstallmentTerms";
 import { useCardPayment, type PaymentTarget } from "@/hooks/useCardPayment";
+import { INSTALLMENTS_OFF, installmentGateOf } from "@/lib/installments";
 import {
   paymentPurpose,
   takesDistanceSalesConsent,
@@ -29,6 +32,10 @@ interface PaymentReadyProps {
   amount?: number;
   pricing?: TradePricingLines | null;
   cardStorageEnabled?: boolean;
+  /** `GET /payments/config` installments (off when absent). */
+  installmentsConfig?: PaymentsInstallmentsConfig;
+  /** direct-form answered 409 `paymentAmountOutOfDate`: start the payment anew. */
+  onPaymentOutdated?: () => void | Promise<void>;
   hasTarget: boolean;
   onCancel: () => void;
   cancelling: boolean;
@@ -49,6 +56,8 @@ export default function PaymentReady({
   amount,
   pricing,
   cardStorageEnabled = false,
+  installmentsConfig = INSTALLMENTS_OFF,
+  onPaymentOutdated,
   hasTarget,
   onCancel,
   cancelling,
@@ -73,8 +82,22 @@ export default function PaymentReady({
     distanceSalesAccepted: needsDistanceSales
       ? distanceSalesAccepted
       : undefined,
+    // A goods payment above the minimum (D6: no trade cash, membership or
+    // boost); the options are priced for this payment.
+    installments: {
+      gate: installmentGateOf({
+        config: installmentsConfig,
+        kind,
+        amount,
+        target,
+      }),
+      minAmount: installmentsConfig.minAmount,
+      paymentId,
+      amount,
+    },
+    onPaymentOutdated: () => onPaymentOutdated?.(),
   });
-  const { processing, loadingCards, submit } = card;
+  const { processing, loadingCards, submit, installments } = card;
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -101,10 +124,17 @@ export default function PaymentReady({
 
       <div className="lg:col-span-1">
         <div className="space-y-4 lg:sticky lg:top-24">
-          <AmountSummaryCard amount={amount} pricing={pricing} />
+          <AmountSummaryCard
+            amount={amount}
+            pricing={pricing}
+            installment={installments.chosen}
+          />
 
           {hasTarget && (
             <div className="space-y-3">
+              {/* Pre-information (AS-L1): the installment terms stand next
+                  to the consent, before the buyer pays. */}
+              <InstallmentTerms option={installments.chosen} />
               {needsDistanceSales && (
                 <DistanceSalesConsent
                   checked={distanceSalesAccepted}
@@ -116,6 +146,7 @@ export default function PaymentReady({
                 disabled={
                   processing ||
                   loadingCards ||
+                  installments.pending ||
                   (needsDistanceSales && !distanceSalesAccepted)
                 }
                 isLoading={processing}

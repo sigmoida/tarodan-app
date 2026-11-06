@@ -15,7 +15,10 @@ import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { paymentCapabilities, paymentsApi } from "@/lib/api";
+import { paymentCapabilities, reinitiatePayment } from "@/lib/api";
+import { usePaymentsConfig } from "@/hooks/usePaymentsConfig";
+import { installmentGateOf, installmentsConfigOf } from "@/lib/installments";
+import { paymentPagePath } from "@/lib/paymentKind";
 import { useCart } from "@/hooks/useCart";
 import { useCartStore } from "@/stores/cartStore";
 import { useCheckoutScope } from "@/hooks/useCartSelection";
@@ -310,30 +313,44 @@ function useCheckoutValue() {
     expectedPricingHash: quote?.pricingHash ?? undefined,
   });
 
-  // Kart kasası yalnız üyede ve sunucu izin veriyorsa açıktır (misafir kart
-  // saklayamaz). Yapılandırma okunamazsa güvenli varsayılan: yeni kart.
-  const [cardStorageEnabled, setCardStorageEnabled] = useState(false);
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setCardStorageEnabled(false);
+  // The card vault is open only to a member and only when the server allows
+  // it (a guest cannot store a card). Unreadable config: the safe default,
+  // new card only and no installments.
+  const paymentsConfig = usePaymentsConfig();
+  const cardStorageEnabled =
+    isAuthenticated && !!paymentsConfig.data
+      ? paymentCapabilities(paymentsConfig.data, "checkout").cardStorageEnabled
+      : false;
+  const installmentsConfig = installmentsConfigOf(paymentsConfig.data);
+  // Installments are priced for the quote's goods total until the cart group
+  // exists, then for its payment (`useCardPayment`). After the order exists
+  // the cart is empty: the submitted snapshot keeps the amount.
+  const installmentAmount =
+    submittedView?.total ?? quote?.pricing?.totalAmount ?? undefined;
+
+  /**
+   * direct-form answered 409 `paymentAmountOutOfDate` after the cart group
+   * was created (the server message is shown): the payment is initiated anew
+   * once and the buyer continues on the payment page, which reads the
+   * current amount. A failure sends the buyer to their orders, where the
+   * payment can be completed.
+   */
+  const handlePaymentOutdated = async (resolved: ResolvedPayment) => {
+    resolvedPaymentRef.current = null;
+    let next: string | null = null;
+    try {
+      next = await reinitiatePayment(resolved.target, !isAuthenticated);
+    } catch {
+      next = null;
+    }
+    if (!next) {
+      toast.error(t("checkout.completePaymentFromOrders"));
+      router.push(isAuthenticated ? "/profile/orders" : "/");
       return;
     }
-    let alive = true;
-    paymentsApi
-      .getConfig()
-      .then((res) => {
-        if (alive)
-          setCardStorageEnabled(
-            paymentCapabilities(res.data, "checkout").cardStorageEnabled,
-          );
-      })
-      .catch(() => {
-        if (alive) setCardStorageEnabled(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [isAuthenticated]);
+    const path = paymentPagePath(next, "checkout");
+    router.push(isAuthenticated ? path : `${path}?guest=true`);
+  };
 
   // Kart formu ve ödeme aynı sayfada: kart alanları doğrulandıktan SONRA
   // `handleCheckout` siparişi oluşturur ve paymentId'yi döndürür; kart bilgisi
@@ -349,9 +366,21 @@ function useCheckoutValue() {
     purpose: "checkout",
     cardStorageEnabled,
     resolvePayment,
-    // Onay checkout'ta grupla birlikte kaydedilir; ödeme formu da taşır ki
-    // sunucu kaydı bulamazsa (ör. grup önceden oluşmuşsa) burada alsın.
+    // The consent is recorded with the group at checkout; the payment form
+    // carries it too, so the server takes it here when it finds no record
+    // (e.g. the group existed before).
     distanceSalesAccepted,
+    installments: {
+      gate: installmentGateOf({
+        config: installmentsConfig,
+        kind: "checkout",
+        amount: installmentAmount,
+        target: null,
+      }),
+      minAmount: installmentsConfig.minAmount,
+      amount: installmentAmount,
+    },
+    onPaymentOutdated: handlePaymentOutdated,
   });
 
   // Default-select an address once the list first settles (default > last), or

@@ -8,6 +8,7 @@ import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import OrderSummaryLines from "@/components/order/OrderSummaryLines";
 import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
+import InstallmentTerms from "@/components/payment/InstallmentTerms";
 import { useCheckout } from "../_context/CheckoutContext";
 import CouponBox from "../../cart/_components/CouponBox";
 
@@ -96,6 +97,9 @@ function PayAction() {
 
   return (
     <div className="mt-5 space-y-3 border-t border-border-subtle pt-5">
+      {/* Pre-information (AS-L1): the installment terms stand next to the
+          consent, before the buyer pays. */}
+      <InstallmentTerms option={card.installments.chosen} />
       <DistanceSalesConsent
         checked={distanceSalesAccepted}
         onChange={setDistanceSalesAccepted}
@@ -103,7 +107,7 @@ function PayAction() {
 
       <Button
         onClick={() => void handlePay()}
-        disabled={busy || !distanceSalesAccepted}
+        disabled={busy || card.installments.pending || !distanceSalesAccepted}
         isLoading={busy}
         size="lg"
         className="w-full"
@@ -134,6 +138,7 @@ function SummaryLines() {
     couponDiscount,
     appliedCouponCode,
     grandTotal,
+    card,
   } = useCheckout();
 
   const loading = quoteLoading || (shippingLoading && !quote);
@@ -141,7 +146,11 @@ function SummaryLines() {
   const amounts = quote?.pricing?.summary ?? null;
 
   return (
-    <OrderSummaryLines loading={loading} amounts={amounts}>
+    <OrderSummaryLines
+      loading={loading}
+      amounts={amounts}
+      installment={card.installments.chosen}
+    >
       {couponDiscount > 0 && (
         <div className="flex justify-between text-success-600">
           <span className="flex items-center gap-1">

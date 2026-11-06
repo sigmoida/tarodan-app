@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   getStatusLightGuest: vi.fn(),
   bypassComplete: vi.fn(),
   cancel: vi.fn(),
+  reinitiatePayment: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn() },
   auth: { isAuthenticated: true, isLoading: false },
 }));
@@ -34,6 +35,7 @@ vi.mock("@/stores/authStore", () => ({ useAuthStore: () => h.auth }));
 vi.mock("@/lib/authMarker", () => ({ hasAuthMarker: () => false }));
 vi.mock("@/lib/api", async () => ({
   paymentCapabilities: (await import("@/lib/api/payments")).paymentCapabilities,
+  reinitiatePayment: h.reinitiatePayment,
   paymentsApi: {
     getConfig: h.getConfig,
     getStatusLight: h.getStatusLight,
@@ -333,5 +335,87 @@ describe("usePaymentStatus load error", () => {
 
     expect(h.toast.error).toHaveBeenCalled();
     expect(h.push).toHaveBeenCalledWith(href);
+  });
+});
+
+describe("usePaymentStatus installments (ADR 0019)", () => {
+  it("reads the installment switch fail-closed from the config", async () => {
+    h.getConfig.mockResolvedValue({
+      data: { ...CONFIG, installments: { enabled: true, minAmount: 500 } },
+    });
+    await mount("", { status: "pending", orderId: "o1" });
+    expect(result.installmentsConfig).toEqual({
+      enabled: true,
+      minAmount: 500,
+    });
+  });
+
+  it("an older API or a failed config call means off", async () => {
+    await mount("", { status: "pending", orderId: "o1" });
+    expect(result.installmentsConfig.enabled).toBe(false);
+    h.getConfig.mockRejectedValue(new Error("down"));
+    act(() => root.unmount());
+    root = createRoot(container);
+    await mount("", { status: "pending", orderId: "o1" });
+    expect(result.installmentsConfig.enabled).toBe(false);
+  });
+
+  const settle = () =>
+    act(async () => {
+      for (let i = 0; i < 5; i += 1) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    });
+
+  it("amount out of date, same payment id: initiates once and reloads", async () => {
+    h.reinitiatePayment.mockResolvedValue("pay-1");
+    await mount("", { status: "pending", checkoutGroupId: "g1" });
+    h.getStatusLight.mockClear();
+
+    await act(async () => {
+      await result.handlePaymentOutdated();
+    });
+    await settle();
+
+    expect(h.reinitiatePayment).toHaveBeenCalledTimes(1);
+    expect(h.reinitiatePayment).toHaveBeenCalledWith(
+      { checkoutGroupId: "g1" },
+      false,
+    );
+    expect(h.getStatusLight).toHaveBeenCalledTimes(1);
+    expect(h.replace).not.toHaveBeenCalled();
+  });
+
+  it("a guest's new payment id opens its page, guest kept", async () => {
+    h.auth = { isAuthenticated: false, isLoading: false };
+    h.reinitiatePayment.mockResolvedValue("pay-2");
+    await mount("guest=true", { status: "pending", orderId: "o1" });
+
+    await act(async () => {
+      await result.handlePaymentOutdated();
+    });
+
+    expect(h.reinitiatePayment).toHaveBeenCalledWith({ orderId: "o1" }, true);
+    expect(h.replace).toHaveBeenCalledWith("/payment/pay-2?guest=true");
+  });
+
+  it("a failed initiate goes back to the purchase's list", async () => {
+    h.reinitiatePayment.mockRejectedValue(new Error("409"));
+    await mount("", { status: "pending", orderId: "o1" });
+
+    await act(async () => {
+      await result.handlePaymentOutdated();
+    });
+
+    expect(h.push).toHaveBeenCalledWith("/profile/orders");
+  });
+
+  it("membership or boost is not initiated here: its own screen", async () => {
+    await mount("type=boost", { status: "pending", orderId: "o1", ...BOOST });
+    await act(async () => {
+      await result.handlePaymentOutdated();
+    });
+    expect(h.reinitiatePayment).not.toHaveBeenCalled();
+    expect(h.push).toHaveBeenCalledWith("/profile/boosts");
   });
 });
