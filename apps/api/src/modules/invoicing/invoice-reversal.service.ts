@@ -553,14 +553,32 @@ export class InvoiceReversalService {
     // cuts the return, from the returns it reads there: two attempts'
     // handlers at once would otherwise both reverse the same outstanding
     // amount. Postgres aborts one of them (P2034) and the retry recomputes.
+    //
+    // The target is read again too, AFTER those returns: a return is cut
+    // only once its refund is finalized, so a target read later always
+    // includes the refund of every return the transaction sees. A target
+    // read before them could miss the refund of a return cut meanwhile and
+    // cap this attempt short for good (400 with 100 and 50 refunded ending
+    // at 300).
     const created = await this.createReturnInvoice(
       inv,
       reversalSourceId,
-      async (tx) =>
-        returnInvoiceAmountsOf({
+      async (tx) => {
+        const priorReturnTotals = await this.priorReturnTotals(
+          tx,
+          invoiceNumber,
+        );
+        const targetTotal =
+          inputs.amounts.targetTotal === null
+            ? null
+            : ((await this.invoiceDocumentNow(inv, adjustment))?.total ??
+              inputs.amounts.targetTotal);
+        return returnInvoiceAmountsOf({
           ...inputs.amounts,
-          priorReturnTotals: await this.priorReturnTotals(tx, invoiceNumber),
-        }),
+          targetTotal,
+          priorReturnTotals,
+        });
+      },
     );
     this.traceCappedReturn(inv, adjustment, inputs, created);
   }

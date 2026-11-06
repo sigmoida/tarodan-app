@@ -1151,3 +1151,31 @@ describe("legacy fee documents and strict reads", () => {
     expect(t.returns()).toHaveLength(0);
   });
 });
+
+describe("target read inside the cutting transaction", () => {
+  it("reverses both refunds in full when another refund's return lands between the target read and the cut (400 -> 250)", async () => {
+    const seed = platformSale();
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePlatformSaleInvoice("o1");
+    expect(Number(t.store.invoices[0].total)).toBe(400);
+
+    refund(seed, 100);
+    t.store.$transaction.mockImplementationOnce(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        // ra1's handler has read its target (300.00). ra2 commits now and
+        // its handler cuts its 50.00 return first.
+        refund(seed, 50);
+        await t.reversals.handleOrderRefund("o1", event("ra2", 0.125));
+        return fn(t.store);
+      },
+    );
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.25));
+
+    expect(t.returned()).toBeCloseTo(150, 2);
+    expect(Number(t.store.invoices[0].total) - t.returned()).toBeCloseTo(
+      250,
+      2,
+    );
+  });
+});
