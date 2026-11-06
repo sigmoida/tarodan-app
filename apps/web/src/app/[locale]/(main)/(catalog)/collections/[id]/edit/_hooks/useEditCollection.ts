@@ -68,7 +68,9 @@ export function useEditCollection() {
 
   const error = !collectionIdOrSlug
     ? t("collection.invalidLink")
-    : collectionQuery.isError
+    : // Only a failed first load: a failed refetch keeps the data and the form,
+      // so a refresh after an item removal cannot take away unsaved edits.
+      collectionQuery.isLoadingError
       ? (collectionQuery.error as any)?.response?.data?.message ||
         t("collection.loadFailed")
       : collection && user && collection.userId !== user.id
@@ -123,7 +125,9 @@ export function useEditCollection() {
     },
   });
 
-  const { requestRemove, removingId } = useRemoveCollectionItem(collection?.id);
+  const { requestRemove, removingIds } = useRemoveCollectionItem(
+    collection?.id,
+  );
   const items = useMemo(
     () => orderCollectionItems(collection?.items),
     [collection?.items],
@@ -132,7 +136,7 @@ export function useEditCollection() {
   return {
     items,
     requestRemove,
-    removingId,
+    removingIds,
     router,
     authLoading,
     isAuthenticated,

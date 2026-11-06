@@ -1913,6 +1913,7 @@
     "collection": "Koleksiyon",
     "removeProduct": "Ürünü kaldır",
     "untitledItem": "Adsız ürün",
+    "itemsHeaderTitle": "Koleksiyondaki Ürünler ({count})",
     "collectionsCount": "{count} koleksiyon",
     "startBuildingToday": "Koleksiyonunuzu bugün oluşturmaya başlayın",
     "membershipRequired": "Üyelik Yükseltme Gerekli",

@@ -13,8 +13,8 @@ interface CollectionItemsListProps {
   /** Every item the API returned, hidden and deleted listings included. */
   items: CollectionItem[];
   onRemove: (itemId: string) => void;
-  /** The item being removed, for its control's busy state. */
-  removingId?: string;
+  /** The items being removed, for their controls' busy state. */
+  removingIds: string[];
 }
 
 /**
@@ -25,13 +25,15 @@ interface CollectionItemsListProps {
 export default function CollectionItemsList({
   items,
   onRemove,
-  removingId,
+  removingIds,
 }: CollectionItemsListProps) {
   const t = useTranslations();
   if (items.length === 0) return null;
 
   return (
-    <SectionCard title={`${t("collection.products")} (${items.length})`}>
+    <SectionCard
+      title={t("collection.itemsHeaderTitle", { count: items.length })}
+    >
       <ul className="divide-y divide-border">
         {items.map((item) => {
           const title = itemDisplayTitle(item, t("collection.untitledItem"));
@@ -51,12 +53,12 @@ export default function CollectionItemsList({
                   <CubeIcon className="m-4 h-6 w-6 text-muted" aria-hidden />
                 )}
               </div>
-              <p className="min-w-0 flex-1 truncate text-sm text-text">
+              <p className="min-w-0 flex-1 truncate text-sm text-body">
                 {title}
               </p>
               <IconButton
                 variant="secondary"
-                disabled={removingId === item.id}
+                disabled={removingIds.includes(item.id)}
                 onClick={() => onRemove(item.id)}
                 aria-label={`${t("collection.removeItem")}: ${title}`}
                 title={t("collection.removeItem")}

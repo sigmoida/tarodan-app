@@ -34,7 +34,7 @@ export default function EditCollectionClient() {
     handleDelete,
     items,
     requestRemove,
-    removingId,
+    removingIds,
   } = useEditCollection();
 
   if (authLoading) return <AuthLoadingScreen />;
@@ -87,7 +87,7 @@ export default function EditCollectionClient() {
         <CollectionItemsList
           items={items}
           onRemove={requestRemove}
-          removingId={removingId}
+          removingIds={removingIds}
         />
       </div>
 
