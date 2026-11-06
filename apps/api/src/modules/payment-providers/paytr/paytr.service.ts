@@ -168,7 +168,6 @@ import {
   isPaytrInstallmentCount,
   parsePaytrInstallmentRates,
   parsePaytrInstallmentCount,
-  parsePaytrSingleRate,
   type PaytrBinLookupResult,
   type PaytrCardFamily,
   type PaytrInstallmentRatesResult,
@@ -817,7 +816,9 @@ export class PayTRService implements IPaymentProvider {
         );
         return { ok: false, errMsg: "request_id mismatch" };
       }
-      const { rates, ignored } = parsePaytrInstallmentRates(data.oranlar);
+      const { rates, singleRatePct, ignored } = parsePaytrInstallmentRates(
+        data.oranlar,
+      );
       if (ignored.length > 0) {
         this.logger.warn(
           `PayTR taksit-oranlari request_id=${reqId}: ${ignored.length} entries not understood: ${ignored.slice(0, 20).join(", ")}`,
@@ -829,7 +830,7 @@ export class PayTRService implements IPaymentProvider {
         maxInstallmentNonBusiness: parsePaytrInstallmentCount(
           data.max_inst_non_bus,
         ),
-        singleRatePct: parsePaytrSingleRate(data),
+        singleRatePct,
         rates,
         ignored,
         raw: data,

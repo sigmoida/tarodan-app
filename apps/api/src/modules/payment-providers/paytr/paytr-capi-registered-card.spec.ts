@@ -6,6 +6,12 @@ import { PayTRService, PayTRBuyer } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
 import { PayTRTransferService } from "./paytr-transfer.service";
+import {
+  paytrTaksitOranlariStagingBody,
+  PAYTR_STAGING_FAMILIES,
+  PAYTR_STAGING_FAMILY_RATES,
+  PAYTR_STAGING_REQUEST_ID,
+} from "../../../../test/fixtures/paytr-taksit-oranlari-staging";
 
 /**
  * PayTR Direkt API doküman uyumu:
@@ -371,12 +377,13 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       });
     });
 
-    it("does not read a single rate until its field is known (an echoed flag is not a 1% rate)", async () => {
+    it("reads the single rate only from oranlar.tumu.tek_cekim (an echoed flag is not a 1% rate)", async () => {
       answer({
         status: "success",
         request_id: "req8",
         max_inst_non_bus: 12,
         single_ratio: "1",
+        tek_cekim: "2.99",
         oranlar: { world: { "2": "5.5" } },
       });
       const r = await service.getInstallmentRates("req8", {
@@ -386,6 +393,32 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       if (!r.ok) return;
       expect(r.singleRatePct).toBeUndefined();
       expect(r.raw.single_ratio).toBe("1");
+    });
+
+    it("parses the staging capture: single rate 3.46, nine families, nothing ignored", async () => {
+      const text = paytrTaksitOranlariStagingBody();
+      fetchSpy.mockResolvedValue({ text: async () => text });
+      const warn = jest.spyOn(Logger.prototype, "warn");
+
+      const r = await service.getInstallmentRates(PAYTR_STAGING_REQUEST_ID, {
+        singleRatio: true,
+      });
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.requestId).toBe(PAYTR_STAGING_REQUEST_ID);
+      expect(r.maxInstallmentNonBusiness).toBe(12);
+      expect(r.singleRatePct).toBe("3.46");
+      expect(Object.keys(r.rates).sort()).toEqual(
+        [...PAYTR_STAGING_FAMILIES].sort(),
+      );
+      for (const family of PAYTR_STAGING_FAMILIES) {
+        expect(r.rates[family]).toEqual(PAYTR_STAGING_FAMILY_RATES);
+      }
+      expect(r.ignored).toEqual([]);
+      expect(r.raw).toEqual(JSON.parse(text));
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     it("aborts after the caller's timeout when one is given", async () => {

@@ -623,12 +623,16 @@ cleared, mobile with the selector live).
   ORDER BY fetched_at DESC LIMIT 12;
   ```
 
-- **Until the staging capture (plan S0) no snapshot is stored.** A snapshot
-  needs the single-payment rate, and the PayTR docs do not say where
-  `single_ratio=1` returns it. The capture names the field; adding it to
-  `PAYTR_SINGLE_RATE_FIELDS` (`payment-providers/paytr/paytr-installments.ts`)
-  is the one code change. Until then the cron logs "single rate missing" at
-  warn and installments stay unavailable even if switched on.
+- **A snapshot needs the single-payment rate and at least one family row.**
+  With `single_ratio=1` PayTR returns the single rate at
+  `oranlar.tumu.tek_cekim` (staging capture, plan S0; parser
+  `payment-providers/paytr/paytr-installments.ts`). An answer without a usable
+  one is not stored: the cron logs "Installment rates incomplete ... single
+  rate missing" at warn and pricing keeps the previous snapshot until it is
+  36 h old, then offers a single payment only. "entries not understood"
+  (warn) lists `oranlar` keys PayTR added or changed (key paths only); an
+  unknown card family is left out of the snapshot, so its cards get no
+  installments until the family is added to `PAYTR_CARD_FAMILIES`.
 - **BIN cache.** PayTR BIN answers are cached in Redis under
   `paytr:bin:<bin>` (success 7 days, "not defined" 1 day; errors and timeouts
   never). Deleting the keys is safe; they refill on demand.
