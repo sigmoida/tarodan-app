@@ -7214,17 +7214,15 @@
           "noPricing": "Bu ödemenin fiyatlama kaydı yok: kullanıcı grubu, kural, platform payı ve kart bilgisi gösterilemiyor.",
           "attempts": {
             "title": "Çekim denemeleri",
-            "description": "Bu ödeme için imzalanan her PayTR formu, en yenisi başta. Yalnız tahsil edilen deneme ödemeye işlenir.",
+            "description": "Bu ödeme için imzalanan her PayTR formu, en yenisi başta. Ödeme yalnız işlenen denemeden kaydedilir; tahsil edilip işlenmeyen bir deneme ikinci bir çekimdir ve ayrıca çözülmelidir.",
             "columns": {
               "oid": "PayTR sipariş no",
               "count": "Taksit",
               "charged": "Çekim tutarı",
-              "fee": "Vade farkı",
-              "status": "Durum",
               "createdAt": "Oluşturma"
             },
-            "captured": "Tahsil edildi",
-            "notCaptured": "Tahsil edilmedi"
+            "applied": "Ödemeye işlendi",
+            "capturedNotApplied": "Tahsil edildi, ödemeye işlenmedi"
           }
         }
       },

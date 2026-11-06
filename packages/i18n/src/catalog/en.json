@@ -7214,17 +7214,15 @@
           "noPricing": "This payment has no pricing record: the user group, rule, platform share and card cannot be shown.",
           "attempts": {
             "title": "Charge attempts",
-            "description": "Every PayTR form signed for this payment, newest first. Only the captured attempt is applied to the payment.",
+            "description": "Every PayTR form signed for this payment, newest first. The payment is booked from the applied attempt only; an attempt captured but not applied is a second charge to resolve separately.",
             "columns": {
               "oid": "PayTR order no",
               "count": "Installments",
               "charged": "Charged amount",
-              "fee": "Installment fee",
-              "status": "Status",
               "createdAt": "Created"
             },
-            "captured": "Captured",
-            "notCaptured": "Not captured"
+            "applied": "Applied to the payment",
+            "capturedNotApplied": "Captured, not applied"
           }
         }
       },
