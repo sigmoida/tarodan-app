@@ -27,6 +27,11 @@ import {
 import { refundInstallmentFeeOf } from "../payment/helpers/charged-amount";
 import { retryOnWriteConflict } from "./helpers/invoice-write-conflict";
 import { refundRequestIdOf } from "./helpers/refund-request-key";
+import {
+  formatInstallmentFeeCancelClaim,
+  isStaleInstallmentFeeCancelClaim,
+  parseInstallmentFeeCancelClaim,
+} from "./helpers/installment-fee-cancel-claim";
 import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
 import { tradeHandedToCargo } from "../trade/helpers/trade-handed-to-cargo";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
@@ -51,12 +56,6 @@ type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
 
 const INSTALLMENT_FEE_TYPE =
   "buyer_installment_fee" satisfies FiscalInvoiceType;
-
-/**
- * `FiscalInvoice.cancelReason` while a refund cancels an installment fee
- * e-Arşiv (shown as is in the admin detail until the cancel settles).
- */
-const INSTALLMENT_FEE_CANCEL_CLAIM = "refund_cancelling";
 
 /** The amounts of a return invoice: VAT-included total, its net, its lines. */
 interface ReturnAmounts {
@@ -326,15 +325,23 @@ export class InvoiceReversalService {
   }
 
   /**
-   * Claims the cancel of an installment fee document: in one Serializable
-   * transaction, no return exists against it and its `cancelReason` becomes
-   * the claim (a retry of an unfinished cancel may re-claim). The cancel
-   * flow then overwrites it (`refund`, cancelled or fallen back to a
-   * return). False: a return got there first, so the return path decides.
+   * Claims the cancel of an installment fee document, exclusively: in one
+   * Serializable transaction, no return exists against it and its
+   * `cancelReason` moves (compare-and-set on the value read) from nothing,
+   * or a stale claim, to this run's claim (`installment-fee-cancel-claim.ts`).
+   *
+   * - `claimed`: this run alone may call eLogo's cancel;
+   * - `busy`: another run holds a fresh claim; the caller backs off (throws,
+   *   the outbox retries) and never falls back to a return meanwhile;
+   * - `return`: a return exists, or an earlier cancel was refused
+   *   (`cancelReason = refund`), so the return path decides;
+   * - `gone`: the document is no longer standing (cancelled meanwhile).
    */
   private async claimInstallmentFeeCancel(
     inv: FiscalInvoice,
-  ): Promise<boolean> {
+  ): Promise<
+    { kind: "claimed"; claim: string } | { kind: "busy" | "return" | "gone" }
+  > {
     return retryOnWriteConflict(() =>
       this.prisma.$transaction(
         async (tx) => {
@@ -345,23 +352,153 @@ export class InvoiceReversalService {
               status: { not: "cancelled" },
             },
           });
-          if (returns > 0) return false;
-          const claimed = await tx.fiscalInvoice.updateMany({
-            where: {
-              id: inv.id,
-              status: { in: ["sent", "signed"] },
-              OR: [
-                { cancelReason: null },
-                { cancelReason: INSTALLMENT_FEE_CANCEL_CLAIM },
-              ],
-            },
-            data: { cancelReason: INSTALLMENT_FEE_CANCEL_CLAIM },
+          if (returns > 0) return { kind: "return" as const };
+          const row = await tx.fiscalInvoice.findUnique({
+            where: { id: inv.id },
+            select: { status: true, cancelReason: true },
           });
-          return claimed.count === 1;
+          if (!row || (row.status !== "sent" && row.status !== "signed")) {
+            return { kind: "gone" as const };
+          }
+          const held = parseInstallmentFeeCancelClaim(row.cancelReason);
+          if (held && !isStaleInstallmentFeeCancelClaim(held)) {
+            return { kind: "busy" as const };
+          }
+          if (row.cancelReason && !held) return { kind: "return" as const };
+          const claim = formatInstallmentFeeCancelClaim(
+            randomUUID(),
+            new Date(),
+          );
+          const taken = await tx.fiscalInvoice.updateMany({
+            // `?? null`: an undefined filter would match any value.
+            where: { id: inv.id, cancelReason: row.cancelReason ?? null },
+            data: { cancelReason: claim },
+          });
+          return taken.count === 1
+            ? { kind: "claimed" as const, claim }
+            : { kind: "busy" as const };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
     );
+  }
+
+  /**
+   * Cancels the installment fee e-Arşiv under `claim`. `cancelled`: done
+   * (also when eLogo refused but its status says cancelled). `fallback`:
+   * eLogo refused for good; the claim is released to `refund` (only if this
+   * run still holds it) and the return path reverses the document. An
+   * unknown outcome throws and leaves the claim, which goes stale and is
+   * settled from the provider's status by a later run.
+   */
+  private async cancelInstallmentFeeUnderClaim(
+    inv: FiscalInvoice & { ettn: string },
+    claim: string,
+  ): Promise<"cancelled" | "fallback"> {
+    let outcomeUnknown = false;
+    const res: EInvoiceCancelResult = await this.provider
+      .cancelEArchive({ ettn: inv.ettn, providerRef: inv.providerRef })
+      .catch((e: unknown): EInvoiceCancelResult => {
+        outcomeUnknown = true;
+        return { success: false, resultMsg: String((e as Error)?.message) };
+      });
+    if (res.success) {
+      await this.markInstallmentFeeCancelled(inv, res.resultMsg ?? null);
+      this.logger.log(`eLogo cancel ${inv.invoiceNumber}: OK`);
+      return "cancelled";
+    }
+    const status = await this.provider
+      .getStatus({ ettn: inv.ettn, providerRef: inv.providerRef }, "EARCHIVE")
+      .catch(() => null);
+    if (status?.state === "cancelled") {
+      await this.markInstallmentFeeCancelled(
+        inv,
+        status.resultMsg ?? res.resultMsg ?? null,
+      );
+      return "cancelled";
+    }
+    if (outcomeUnknown && !status) {
+      throw new Error(
+        `INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN invoice=${inv.invoiceNumber}: cancel outcome is unknown, the claim stays until it is settled`,
+      );
+    }
+    const released = await this.prisma.fiscalInvoice.updateMany({
+      where: { id: inv.id, cancelReason: claim },
+      data: {
+        cancelReason: "refund",
+        providerResultMsg: res.resultMsg ?? null,
+      },
+    });
+    if (released.count !== 1) {
+      throw new Error(
+        `INSTALLMENT_FEE_CANCEL_CLAIM_LOST invoice=${inv.invoiceNumber}: another run took the claim over`,
+      );
+    }
+    this.logger.warn(
+      `eLogo cancel refused (${inv.invoiceNumber}): ${res.resultMsg}; falling back to a return invoice`,
+    );
+    return "fallback";
+  }
+
+  private async markInstallmentFeeCancelled(
+    inv: FiscalInvoice,
+    resultMsg: string | null,
+  ): Promise<void> {
+    await this.prisma.fiscalInvoice.update({
+      where: { id: inv.id },
+      data: {
+        status: "cancelled",
+        cancelledAt: new Date(),
+        cancelReason: "refund",
+        providerResultMsg: resultMsg,
+      },
+    });
+  }
+
+  /**
+   * A claim found before deciding anything. Fresh: another run is
+   * cancelling, so back off (throw, the outbox retries). Stale: its holder
+   * died or the outcome stayed unknown; logged as an error (Sentry) and
+   * settled from the provider's status: cancelled -> marked cancelled (null
+   * returned, nothing else to do); standing -> the claim is cleared and the
+   * normal path decides again (cancel within the window, else a return);
+   * unknown -> throw, the outbox retries.
+   */
+  private async settleInstallmentFeeCancelClaim(
+    inv: FiscalInvoice & { ettn: string },
+  ): Promise<FiscalInvoice | null> {
+    const claim = parseInstallmentFeeCancelClaim(inv.cancelReason);
+    if (!claim) return inv;
+    if (!isStaleInstallmentFeeCancelClaim(claim)) {
+      throw new Error(
+        `INSTALLMENT_FEE_CANCEL_IN_PROGRESS invoice=${inv.invoiceNumber}: another run is cancelling it`,
+      );
+    }
+    this.logger.error(
+      `INSTALLMENT_FEE_CANCEL_CLAIM_STUCK invoice=${inv.invoiceNumber} claimedAt=${claim.claimedAt.toISOString()}: settling it from the provider status`,
+    );
+    const status = await this.provider
+      .getStatus({ ettn: inv.ettn, providerRef: inv.providerRef }, "EARCHIVE")
+      .catch(() => null);
+    if (status?.state === "cancelled") {
+      await this.markInstallmentFeeCancelled(inv, status.resultMsg ?? null);
+      return null;
+    }
+    if (status?.state !== "completed") {
+      throw new Error(
+        `INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN invoice=${inv.invoiceNumber}: provider status ${status?.state ?? "unavailable"}`,
+      );
+    }
+    const cleared = await this.prisma.fiscalInvoice.updateMany({
+      where: { id: inv.id, cancelReason: claim.raw },
+      data: { cancelReason: null },
+    });
+    if (cleared.count !== 1) {
+      throw new Error(
+        `INSTALLMENT_FEE_CANCEL_CLAIM_LOST invoice=${inv.invoiceNumber}: another run took the claim over`,
+      );
+    }
+    return { ...inv, cancelReason: null };
   }
 
   /** `installmentFeeReturnOf` for `inv` against the returns cut so far. */
@@ -699,9 +836,24 @@ export class InvoiceReversalService {
   }
 
   private async reverseInvoice(
-    inv: FiscalInvoice,
+    found: FiscalInvoice,
     adjustment?: ResolvedRefundAdjustment,
   ): Promise<void> {
+    if (!found.ettn || !found.invoiceNumber || !found.issuedAt) {
+      throw new Error(`Invoice ${found.id} is missing reversal identifiers`);
+    }
+    // A cancel claim on an installment fee document is settled before
+    // anything is decided from the document (fresh: back off; stale: from
+    // the provider's status). Other types never carry one.
+    const settled =
+      found.type === INSTALLMENT_FEE_TYPE
+        ? await this.settleInstallmentFeeCancelClaim({
+            ...found,
+            ettn: found.ettn,
+          })
+        : found;
+    if (!settled) return;
+    const inv = settled;
     if (!inv.ettn || !inv.invoiceNumber || !inv.issuedAt) {
       throw new Error(`Invoice ${inv.id} is missing reversal identifiers`);
     }
@@ -745,15 +897,28 @@ export class InvoiceReversalService {
       inv.documentType === "EARCHIVE" &&
       this.provider.eArchiveReversalStrategy(inv.issuedAt) === "CANCEL";
 
-    // The installment fee document is cancelled only under a claim taken in
-    // a Serializable transaction that sees no return: a concurrent handler
-    // of another attempt either aborts there (P2034) or, holding no claim,
-    // finds the claim inside its own return transaction and cuts nothing.
-    const cancel =
-      canCancel && isInstallmentFee
-        ? await this.claimInstallmentFeeCancel(inv)
-        : canCancel;
-    if (cancel) {
+    // The installment fee document is cancelled only by the run holding its
+    // exclusive claim (taken where no return exists); any other run backs
+    // off and retries, it never falls back to a return meanwhile.
+    if (isInstallmentFee && canCancel) {
+      const claim = await this.claimInstallmentFeeCancel(inv);
+      if (claim.kind === "busy") {
+        throw new Error(
+          `INSTALLMENT_FEE_CANCEL_IN_PROGRESS invoice=${inv.invoiceNumber}: another run is cancelling it`,
+        );
+      }
+      if (claim.kind === "gone") return;
+      if (
+        claim.kind === "claimed" &&
+        (await this.cancelInstallmentFeeUnderClaim(
+          { ...inv, ettn: inv.ettn },
+          claim.claim,
+        )) === "cancelled"
+      ) {
+        return;
+      }
+      // `return` or a refused cancel: the return path below decides.
+    } else if (canCancel) {
       let cancellationOutcomeUnknown = false;
       const res: EInvoiceCancelResult = await this.provider
         .cancelEArchive({ ettn: inv.ettn, providerRef: inv.providerRef })
@@ -851,14 +1016,14 @@ export class InvoiceReversalService {
             where: { id: inv.id },
             select: { status: true, cancelReason: true },
           });
-          // Being cancelled (or cancelled) by another handler: the cancel
-          // reverses everything, a return on top would reverse it twice.
-          if (
-            !original ||
-            original.status === "cancelled" ||
-            original.cancelReason === INSTALLMENT_FEE_CANCEL_CLAIM
-          ) {
-            return null;
+          // Cancelled by another run: the cancel reversed everything.
+          if (!original || original.status === "cancelled") return null;
+          // Being cancelled by another run: back off and retry later; a
+          // return now could land on top of the cancel.
+          if (parseInstallmentFeeCancelClaim(original.cancelReason)) {
+            throw new Error(
+              `INSTALLMENT_FEE_CANCEL_IN_PROGRESS invoice=${inv.invoiceNumber}: another run is cancelling it`,
+            );
           }
           const prior = await tx.fiscalInvoice.findMany({
             where: {

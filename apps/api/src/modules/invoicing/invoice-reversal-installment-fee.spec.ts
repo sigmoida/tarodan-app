@@ -1,6 +1,10 @@
 import { Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { InvoiceReversalService } from "./invoice-reversal.service";
+import {
+  formatInstallmentFeeCancelClaim,
+  INSTALLMENT_FEE_CANCEL_LEASE_MS,
+} from "./helpers/installment-fee-cancel-claim";
 import type {
   InstallmentFeeBasis,
   InvoiceDocumentService,
@@ -125,24 +129,20 @@ function makeService(
       async ({ where }: { where: Where }) =>
         store.invoices.filter((i) => matches(i, where)).length,
     ),
-    // The cancel claim: `{ id, status: { in }, OR: [{ cancelReason }] }`.
+    // Compare-and-set on `cancelReason` (the cancel claim and its release).
     updateMany: jest.fn(
       async ({
         where,
         data,
       }: {
-        where: {
-          id: string;
-          status: { in: string[] };
-          OR: Array<{ cancelReason: string | null }>;
-        };
+        where: { id: string; cancelReason?: string | null };
         data: Partial<Row>;
       }) => {
         const row = store.invoices.find(
           (i) =>
             i.id === where.id &&
-            where.status.in.includes(String(i.status)) &&
-            where.OR.some((c) => (i.cancelReason ?? null) === c.cancelReason),
+            (!("cancelReason" in where) ||
+              (i.cancelReason ?? null) === where.cancelReason),
         );
         if (!row) return { count: 0 };
         Object.assign(row, data);
@@ -658,13 +658,164 @@ describe("InvoiceReversalService: installment fee document", () => {
   it("cuts no return while another handler holds the cancel claim", async () => {
     const { service, refund, returns } = makeService({
       strategy: "CANCEL",
-      invoices: [sentFeeInvoice({ cancelReason: "refund_cancelling" })],
+      invoices: [
+        sentFeeInvoice({
+          cancelReason: formatInstallmentFeeCancelClaim(
+            "other-run",
+            new Date(),
+          ),
+        }),
+      ],
     });
 
-    await service.handleOrderRefund("o1", refund("ra1", "o1", 26.55));
-
+    // Backs off (the outbox retries) instead of cutting a return that could
+    // land on top of the other run's cancel.
+    await expect(
+      service.handleOrderRefund("o1", refund("ra1", "o1", 26.55)),
+    ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_IN_PROGRESS/);
     expect(returns()).toEqual([]);
   });
+
+  /**
+   * QA F1: the fast path and the outbox drainer handle the SAME attempt at
+   * once. The claim is exclusive per run: the second run backs off, so a
+   * refused second cancel can never turn into a return on top of the first
+   * run's cancel.
+   */
+  it("lets only one of two runs of the same attempt cancel; the other backs off", async () => {
+    const { service, refund, store, provider, returns } = makeService({
+      strategy: "CANCEL",
+    });
+    const adjustment = refund("ra1", "o1", 66.38, 1);
+    let release: () => void = () => undefined;
+    provider.cancelEArchive
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ success: true, resultMsg: "OK" });
+          }),
+      )
+      .mockImplementation(async () => ({
+        success: false,
+        resultMsg: "already being cancelled",
+      }));
+
+    const first = service.handleOrderRefund("o1", adjustment);
+    // Let the first run take the claim and wait on eLogo.
+    await new Promise((r) => setImmediate(r));
+    await expect(service.handleOrderRefund("o1", adjustment)).rejects.toThrow(
+      /INSTALLMENT_FEE_CANCEL_IN_PROGRESS/,
+    );
+    release();
+    await first;
+
+    expect(provider.cancelEArchive).toHaveBeenCalledTimes(1);
+    expect(store.invoices[0]).toMatchObject({
+      status: "cancelled",
+      cancelReason: "refund",
+    });
+    expect(returns()).toEqual([]);
+    // The retry of the backed-off run finds the document cancelled.
+    await service.handleOrderRefund("o1", adjustment);
+    expect(returns()).toEqual([]);
+  });
+
+  it("falls back to a return only in the run holding the claim, after releasing it", async () => {
+    const { service, refund, store, provider, returns } = makeService({
+      strategy: "CANCEL",
+    });
+    provider.cancelEArchive.mockResolvedValueOnce({
+      success: false,
+      resultMsg: "refused",
+    });
+    provider.getStatus.mockResolvedValueOnce({ state: "completed" } as never);
+
+    await service.handleOrderRefund("o1", refund("ra1", "o1", 66.38, 1));
+
+    expect(store.invoices[0]).toMatchObject({
+      status: "sent",
+      cancelReason: "refund",
+    });
+    expect(returns().map((r) => r.total)).toEqual([66.38]);
+  });
+
+  /**
+   * QA F2: a cancel whose outcome stayed unknown leaves the claim. A later
+   * run settles it from the provider's status instead of finding the claim
+   * and cutting nothing forever.
+   */
+  describe("a claim left by an unknown cancel outcome", () => {
+    afterEach(() => jest.useRealTimers());
+
+    async function stuck() {
+      const made = makeService({ strategy: "CANCEL" });
+      made.provider.cancelEArchive.mockImplementationOnce(async () => {
+        throw new Error("socket hang up");
+      });
+      const adjustment = made.refund("ra1", "o1", 66.38, 1);
+      await expect(
+        made.service.handleOrderRefund("o1", adjustment),
+      ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN/);
+      expect(String(made.store.invoices[0].cancelReason)).toMatch(
+        /^refund_cancelling:\d+:/,
+      );
+      // The outbox retries after the lease and the 8-day window.
+      jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+      jest.setSystemTime(Date.now() + INSTALLMENT_FEE_CANCEL_LEASE_MS + 1);
+      made.provider.eArchiveReversalStrategy.mockReturnValue("RETURN_INVOICE");
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      return { ...made, adjustment, error };
+    }
+
+    it("still reverses the document when eLogo says it stands", async () => {
+      const { service, store, provider, adjustment, returns, error } =
+        await stuck();
+      provider.getStatus.mockResolvedValueOnce({ state: "completed" } as never);
+
+      await service.handleOrderRefund("o1", adjustment);
+
+      expect(returns().map((r) => r.total)).toEqual([66.38]);
+      expect(store.invoices[0]).toMatchObject({
+        status: "sent",
+        cancelReason: null,
+      });
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/^INSTALLMENT_FEE_CANCEL_CLAIM_STUCK invoice=/),
+      );
+      error.mockRestore();
+    });
+
+    it("marks it cancelled when eLogo says the cancel went through", async () => {
+      const { service, store, provider, adjustment, returns, error } =
+        await stuck();
+      provider.getStatus.mockResolvedValueOnce({ state: "cancelled" } as never);
+
+      await service.handleOrderRefund("o1", adjustment);
+
+      expect(returns()).toEqual([]);
+      expect(store.invoices[0]).toMatchObject({
+        status: "cancelled",
+        cancelReason: "refund",
+      });
+      error.mockRestore();
+    });
+
+    it("keeps retrying while eLogo cannot tell", async () => {
+      const { service, store, adjustment, returns, error } = await stuck();
+
+      await expect(service.handleOrderRefund("o1", adjustment)).rejects.toThrow(
+        /INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN/,
+      );
+      expect(returns()).toEqual([]);
+      expect(String(store.invoices[0].cancelReason)).toMatch(
+        /^refund_cancelling:/,
+      );
+      error.mockRestore();
+    });
+  });
+
   it("cuts no return when another handler cancelled the document after it was read", async () => {
     const { service, refund, store, returns, db } = makeService();
     const transaction = db.$transaction.getMockImplementation();

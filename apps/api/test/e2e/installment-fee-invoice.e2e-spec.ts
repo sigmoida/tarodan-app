@@ -140,6 +140,13 @@ describe("installment fee document on a real database (E2E)", () => {
 
   // ── e-documents: real services, fake integrator ──────────────────────────
   const sent: FiscalDocumentInput[] = [];
+  /** eLogo's cancel answer; a test may slow it down or refuse it. */
+  const acceptCancel = async () => ({
+    success: true,
+    resultMsg: "cancelled",
+  });
+  let cancelHook: () => Promise<{ success: boolean; resultMsg?: string }> =
+    acceptCancel;
   const cancelled: string[] = [];
   const provider: EInvoiceProvider = {
     name: "elogo",
@@ -153,7 +160,7 @@ describe("installment fee document on a real database (E2E)", () => {
     getStatus: async () => ({ state: "unknown" }),
     cancelEArchive: async (ref) => {
       cancelled.push(ref.ettn);
-      return { success: true, resultMsg: "cancelled" };
+      return cancelHook();
     },
     fetchPdf: async () => null,
     // Like eLogo: a fresh e-Arşiv is cancelled, an older one gets a return.
@@ -637,7 +644,9 @@ describe("installment fee document on a real database (E2E)", () => {
 
     // Both events at once (outbox and fast path, or two workers): each one
     // decides its amount inside its Serializable transaction.
-    await Promise.all([
+    // A run that finds the other one cancelling backs off (rejects) and is
+    // retried below, as the outbox would.
+    await Promise.allSettled([
       reversals.handleOrderRefund(r1.orderId, r1),
       reversals.handleOrderRefund(r2.orderId, r2),
     ]);
@@ -663,7 +672,59 @@ describe("installment fee document on a real database (E2E)", () => {
         sum((r) => r.taxAmount),
       ]).toEqual(["39.83", "33.19", "6.64"]);
     }
-    expect(after.cancelReason).not.toBe("refund_cancelling");
+    expect(after.cancelReason ?? "").not.toMatch(/^refund_cancelling/);
+  });
+
+  it("lets only one of two runs of the same refund cancel, even when the second cancel would be refused", async () => {
+    // QA F1: the post-commit fast path and the outbox drainer handle the
+    // SAME attempt at once. eLogo answers the first cancel slowly and would
+    // refuse a second one; that refusal must never turn into a return on top
+    // of the first run's cancel.
+    const target = await singleOrder();
+    await capture(target, target.paymentId);
+    await deliver(target.orderId);
+    const doc = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+    const full = await refund(
+      target.orderId,
+      1000,
+      `e2e-a6-same:${target.paymentId}`,
+      { handle: false },
+    );
+    const before = cancelled.length;
+    let calls = 0;
+    cancelHook = async () => {
+      calls += 1;
+      if (calls === 1) {
+        await new Promise((r) => setTimeout(r, 400));
+        return { success: true, resultMsg: "cancelled" };
+      }
+      return { success: false, resultMsg: "already being cancelled" };
+    };
+    try {
+      const results = await Promise.allSettled([
+        reversals.handleOrderRefund(full.orderId, full),
+        reversals.handleOrderRefund(full.orderId, full),
+      ]);
+      expect(results.map((r) => r.status).sort()).toEqual([
+        "fulfilled",
+        "rejected",
+      ]);
+      const rejected = results.find((r) => r.status === "rejected");
+      expect(String((rejected as PromiseRejectedResult).reason)).toMatch(
+        /INSTALLMENT_FEE_CANCEL_IN_PROGRESS/,
+      );
+      // The outbox retry of the backed-off run.
+      await reversals.handleOrderRefund(full.orderId, full);
+    } finally {
+      cancelHook = acceptCancel;
+    }
+
+    const after = (await feeDocumentOf(target.packageId)) as FiscalInvoice;
+    expect([after.status, after.cancelReason]).toEqual(["cancelled", "refund"]);
+    expect(cancelled.length - before).toBe(1);
+    expect(
+      (await returnsOf(doc)).filter((r) => r.status !== "cancelled"),
+    ).toEqual([]);
   });
 
   it("issues no fee document for a single payment", async () => {
