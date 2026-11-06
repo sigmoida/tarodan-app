@@ -421,6 +421,31 @@ describe("LedgerService", () => {
       expect(b.net).toBe(0);
     });
 
+    it("a degenerate goods split still books the fee share PayTR gave back", async () => {
+      const svc = new LedgerService({} as never);
+      const tx = makeTx();
+      // Commission + stopaj eat the whole goods refund (sellerPortion <= 0):
+      // the goods part is skipped as before, the 0.66 of vade farkı is not.
+      await svc.recordRefund(tx, {
+        orderId: "o1",
+        refundAttemptId: "a1",
+        orderTotal: 10,
+        commission: 9,
+        withholdingTax: 1,
+        refundAmount: 10,
+        installmentFeeRefund: 0.66,
+      });
+      const { byAccount, net } = refundGroup(tx);
+      expect(byAccount).toEqual({
+        [LedgerAccount.refund]: [LedgerDirection.debit, 0.66],
+        [LedgerAccount.installment_fee]: [LedgerDirection.credit, 0.66],
+      });
+      expect(net).toBe(0);
+      expect(tx.ledgerEntry.createMany.mock.calls[0][0].data[0]).toMatchObject({
+        idempotencyKey: "refund:attempt:a1",
+      });
+    });
+
     it("tutar 0 / dejenere split → null (kayıt yok)", async () => {
       const svc = new LedgerService({} as any);
       const tx = makeTx();

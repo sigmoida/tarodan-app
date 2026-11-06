@@ -416,8 +416,38 @@ export class LedgerService {
     const sellerPortion = round2(
       refund - commissionPortion - withholdingPortion,
     );
-    // Degenerate (almost all commission/stopaj): skip.
-    if (sellerPortion <= 0) return null;
+    // Degenerate goods split (almost all commission/stopaj): the goods part
+    // is not booked, as before. A fee share PayTR gave back with it is still
+    // money out: it is booked on its own (refund debit / installment_fee
+    // credit) so `installment_fee` never stays earned for cash returned.
+    if (sellerPortion <= 0) {
+      if (!(feeRefund > 0)) return null;
+      return this.record(tx, {
+        eventType: LedgerEventType.refund_issued,
+        currency: input.currency,
+        idempotencyKey: input.refundAttemptId
+          ? `refund:attempt:${input.refundAttemptId}`
+          : null,
+        entries: [
+          {
+            account: LedgerAccount.refund,
+            direction: LedgerDirection.debit,
+            amount: feeRefund,
+          },
+          {
+            account: LedgerAccount.installment_fee,
+            direction: LedgerDirection.credit,
+            amount: feeRefund,
+          },
+        ],
+        refs: {
+          paymentId: input.paymentId,
+          orderId: input.orderId,
+          buyerId: input.buyerId,
+          sellerId: input.sellerId,
+        },
+      });
+    }
 
     const entries: LedgerEntryInput[] = [
       {
