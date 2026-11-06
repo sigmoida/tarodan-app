@@ -23,6 +23,35 @@ import { invoiceIssueDate, invoiceIssueTime } from "./invoice/invoice-datetime";
 import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
 import { formatInvoiceNumber } from "./invoice/document-number";
 import { DEFAULT_ELOGO_INVOICE_PREFIX } from "../../config/elogo";
+import {
+  buildPlatformSaleLines,
+  type InvoiceLineItem,
+} from "./invoice/invoice-lines";
+
+/** How the reversal reads a package's fee basis (the cut uses the defaults). */
+export interface PackageFeeBasisOptions {
+  /** The rate the document was cut with; default: today's service rate. */
+  vatRate?: number;
+  /** Refund requests to count as refunded before their `refundedAt` stamp. */
+  refundedRequestIds?: readonly string[];
+  /** Read errors propagate instead of reading as "nothing refunded". */
+  strict?: boolean;
+}
+
+/** The platform sale document of an order: what it carries and its lines. */
+export interface PlatformSaleDocument {
+  order: {
+    sellerId: string;
+    buyerId: string;
+    orderNumber: string;
+    shippingAddress: Prisma.JsonValue;
+  };
+  categoryId: string | null;
+  /** The order total less what was refunded (VAT included). */
+  netSaleAmount: number;
+  /** Empty when the product line cannot be built (single-line document). */
+  lines: InvoiceLineItem[];
+}
 
 /**
  * Faturanın GÖVDESİNİ kuran katman — InvoicingService'ten birebir taşındı.
@@ -307,21 +336,40 @@ export class InvoiceDocumentService {
    */
   private async refundedBuyerShippingForOrders(
     orderIds: string[],
+    opts: PackageFeeBasisOptions = {},
   ): Promise<number> {
-    try {
-      const rows = await this.prisma.refundFinancialComponent.findMany({
+    // A refund request's `refundedAt` is stamped AFTER its money transaction
+    // commits, so the refund's own invoice handler can run before it: the
+    // reversal names that request to count it as refunded already.
+    const refundedRequestIds = opts.refundedRequestIds ?? [];
+    const read = () =>
+      this.prisma.refundFinancialComponent.findMany({
         where: {
           componentCode: "outbound_shipping",
           treatment: "buyer_refund",
           refundRequest: {
             orderId: { in: orderIds },
-            refundedAt: { not: null },
+            ...(refundedRequestIds.length
+              ? {
+                  OR: [
+                    { refundedAt: { not: null } },
+                    { id: { in: [...refundedRequestIds] } },
+                  ],
+                }
+              : { refundedAt: { not: null } }),
           },
         },
         select: { netAmount: true },
       });
+    try {
+      const rows = await read();
       return rows.reduce((sum, row) => sum + Number(row.netAmount), 0);
-    } catch {
+    } catch (error: unknown) {
+      // The reversal reads strictly: 0 here would make the document look
+      // like it should still carry the refunded shipping, and its return
+      // would be capped away for good. The error propagates, the outbox
+      // retries.
+      if (opts.strict) throw error;
       // İade bileşenleri okunamadı — kargo matrahı iade DÜŞÜLMEDEN kesilir ve
       // fazlası iade faturasıyla dengelenir; belgeyi hiç kesmemek daha kötüdür.
       return 0;
@@ -340,7 +388,10 @@ export class InvoiceDocumentService {
    * yoktur (v2 öncesi kayıt): kalem bazlı belge üretilemez, çağıran LEGACY
    * birleşik belgeye düşer.
    */
-  async resolvePackageFeeBasis(packageId: string): Promise<{
+  async resolvePackageFeeBasis(
+    packageId: string,
+    opts: PackageFeeBasisOptions = {},
+  ): Promise<{
     sellerId: string;
     buyerId: string;
     /** Koli kodu — belgeye "Sipariş No" olarak basılır. */
@@ -381,7 +432,10 @@ export class InvoiceDocumentService {
           },
         },
       })
-      .catch(() => null);
+      .catch((error: unknown) => {
+        if (opts.strict) throw error;
+        return null;
+      });
     if (!pkg || pkg.orders.length === 0) return null;
 
     // Alıcıya GERİ VERİLMİŞ gidiş kargosu: kargo payının kesinti defterinde
@@ -393,6 +447,7 @@ export class InvoiceDocumentService {
     // siparişten doğmuş olabilir ve orada düşülürse (matrahı 0) yok olurdu.
     const refundedBuyerShipping = await this.refundedBuyerShippingForOrders(
       pkg.orders.map((o) => o.id),
+      opts,
     );
     const shippingCarrierId =
       pkg.orders.find((o) => Number(o.buyerShippingAmount ?? 0) > 0)?.id ??
@@ -439,7 +494,8 @@ export class InvoiceDocumentService {
 
     // Oran TEK kez çözülür: altı kalem de aynı hizmet KDV'sine tabidir ve kalem
     // başına ayrı okumak, ayar kesim ortasında değişirse belgeleri ayrıştırırdı.
-    const vatRate = await this.resolveVatRate("buyer_service_fee");
+    const vatRate =
+      opts.vatRate ?? (await this.resolveVatRate("buyer_service_fee"));
 
     return {
       sellerId: pkg.sellerId,
@@ -448,6 +504,91 @@ export class InvoiceDocumentService {
       componentBreakdownComplete: hasCompleteComponentBreakdown(orders),
       shippingAddress: pkg.orders[0].shippingAddress,
       documents: buildPackageFeeDocuments(orders, vatRate),
+    };
+  }
+
+  /**
+   * The platform sale document of an order (the platform sells its own
+   * product): the order total less what was refunded, and its lines. The ONE
+   * source of the cut (`InvoiceIssuingService`), the reprice of an unsent
+   * document and what a sent one should carry now (`InvoiceReversalService`).
+   *
+   * `rates` pins the VAT rates (the reversal passes the ones the document was
+   * cut with); missing ones are today's. Null when the order does not exist.
+   * Read errors propagate.
+   */
+  async resolvePlatformSaleDocument(
+    orderId: string,
+    rates: {
+      productVatRate?: number | null;
+      serviceVatRate?: number | null;
+    } = {},
+  ): Promise<PlatformSaleDocument | null> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        sellerId: true,
+        buyerId: true,
+        orderNumber: true,
+        totalAmount: true,
+        checkoutGroupId: true,
+        shippingAddress: true,
+        quantity: true,
+        subtotal: true,
+        buyerShippingAmount: true,
+        buyerFeeAmount: true,
+        product: { select: { title: true, categoryId: true } },
+      },
+    });
+    if (!order) return null;
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        OR: [
+          { orderId },
+          ...(order.checkoutGroupId
+            ? [{ checkoutGroupId: order.checkoutGroupId }]
+            : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metadata: true },
+    });
+    const refundedOrders =
+      ((payment?.metadata as Record<string, unknown> | null)?.refundedOrders as
+        Record<string, number> | undefined) ?? {};
+    const orderTotal = Number(order.totalAmount);
+    const netSaleAmount = Math.max(
+      0,
+      orderTotal - Number(refundedOrders[orderId] ?? 0),
+    );
+
+    const categoryId = order.product?.categoryId ?? null;
+    const [productVatRate, serviceVatRate] = await Promise.all([
+      rates.productVatRate ?? this.resolveVatRate("platform_sale", categoryId),
+      rates.serviceVatRate ?? this.resolveVatRate("service_fee"),
+    ]);
+    // Kısmi iadede tüm kalemler aynı oranda küçülür; belge her zaman gerçekte
+    // elde kalan tutarı gösterir.
+    const lines = buildPlatformSaleLines({
+      productName: order.product?.title ?? "",
+      quantity: Number(order.quantity ?? 1),
+      productGross: Number(order.subtotal ?? 0),
+      shippingNet: Number(order.buyerShippingAmount ?? 0),
+      buyerFeeNet: Number(order.buyerFeeAmount ?? 0),
+      productVatRate,
+      serviceVatRate,
+      ratio: orderTotal > 0 ? netSaleAmount / orderTotal : 0,
+    });
+    return {
+      order: {
+        sellerId: order.sellerId,
+        buyerId: order.buyerId,
+        orderNumber: order.orderNumber,
+        shippingAddress: order.shippingAddress,
+      },
+      categoryId,
+      netSaleAmount,
+      lines,
     };
   }
 

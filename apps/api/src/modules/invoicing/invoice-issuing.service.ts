@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { OrderStatus, type FiscalInvoiceType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
-import { buildPlatformSaleLines } from "./invoice/invoice-lines";
 import {
   LEGACY_PACKAGE_FEE_INVOICE_TYPES,
   PACKAGE_FEE_COMPONENT_BY_TYPE,
@@ -365,75 +364,30 @@ export class InvoiceIssuingService {
    * KDV'siyle) + kargo + hizmet bedeli.
    */
   async issuePlatformSaleInvoice(orderId: string): Promise<void> {
-    const order = await this.prisma.order.findUnique({
+    const seller = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: {
-        sellerId: true,
-        buyerId: true,
-        orderNumber: true,
-        totalAmount: true,
-        checkoutGroupId: true,
-        shippingAddress: true,
-        quantity: true,
-        subtotal: true,
-        buyerShippingAmount: true,
-        buyerFeeAmount: true,
-        product: { select: { title: true, categoryId: true } },
-      },
+      select: { sellerId: true },
     });
-    if (!order) return;
-    if (!(await this.isPlatformSeller(order.sellerId))) return;
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        OR: [
-          { orderId },
-          ...(order.checkoutGroupId
-            ? [{ checkoutGroupId: order.checkoutGroupId }]
-            : []),
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      select: { metadata: true },
-    });
-    const refundedOrders =
-      ((payment?.metadata as Record<string, unknown> | null)?.refundedOrders as
-        Record<string, number> | undefined) ?? {};
-    const orderTotal = Number(order.totalAmount);
-    const netSaleAmount = Math.max(
-      0,
-      orderTotal - Number(refundedOrders[orderId] ?? 0),
-    );
-
-    const categoryId = order.product?.categoryId ?? null;
-    const [productVatRate, serviceVatRate] = await Promise.all([
-      this.documents.resolveVatRate("platform_sale", categoryId),
-      this.documents.resolveVatRate("service_fee"),
-    ]);
-    // Kısmi iadede tüm kalemler aynı oranda küçülür; belge her zaman gerçekte
-    // elde kalan tutarı gösterir.
-    const lineItems = buildPlatformSaleLines({
-      productName: order.product?.title ?? "",
-      quantity: Number(order.quantity ?? 1),
-      productGross: Number(order.subtotal ?? 0),
-      shippingNet: Number(order.buyerShippingAmount ?? 0),
-      buyerFeeNet: Number(order.buyerFeeAmount ?? 0),
-      productVatRate,
-      serviceVatRate,
-      ratio: orderTotal > 0 ? netSaleAmount / orderTotal : 0,
-    });
+    if (!seller) return;
+    if (!(await this.isPlatformSeller(seller.sellerId))) return;
+    // Amounts and lines come from the one reader the reversal also uses:
+    // what a sent document should carry now is compared to the kuruş with
+    // what was cut.
+    const doc = await this.documents.resolvePlatformSaleDocument(orderId);
+    if (!doc) return;
 
     await this.delivery.cut(
       "platform_sale",
       orderId,
-      order.buyerId,
-      netSaleAmount,
+      doc.order.buyerId,
+      doc.netSaleAmount,
       {
-        guestRecipient: resolveGuestInvoiceRecipient(order.shippingAddress),
-        categoryId,
-        lineItems,
+        guestRecipient: resolveGuestInvoiceRecipient(doc.order.shippingAddress),
+        categoryId: doc.categoryId,
+        lineItems: doc.lines,
         // Ürün faturası SİPARİŞ anahtarlıdır (koli değil) — kayıt no da sipariş
         // numarasının gövdesinden türetilir.
-        sourceReference: invoiceRecordReference(order.orderNumber),
+        sourceReference: invoiceRecordReference(doc.order.orderNumber),
       },
     );
   }

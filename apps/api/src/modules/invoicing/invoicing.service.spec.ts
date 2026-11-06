@@ -65,6 +65,9 @@ function makePrisma(seed: any = {}) {
           return true;
         });
       }),
+      count: jest.fn(
+        async (args: any) => (await store.fiscalInvoice.findMany(args)).length,
+      ),
       create: jest.fn(async ({ data }: any) => {
         const rec = {
           id: `inv-${++idCounter}`,
@@ -559,6 +562,10 @@ describe("InvoicingService", () => {
       invoiceNumber: "TRD2026000000001",
       providerRef: "42",
       issuedAt: new Date(),
+      netAmount: 100,
+      taxAmount: 20,
+      total: 120,
+      vatRate: 20,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
     // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
@@ -618,10 +625,11 @@ describe("InvoicingService", () => {
       recipientUserId: "s1",
       recipientVknTckn: "11111111111",
       recipientName: "Satıcı",
-      netAmount: 100,
-      taxAmount: 20,
-      total: 120,
-      originalTotal: 120,
+      // Cut before the refund: 120 base (the ledger's commission) + 20 % VAT.
+      netAmount: 120,
+      taxAmount: 24,
+      total: 144,
+      originalTotal: 144,
       vatRate: 20,
       attemptCount: 1,
       createdAt: issuedAt,
@@ -660,7 +668,7 @@ describe("InvoicingService", () => {
     );
     expect(returns).toHaveLength(1);
     expect(returns[0].sourceId).toBe("i1:ra1");
-    // 25 matrah + %20 KDV (komisyon matrah bazlı)
+    // 30 matrah (120'nin %25'i) + %20 KDV (komisyon matrah bazlı)
     expect(Number(returns[0].total)).toBeCloseTo(36, 2);
     expect(returns[0].billingReferenceIssueDate).toEqual(issuedAt);
   });
@@ -932,6 +940,10 @@ describe("InvoicingService", () => {
       invoiceNumber: "TRD2026000000010",
       providerRef: "10",
       issuedAt: new Date(),
+      netAmount: 50,
+      taxAmount: 10,
+      total: 60,
+      vatRate: 20,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
     // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
@@ -972,6 +984,10 @@ describe("InvoicingService", () => {
       invoiceNumber: "TRD2026000000009",
       providerRef: "9",
       issuedAt: new Date(),
+      netAmount: 50,
+      taxAmount: 10,
+      total: 60,
+      vatRate: 20,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
     // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
@@ -1064,6 +1080,10 @@ describe("InvoicingService", () => {
       invoiceNumber: "TRD2026000000012",
       providerRef: "12",
       issuedAt: new Date(),
+      netAmount: 50,
+      taxAmount: 10,
+      total: 60,
+      vatRate: 20,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
     const documents = new InvoiceDocumentService(
@@ -1201,6 +1221,10 @@ describe("InvoicingService", () => {
       invoiceNumber: "TRD2026000000001",
       providerRef: "1",
       issuedAt: new Date(),
+      netAmount: 83.33,
+      taxAmount: 16.67,
+      total: 100,
+      vatRate: 20,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
     // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
