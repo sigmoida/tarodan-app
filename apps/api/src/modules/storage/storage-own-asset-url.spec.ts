@@ -69,6 +69,21 @@ describe("StorageService.ownPublicAssetKey", () => {
       expect(svc.ownPublicAssetKey(`${S3_ROOT}/${KEY}`)).toBeNull();
     });
 
+    it("a URL under a nested root when the outer root also prefix-matches", () => {
+      const svc = makeService({
+        S3_PUBLIC_BASE_URL: "https://storage.example.com",
+        S3_ENDPOINT: "https://storage.example.com",
+      });
+      expect(
+        svc.ownPublicAssetKey(
+          `https://storage.example.com/amzn-tarodan/${KEY}`,
+        ),
+      ).toBe(KEY);
+      expect(svc.ownPublicAssetKey(`https://storage.example.com/${KEY}`)).toBe(
+        KEY,
+      );
+    });
+
     it("every public bucket root", () => {
       const svc = makeService({ S3_PUBLIC_BASE_URL: S3_ROOT });
       for (const root of [

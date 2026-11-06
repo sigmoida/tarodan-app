@@ -685,10 +685,13 @@ export class StorageService implements OnModuleInit {
     if (typeof url !== "string" || url.length > MAX_OWN_ASSET_URL_LENGTH) {
       return null;
     }
+    // Roots can nest (a public base on the S3 endpoint origin and the
+    // path-style root under it), so a prefix match whose remainder is not a
+    // key moves on to the next root instead of refusing the URL.
     for (const root of this.ownPublicRoots()) {
       if (!url.startsWith(`${root}/`)) continue;
       const key = url.slice(root.length + 1);
-      return isSafePublicObjectKey(key) && sameHost(url, root) ? key : null;
+      if (isSafePublicObjectKey(key) && sameHost(url, root)) return key;
     }
     return null;
   }
