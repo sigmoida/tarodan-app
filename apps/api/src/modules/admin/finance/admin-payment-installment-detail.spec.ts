@@ -142,6 +142,7 @@ describe("AdminPaymentService.getPaymentById installment block", () => {
           chargedAmount: 1062.4,
           installmentFeeAmount: 62.4,
           capturedAt: "2026-11-01T10:05:00.000Z",
+          applied: true,
           createdAt: "2026-11-01T10:03:00.000Z",
         },
         {
@@ -151,6 +152,7 @@ describe("AdminPaymentService.getPaymentById installment block", () => {
           chargedAmount: 1000,
           installmentFeeAmount: 0,
           capturedAt: null,
+          applied: false,
           createdAt: "2026-11-01T10:00:00.000Z",
         },
       ],
@@ -194,6 +196,36 @@ describe("AdminPaymentService.getPaymentById installment block", () => {
       businessCard: null,
     });
     expect(result.installment.installmentFeeAmount).toBe(20);
+  });
+
+  it("marks only the attempt the payment is booked from as applied, not a second captured charge", async () => {
+    const attempt = (id: string) => ({
+      id,
+      merchantOid: `OID-${id}`,
+      installmentCount: 1,
+      chargedAmount: D("500.00"),
+      installmentFeeAmount: D("0"),
+      capturedAt: new Date("2026-11-01T10:05:00.000Z"),
+      createdAt: new Date("2026-11-01T10:00:00.000Z"),
+    });
+    const { svc } = makeService({
+      ...basePayment,
+      amount: D("500.00"),
+      chargedAmount: D("500.00"),
+      installmentCount: 1,
+      chargeAttemptId: "att-booked",
+      chargeAttempt: null,
+      chargeAttempts: [attempt("att-late"), attempt("att-booked")],
+    });
+
+    const result = await svc.getPaymentById("pay-1");
+
+    expect(
+      result.installment.chargeAttempts.map((a) => [a.id, a.applied]),
+    ).toEqual([
+      ["att-late", false],
+      ["att-booked", true],
+    ]);
   });
 
   it("selects the attempts explicitly (no BIN, no saved card) and narrows the order parties", async () => {

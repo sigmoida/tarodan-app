@@ -50,7 +50,7 @@ type AdminPaymentInstallmentRow = Prisma.PaymentGetPayload<{
 /** What the mapper reads; the relations are optional for partial reads. */
 export type AdminPaymentInstallmentSource = Pick<
   AdminPaymentInstallmentRow,
-  "amount" | "chargedAmount" | "installmentCount"
+  "amount" | "chargedAmount" | "installmentCount" | "chargeAttemptId"
 > & {
   chargeAttempt?: AdminPaymentInstallmentRow["chargeAttempt"];
   chargeAttempts?: AdminPaymentInstallmentRow["chargeAttempts"];
@@ -88,6 +88,7 @@ function pricingOf(
 
 function attemptOf(
   attempt: AdminPaymentInstallmentRow["chargeAttempts"][number],
+  appliedId: string | null,
 ): AdminPaymentChargeAttempt {
   return {
     id: attempt.id,
@@ -96,6 +97,7 @@ function attemptOf(
     chargedAmount: Number(attempt.chargedAmount),
     installmentFeeAmount: Number(attempt.installmentFeeAmount),
     capturedAt: toIso(attempt.capturedAt),
+    applied: appliedId !== null && attempt.id === appliedId,
     createdAt: toIso(attempt.createdAt) as string,
   };
 }
@@ -115,6 +117,8 @@ export function adminPaymentInstallmentOf(
     installmentFeeAmount: fields.installmentFeeAmount ?? 0,
     chargedAmount: fields.chargedAmount ?? Number(payment.amount),
     pricing: payment.chargeAttempt ? pricingOf(payment.chargeAttempt) : null,
-    chargeAttempts: (payment.chargeAttempts ?? []).map(attemptOf),
+    chargeAttempts: (payment.chargeAttempts ?? []).map((attempt) =>
+      attemptOf(attempt, payment.chargeAttemptId ?? null),
+    ),
   };
 }

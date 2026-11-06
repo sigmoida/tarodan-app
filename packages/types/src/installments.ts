@@ -519,6 +519,11 @@ export interface AdminPaymentChargeAttempt {
   installmentFeeAmount: number;
   /** When PayTR's charge of this oid was captured; null = never captured. */
   capturedAt: string | null;
+  /**
+   * The attempt the payment is booked from (`Payment.chargeAttemptId`). A
+   * captured attempt that is not applied is a second charge to resolve.
+   */
+  applied: boolean;
   createdAt: string;
 }
 
