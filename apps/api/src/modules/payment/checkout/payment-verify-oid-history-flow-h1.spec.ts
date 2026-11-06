@@ -1,5 +1,5 @@
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
-import { PaymentStatus, PaytrMerchant } from "@prisma/client";
+import { PaymentStatus, PaytrMerchant, Prisma } from "@prisma/client";
 
 /**
  * FLOW-H1: verifyPaymentFromClient (çift-çekim guard'ı) artık TÜM oid'leri tarar
@@ -11,6 +11,10 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
     queryImpl: (oid: string) => any,
     oids = ["oid2", "oid1"],
     paytrMerchant: PaytrMerchant = PaytrMerchant.marketplace,
+    attempts: Array<{
+      merchantOid: string;
+      chargedAmount: Prisma.Decimal;
+    }> = [],
   ) => {
     const payment = {
       id: "pay-1",
@@ -24,10 +28,11 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
       tradeCashPayment: null,
     };
     const prisma = {
-      // Forms signed before charge attempts: every oid falls back to `amount`.
+      // Without attempts (forms signed before them) every oid falls back
+      // to `amount`.
       paymentChargeAttempt: {
         findFirst: jest.fn().mockResolvedValue(null),
-        findMany: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue(attempts),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       payment: { findUnique: jest.fn().mockResolvedValue(payment) },
@@ -136,5 +141,61 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
     expect(res.completed).toBe(false);
     expect(res.status).toBe("amount_mismatch");
     expect(processSuccessfulPayment).not.toHaveBeenCalled();
+  });
+
+  describe("installment oids (ADR 0019, PSP scale)", () => {
+    // oid1 was signed for 3 installments: PayTR charged C = 106.64, T = 100.
+    const attempts = [
+      { merchantOid: "oid1", chargedAmount: new Prisma.Decimal("106.64") },
+      { merchantOid: "oid2", chargedAmount: new Prisma.Decimal("100.00") },
+    ];
+    const paidAt = (paymentTotalTl: number) => (oid: string) =>
+      oid === "oid1"
+        ? {
+            ok: true,
+            paymentTotalTl,
+            paymentDate: "2026-11-06",
+            paymentType: "card",
+            installmentCount: 3,
+            currency: "TL",
+          }
+        : { ok: false };
+
+    it("finds an installment form paid at its C, so the next form is never charged again", async () => {
+      const { service, processSuccessfulPayment } = makeService(
+        paidAt(106.64),
+        ["oid2", "oid1"],
+        PaytrMerchant.marketplace,
+        attempts,
+      );
+
+      const res = await service.verifyPaymentFromClient("pay-1", {
+        internal: true,
+      });
+
+      expect(res).toEqual({ completed: true, status: "completed_now" });
+      expect(processSuccessfulPayment).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining("oid1"),
+        "oid1",
+        { paymentType: "card", installmentCount: 3, currency: "TL" },
+      );
+    });
+
+    it("does not complete an installment oid PayTR reports at T", async () => {
+      const { service, processSuccessfulPayment } = makeService(
+        paidAt(100),
+        ["oid2", "oid1"],
+        PaytrMerchant.marketplace,
+        attempts,
+      );
+
+      const res = await service.verifyPaymentFromClient("pay-1", {
+        internal: true,
+      });
+
+      expect(res).toEqual({ completed: false, status: "amount_mismatch" });
+      expect(processSuccessfulPayment).not.toHaveBeenCalled();
+    });
   });
 });

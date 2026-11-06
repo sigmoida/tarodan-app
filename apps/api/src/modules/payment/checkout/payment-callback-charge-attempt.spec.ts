@@ -70,7 +70,8 @@ function signedCallback(oid: string, totalKurus: string) {
   return { ...body, hash, payment_type: "card" };
 }
 
-function setup() {
+function setup(opts: { payment?: typeof payment } = {}) {
+  const target = opts.payment ?? payment;
   const config = {
     get: (key: string, fallback?: string) => ENV[key] ?? fallback,
   } as unknown as ConfigService;
@@ -100,7 +101,7 @@ function setup() {
       findFirst: jest.fn(
         async ({ where }: { where: Record<string, unknown> }) =>
           // Current oid by providerConversationId, an older one by history.
-          where.OR || where.metadata ? payment : null,
+          where.OR || where.metadata ? target : null,
       ),
     },
     membershipPayment: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -108,6 +109,11 @@ function setup() {
   const fulfillment = {
     processSuccessfulPayment: jest.fn().mockResolvedValue(true),
     processFailedPayment: jest.fn(),
+  };
+  // Hash-mismatch inquiry throttle (first call in the window).
+  const cache = {
+    incr: jest.fn().mockResolvedValue(1),
+    set: jest.fn().mockResolvedValue(undefined),
   };
   const svc = new PaymentCallbackService(
     prisma as never,
@@ -117,10 +123,10 @@ function setup() {
     fulfillment as never,
     { syncSavedCardsFromUtoken: jest.fn() } as never,
     { record: jest.fn().mockResolvedValue(undefined) } as never,
-    {} as never,
+    cache as never,
     {} as never,
   );
-  return { svc, fulfillment, prisma };
+  return { svc, fulfillment, prisma, paytr };
 }
 
 describe("PaymentCallbackService: the amount of the oid's charge attempt", () => {
@@ -188,5 +194,59 @@ describe("PaymentCallbackService: the amount of the oid's charge attempt", () =>
     await svc.handlePayTRCallback(signedCallback(NEW_OID, "100000"));
 
     expect(fulfillment.processSuccessfulPayment).toHaveBeenCalledTimes(1);
+  });
+
+  describe("hash mismatch recovery (durum-sorgu)", () => {
+    // A forged or garbled callback is never trusted: the service asks PayTR
+    // about the payment's CURRENT oid and completes only when PayTR's amount
+    // matches what that oid was signed for.
+    const current = {
+      ...payment,
+      providerConversationId: OLD_OID,
+      metadata: { merchantOidHistory: [] },
+    };
+    const badHash = { ...signedCallback(OLD_OID, "106638"), hash: "forged" };
+    const inquiryOf = (paymentTotalTl: number) => ({
+      ok: true as const,
+      paymentTotalTl,
+      paymentAmountTl: paymentTotalTl,
+      paymentDate: "2026-11-06 10:00:00",
+      paymentType: "card",
+      installmentCount: 3,
+      currency: "TL",
+    });
+
+    it("completes an installment oid PayTR reports at its signed C", async () => {
+      const { svc, fulfillment, paytr } = setup({ payment: current });
+      const query = jest
+        .spyOn(paytr, "queryPaymentStatus")
+        .mockResolvedValue(inquiryOf(1066.38) as never);
+
+      await expect(svc.handlePayTRCallback(badHash)).resolves.toBe("OK");
+
+      expect(query).toHaveBeenCalledWith(OLD_OID);
+      expect(fulfillment.processSuccessfulPayment).toHaveBeenCalledWith(
+        current,
+        expect.stringContaining(OLD_OID),
+        OLD_OID,
+        expect.objectContaining({ installmentCount: 3 }),
+      );
+    });
+
+    it("does not complete an installment oid PayTR reports at T", async () => {
+      const { svc, fulfillment, paytr } = setup({ payment: current });
+      jest
+        .spyOn(paytr, "queryPaymentStatus")
+        .mockResolvedValue(inquiryOf(1000) as never);
+
+      await svc.handlePayTRCallback(badHash);
+
+      expect(fulfillment.processSuccessfulPayment).not.toHaveBeenCalled();
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "PayTR hash mismatch: amount mismatch payment=pay-1",
+        ),
+      );
+    });
   });
 });

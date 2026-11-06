@@ -212,6 +212,29 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
     expect(day.tolerance).toBe(0.05);
   });
 
+  it("sums an installment payment at what PayTR charged (C), not its goods total (ADR 0019)", async () => {
+    const prisma = makePrisma({
+      lines: [SALE({ amount: 1066.38 })],
+      payments: [
+        {
+          id: "pay-3x",
+          amount: 1000,
+          chargedAmount: 1066.38,
+          paidAt: new Date("2026-07-31T10:00:00Z"),
+          providerConversationId: "ORD1",
+          status: PaymentStatus.completed,
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getReconciliationSummary(7);
+    const day = result.days.find((d) => d.date === "2026-07-31");
+
+    expect(day?.ours).toMatchObject({ salesCount: 1, salesTotal: 1066.38 });
+    expect(day?.salesDiff).toBeCloseTo(0);
+  });
+
   it("counts a payment as missing only when ITS merchant's statement covers the day", async () => {
     // Yalnız pazaryeri dökümü gelmiş: üyelik mağazasında alınan ödeme ve
     // yenileme "dökümde yok" sayılmaz (o mağazanın raporu henüz yok).

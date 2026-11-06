@@ -1,5 +1,5 @@
 import { PspReconciliationService } from "../reconciliation/psp-reconciliation.service";
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, Prisma } from "@prisma/client";
 
 /**
  * FLOW-M3 (2.1): detectOrphanCapturedFailedPayments — `failed` işaretli ama PayTR'da
@@ -12,12 +12,14 @@ describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M
     query: (oid: string) => any;
     full: any;
     casCount?: number;
+    attempts?: Array<{ merchantOid: string; chargedAmount: Prisma.Decimal }>;
   }) => {
     const prisma = {
-      // Forms signed before charge attempts: every oid falls back to `amount`.
+      // Without attempts (forms signed before them) every oid falls back
+      // to `amount`.
       paymentChargeAttempt: {
         findFirst: jest.fn().mockResolvedValue(null),
-        findMany: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue(opts.attempts ?? []),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       payment: {
@@ -149,5 +151,64 @@ describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M
 
     expect(res.checked).toBe(0);
     expect(prisma.payment.findUnique).not.toHaveBeenCalled();
+  });
+
+  describe("installment oids (ADR 0019, PSP scale)", () => {
+    // oid1 was signed for 3 installments: PayTR charged C = 106.64, T = 100.
+    const attempts = [
+      { merchantOid: "oid1", chargedAmount: new Prisma.Decimal("106.64") },
+    ];
+    const payable = {
+      orderId: "o1",
+      order: {
+        status: "pending_payment",
+        buyer: {},
+        seller: {},
+        product: {},
+      },
+      checkoutGroup: null,
+    };
+    const charged = (paymentTotalTl: number) => () => ({
+      ok: true,
+      paymentTotalTl,
+      paymentDate: "x",
+      paymentType: "card",
+      installmentCount: 3,
+      currency: "TL",
+    });
+
+    it("recovers an orphan installment capture at the C its oid was signed for", async () => {
+      const { service, processSuccessfulPayment } = makeService({
+        candidate,
+        query: charged(106.64),
+        full: payable,
+        attempts,
+      });
+
+      const res = await service.detectOrphanCapturedFailedPayments();
+
+      expect(processSuccessfulPayment).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining("oid1"),
+        "oid1",
+        { paymentType: "card", installmentCount: 3, currency: "TL" },
+      );
+      expect(res).toEqual({ checked: 1, recovered: 1, alarms: 0 });
+    });
+
+    it("leaves an installment oid PayTR reports at T alone", async () => {
+      const { service, prisma, processSuccessfulPayment } = makeService({
+        candidate,
+        query: charged(100),
+        full: payable,
+        attempts,
+      });
+
+      const res = await service.detectOrphanCapturedFailedPayments();
+
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+      expect(processSuccessfulPayment).not.toHaveBeenCalled();
+      expect(res).toEqual({ checked: 1, recovered: 0, alarms: 0 });
+    });
   });
 });
