@@ -66,7 +66,7 @@ function sentFeeInvoice(over: Record<string, any> = {}): Record<string, any> {
 
 function makeService(
   initial: Partial<Store> & {
-    strategy?: "CANCEL" | "RETURN";
+    strategy?: "CANCEL" | "RETURN_INVOICE";
     orderPackage?: Record<string, string>;
   } = {},
 ) {
@@ -169,7 +169,9 @@ function makeService(
   };
   const provider = {
     name: "elogo",
-    eArchiveReversalStrategy: jest.fn(() => initial.strategy ?? "RETURN"),
+    eArchiveReversalStrategy: jest.fn(
+      () => initial.strategy ?? "RETURN_INVOICE",
+    ),
     cancelEArchive: jest.fn(async () => ({ success: true, resultMsg: "OK" })),
     getStatus: jest.fn(async () => null),
   };
