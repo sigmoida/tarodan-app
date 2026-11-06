@@ -646,6 +646,40 @@ describe("InvoiceReversalService: installment fee document", () => {
     expect(provider.cancelEArchive).not.toHaveBeenCalled();
   });
 
+  it("reverses a document repriced while unsent only for the refunds after it: 39.83 -> 26.55 -> 0", async () => {
+    const { service, refund, returns, store, provider } = makeService({
+      strategy: "CANCEL",
+      invoices: [
+        sentFeeInvoice({
+          issuedAt: new Date(),
+          netAmount: D("33.19"),
+          taxAmount: D("6.64"),
+          total: D("39.83"),
+          originalTotal: D("39.83"),
+        }),
+      ],
+    });
+    // The unsent reprice of this refund stamped it; the stamp skips nothing.
+    const stamped = refund("ra1", "o1", 26.55);
+    store.invoices[0].refundAdjustedAt = store.attempts.ra1.finalizedAt;
+
+    await service.handleOrderRefund("o1", stamped);
+    expect(returns()).toEqual([]);
+
+    const later = refund("ra2", "o1", 13.28);
+    await service.handleOrderRefund("o1", later);
+    await service.handleOrderRefund("o1", stamped);
+    await service.handleOrderRefund("o1", later);
+    expect(returns().map((r) => r.total)).toEqual([13.28]);
+
+    await service.handleOrderRefund("o1", refund("ra3", "o1", 26.55));
+
+    expect(returns().map((r) => r.total)).toEqual([13.28, 26.55]);
+    expect(returns().reduce((sum, r) => sum + r.net, 0)).toBeCloseTo(33.19, 2);
+    expect(returns().reduce((sum, r) => sum + r.tax, 0)).toBeCloseTo(6.64, 2);
+    expect(provider.cancelEArchive).not.toHaveBeenCalled();
+  });
+
   it("logs a refund whose whole share was capped away", async () => {
     const { service, refund } = makeService({
       invoices: [
@@ -975,6 +1009,90 @@ describe("InvoiceReversalService: installment fee document", () => {
     ).rejects.toThrow(/INVOICE_CANCEL_CLAIM_LOST/);
     expect(returns()).toEqual([]);
   });
+
+  describe("a cancel call that fails in transport", () => {
+    const fails = async () => {
+      throw new Error("socket hang up");
+    };
+
+    it("falls back to a return only when eLogo shows the document standing", async () => {
+      const { service, refund, store, returns, provider } = makeService({
+        strategy: "CANCEL",
+      });
+      provider.cancelEArchive.mockImplementationOnce(fails);
+      provider.getStatus.mockResolvedValueOnce({ state: "completed" } as never);
+
+      await service.handleOrderRefund("o1", refund("ra1", "o1", 66.38, 1));
+
+      expect(store.invoices[0]).toMatchObject({
+        status: "sent",
+        cancelReason: "refund",
+      });
+      expect(returns().map((r) => [r.total, r.net, r.tax])).toEqual([
+        [66.38, 55.32, 11.06],
+      ]);
+    });
+
+    it.each(["processing", "unknown", "failed"])(
+      "keeps the claim and cuts no return while eLogo answers %s",
+      async (state) => {
+        const { service, refund, store, returns, provider } = makeService({
+          strategy: "CANCEL",
+        });
+        provider.cancelEArchive.mockImplementationOnce(fails);
+        provider.getStatus.mockResolvedValueOnce({ state } as never);
+
+        await expect(
+          service.handleOrderRefund("o1", refund("ra1", "o1", 66.38, 1)),
+        ).rejects.toThrow(/INVOICE_CANCEL_OUTCOME_UNKNOWN/);
+
+        expect(returns()).toEqual([]);
+        expect(store.invoices[0].status).toBe("sent");
+        expect(String(store.invoices[0].cancelReason)).toMatch(
+          /^refund_cancelling:\d+:/,
+        );
+      },
+    );
+  });
+
+  it.each([
+    ["the cancel call", { success: true, resultMsg: "OK" }, null],
+    [
+      "the status after a refused call",
+      { success: false, resultMsg: "refused" },
+      { state: "cancelled", resultMsg: "cancelled" },
+    ],
+  ])(
+    "marks the document cancelled and raises the alarm when %s confirms it after the claim was lost",
+    async (_name, answer, status) => {
+      const { service, refund, store, returns, provider } = makeService({
+        strategy: "CANCEL",
+      });
+      provider.cancelEArchive.mockImplementationOnce(async () => {
+        store.invoices[0].cancelReason = formatInvoiceCancelClaim(
+          "other-run",
+          new Date(),
+        );
+        return answer as never;
+      });
+      if (status) provider.getStatus.mockResolvedValueOnce(status as never);
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+
+      await service.handleOrderRefund("o1", refund("ra1", "o1", 66.38, 1));
+
+      expect(store.invoices[0]).toMatchObject({
+        status: "cancelled",
+        cancelReason: "refund",
+      });
+      expect(returns()).toEqual([]);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/^INVOICE_CANCEL_CLAIM_LOST invoice=/),
+      );
+      error.mockRestore();
+    },
+  );
 
   it("cuts no return when another handler cancelled the document after it was read", async () => {
     const { service, refund, store, returns, db } = makeService();
