@@ -74,13 +74,14 @@ type CancellationOrder = Prisma.OrderGetPayload<{
 }>;
 
 /**
- * İade talebinin DOĞUŞU — RefundService'ten birebir taşındı. Bir talebin hangi
- * yoldan açılacağına siparişin fazı karar verir (classifyOrderPhase): henüz
- * yola çıkmamış sipariş anında iade edilir, cayma penceresindeki sipariş fiziksel
- * dönüş bekler, penceresi geçmiş sipariş admin incelemesine düşer.
+ * The BIRTH of a refund request, moved as-is from RefundService. The order's
+ * phase decides the path (classifyOrderPhase): an order not yet handed to the
+ * carrier is refunded instantly, an order inside the return window waits for
+ * the physical return, and an order past the window is refused (no request
+ * is opened).
  *
- * Üç yol da AYNI finansal servisten hesap alır; buradaki fark yalnız hangi
- * durumla başlanacağı ve iade kargosunun ne zaman açılacağıdır.
+ * Both open paths take their figures from the SAME financial service; they
+ * differ only in the starting status and when the return shipment opens.
  */
 @Injectable()
 export class RefundCreationService {
@@ -99,10 +100,11 @@ export class RefundCreationService {
     requesterId: string,
     dto: CreateRefundRequestDto,
   ) {
-    // KOŞULSUZ 14 GÜN İADE (Mesafeli Satış cayma hakkı): teslimden sonraki 14 gün
-    // içinde sebep belirtmeden (changed_mind dahil) ve kanıt fotoğrafı olmadan iade
-    // edilebilir. changed_mind reddi KALDIRILDI; sebep/foto zorunluluğu yalnızca
-    // 14 gün GEÇTİKTEN sonra (past_cooling_off) uygulanır.
+    // Distance-sales right of withdrawal: inside the return window the buyer
+    // may return without a reason (`changed_mind`) and without a photo; a
+    // fault claim (damaged, wrong item, ...) needs evidence. After the window
+    // no request can be opened at all, so the window check runs before the
+    // evidence rule (decision order: order and payment state, phase, evidence).
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -177,24 +179,46 @@ export class RefundCreationService {
       orderQty,
     );
 
-    // Cayma penceresi: teslimde damgalanan sonu (`returnWindowEndsAt`) varsa o
-    // geçerlidir — escrow ödemesi de aynı damgadan hesaplanır. Bugünkü değer
-    // (Süreler ve Kurallar → returnWindowDays) yalnız damgasız eski siparişte
-    // kullanılır.
+    // Return window: the end stamped at delivery (`returnWindowEndsAt`) wins
+    // when present; the escrow payout reads the same stamp. Today's value
+    // (Timing Rules -> returnWindowDays) applies only to an old, unstamped
+    // order.
     const coolingOffDays = await resolveTimingValue(
       this.prisma,
       "returnWindowDays",
     );
     const phase = this.classifyOrderPhase(order, coolingOffDays);
-    const policy =
-      phase === "preparing" || phase === "paid"
-        ? resolveCancellationPolicy(
-            dto.reason === RefundReason.changed_mind ? "changed_mind" : "other",
-            // Bu dal yalnız `paid`/`preparing` fazında çalışır: paket henüz
-            // taşıyıcıya verilmemiştir, dolayısıyla taşıma maliyeti doğmamıştır.
-            { hasShipped: false },
-          )
-        : resolveReturnPolicy(dto.reason);
+
+    // The phase decides whether a refund is possible at all, so a refused
+    // phase answers BEFORE any reason-specific rule: asking for a photo that
+    // can never open a refund misleads the buyer.
+    if (phase === "past_cooling_off") {
+      // No refund after the return window: once it closes the buyer cannot
+      // open a request. Escrow pays the seller out from the same window end
+      // (plus the payout grace), so no new request can appear after payout.
+      throw new BadRequestException(
+        i18nMessage("server.refund.coolingOffExpired", {
+          returnWindowDays: coolingOffDays,
+        }),
+      );
+    }
+    const isPreShipment = phase === "preparing" || phase === "paid";
+    // Default closed: only the pre-shipment and in-window phases open a
+    // request; any other phase (`unknown`, or one added later) is refused.
+    if (!isPreShipment && phase !== "in_cooling_off") {
+      throw new BadRequestException(
+        i18nMessage("server.refund.orderStatusNotEligible"),
+      );
+    }
+
+    const policy = isPreShipment
+      ? resolveCancellationPolicy(
+          dto.reason === RefundReason.changed_mind ? "changed_mind" : "other",
+          // Only the `paid`/`preparing` phase gets here: the package has not
+          // been handed to the carrier, so no carriage cost has arisen.
+          { hasShipped: false },
+        )
+      : resolveReturnPolicy(dto.reason);
 
     if (
       policy.requiresEvidence &&
@@ -205,34 +229,12 @@ export class RefundCreationService {
       );
     }
 
-    if (phase === "preparing" || phase === "paid") {
+    if (isPreShipment) {
       return this.createInstantRefund(order, requesterId, dto, reqQty, policy);
     }
 
-    if (phase === "in_cooling_off") {
-      return this.createCoolingOffRefund(
-        order,
-        requesterId,
-        dto,
-        reqQty,
-        policy,
-      );
-    }
-
-    if (phase === "past_cooling_off") {
-      // 14 GÜNDEN SONRA İADE YOK: cayma penceresi kapandıktan sonra alıcı iade
-      // talebi oluşturamaz. (Escrow de gün 15'te payout ettiği için bu kural
-      // sayesinde payout anında asla açık/açılabilir iade kalmaz.)
-      throw new BadRequestException(
-        i18nMessage("server.refund.coolingOffExpired", {
-          returnWindowDays: coolingOffDays,
-        }),
-      );
-    }
-
-    throw new BadRequestException(
-      i18nMessage("server.refund.orderStatusNotEligible"),
-    );
+    // Only `in_cooling_off` is left: every other phase threw above.
+    return this.createCoolingOffRefund(order, requesterId, dto, reqQty, policy);
   }
 
   /**
