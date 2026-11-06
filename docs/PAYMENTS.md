@@ -1428,8 +1428,11 @@ as its own document, `buyer_installment_fee` (D4; §8b):
   reconciled (the closing refund can carry another package's shortfall),
   each other package only for its own shortfall.
 - **Concurrency**: the return amount is decided inside the Serializable
-  transaction that cuts it, and a cancel runs only under a claim
-  (`cancelReason = refund_cancelling`) taken where no return exists, so two
-  refund events at once never reverse the document twice.
+  transaction that cuts it, and a cancel runs only under an exclusive,
+  leased claim (`cancelReason = refund_cancelling:<ms>:<token>`) taken where
+  no return exists: any other run, the same attempt's included, backs off and
+  retries; a stale claim is settled from eLogo's status. Two refund events at
+  once never reverse the document twice. Partial returns are split
+  cumulatively, so any number of them sums to the document's net and VAT.
 - Amounts: `invoicing/invoice/installment-fee-basis.ts` (pure, pinned by its
   spec); reads: `InvoiceDocumentService.resolveInstallmentFeeBasis`.

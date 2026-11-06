@@ -717,12 +717,17 @@ the delivered-orders backfill retry as for every document.
   GROUP BY f.id;
   ```
 
-- `cancel_reason = 'refund_cancelling'` on a `buyer_installment_fee` row: a
-  refund is cancelling the e-Arşiv (the claim keeps concurrent refund
-  events from also cutting a return). It turns into `refund` when the cancel
-  settles; the outbox retries an unknown outcome. One older than an hour:
-  check its ETTN in the eLogo portal and hand it to a developer, never clear
-  it by hand.
+- `cancel_reason = 'refund_cancelling:<ms>:<token>'` on a
+  `buyer_installment_fee` row: one refund run holds the exclusive cancel
+  claim (a 5-minute lease); any other run of that document backs off with
+  `INSTALLMENT_FEE_CANCEL_IN_PROGRESS` and the outbox retries it. It turns
+  into `refund` when the cancel settles. A claim older than the lease is
+  settled by the next run from eLogo's status, logged as the error
+  `INSTALLMENT_FEE_CANCEL_CLAIM_STUCK`: cancelled -> marked cancelled;
+  standing -> cleared and reversed normally; unknown ->
+  `INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN`, retried. Repeating stuck errors
+  for one invoice: check its ETTN in the eLogo portal and hand it to a
+  developer; never clear the claim by hand.
 
 **A payment left pending by `CHARGE_ATTEMPT_BASE_MISMATCH ... left pending`.**
 The payment's amount moved after the form was signed and PayTR collected the
