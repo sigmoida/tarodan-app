@@ -356,6 +356,33 @@ export async function paytrChargeExpectationsOf(
     expectedPaytrChargeOf(payment, byOid.get(merchantOid) ?? null);
 }
 
+/**
+ * `paytrChargeExpectationsOf` for a batch of payments with ONE query: the
+ * sweeps read the attempts of every candidate up front instead of one query
+ * per candidate. An attempt is used only for the payment that signed it.
+ */
+export async function paytrChargeExpectationsForPayments(
+  db: ChargeAttemptReader,
+  payments: readonly ExpectedChargeSource[],
+): Promise<
+  (payment: ExpectedChargeSource, merchantOid: string) => Prisma.Decimal
+> {
+  const attempts = payments.length
+    ? await db.paymentChargeAttempt.findMany({
+        where: { paymentId: { in: payments.map((p) => p.id) } },
+        select: { paymentId: true, merchantOid: true, chargedAmount: true },
+      })
+    : [];
+  const byPaymentOid = new Map(
+    attempts.map((a) => [`${a.paymentId}\u0000${a.merchantOid}`, a]),
+  );
+  return (payment, merchantOid) =>
+    expectedPaytrChargeOf(
+      payment,
+      byPaymentOid.get(`${payment.id}\u0000${merchantOid}`) ?? null,
+    );
+}
+
 // ── The one comparison rule ─────────────────────────────────────────────────
 
 type AmountValue = Prisma.Decimal | number | string;
