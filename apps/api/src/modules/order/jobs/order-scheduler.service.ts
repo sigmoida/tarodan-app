@@ -14,6 +14,7 @@ import { PrismaService } from "../../../prisma";
 import { LIVE_ORDER } from "../../account-lane/live-lane.where";
 import { OrderService } from "../order.service";
 import { InvoicingService } from "../../invoicing/invoicing.service";
+import { orderInstallmentFeeOf } from "../../payment/helpers/charged-amount";
 import {
   LEGACY_PACKAGE_FEE_INVOICE_TYPES,
   PACKAGE_FEE_INVOICE_TYPES,
@@ -436,6 +437,7 @@ export class OrderSchedulerService implements OnModuleInit {
         packageId: true,
         buyerShippingAmount: true,
         sellerShippingAmount: true,
+        installmentFeeAmount: true,
         commissionLedger: {
           select: {
             buyerFee: true,
@@ -471,6 +473,7 @@ export class OrderSchedulerService implements OnModuleInit {
               ...PACKAGE_FEE_INVOICE_TYPES,
               ...LEGACY_PACKAGE_FEE_INVOICE_TYPES,
               "platform_sale",
+              "buyer_installment_fee",
             ] as FiscalInvoiceType[],
           },
         },
@@ -528,10 +531,18 @@ export class OrderSchedulerService implements OnModuleInit {
             ([amount, type]) =>
               !(Number(amount) > 0) || has(`${feeSourceId}:${type}`),
           );
+        // The buyer's installment fee document (package key) is cut for
+        // platform sales too (AS-F2). A fee fully refunded before delivery
+        // never gets one: the issue run then finds nothing to cut and stamps
+        // the order, so it leaves the window all the same.
+        const installmentFeeDone =
+          !o.packageId ||
+          !orderInstallmentFeeOf(o).gt(0) ||
+          has(`${o.packageId}:buyer_installment_fee`);
         const invoicesComplete =
-          o.seller.sellerType === "platform"
+          (o.seller.sellerType === "platform"
             ? has(`${o.id}:platform_sale`)
-            : feesDone && shippingDone;
+            : feesDone && shippingDone) && installmentFeeDone;
         if (invoicesComplete) {
           // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
           // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve

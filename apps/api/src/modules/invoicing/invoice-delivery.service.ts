@@ -103,6 +103,7 @@ export class InvoiceDeliveryService {
       categoryId,
       lineItems,
       sourceReference,
+      snapshotVatRate,
     } = opts;
     try {
       const providerEnabled = this.provider.isEnabled();
@@ -140,7 +141,10 @@ export class InvoiceDeliveryService {
       // Kalem listesi varsa belge ÇOK ORANLI olabilir; toplamlar satırlardan
       // gelir ve `vatRate` yalnız geriye-uyumluluk için (tek oranlı özet) tutulur.
       const hasLines = !!lineItems?.length;
-      const vatRate = await this.documents.resolveVatRate(type, categoryId);
+      const vatRate = await this.documents.resolveCutVatRate(type, {
+        categoryId,
+        snapshotVatRate,
+      });
       const amounts = hasLines
         ? invoiceTotalsFromLines(lineItems!)
         : this.documents.invoiceAmounts(type, grossAmount, vatRate);

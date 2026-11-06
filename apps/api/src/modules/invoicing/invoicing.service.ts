@@ -40,7 +40,9 @@ export type RevenueType =
   | "trade_service_fee"
   | "trade_shipping"
   | "platform_sale"
-  | "penalty";
+  | "penalty"
+  // Installment fee (vade farkı) to the buyer, per package (ADR 0019 D4).
+  | "buyer_installment_fee";
 
 /** `cut()` çağrısının türe göre değişen bağlamı. */
 export interface CutOptions {
@@ -58,6 +60,12 @@ export interface CutOptions {
    * faturada gösterilemez, admin listesinde de belgeyi siparişe bağlamaz.
    */
   sourceReference?: string | null;
+  /**
+   * The VAT rate frozen on the charge, for the `charge_snapshot` types only
+   * (`invoice-vat-rate.ts`): the installment fee is cut at its charge
+   * attempt's `feeVatRatePct`. Refused for every other type.
+   */
+  snapshotVatRate?: number;
 }
 
 @Injectable()
@@ -92,6 +100,10 @@ export class InvoicingService {
 
   issuePlatformSaleInvoice(orderId: string): Promise<void> {
     return this.issuing.issuePlatformSaleInvoice(orderId);
+  }
+
+  issueInstallmentFeeInvoice(packageId: string): Promise<void> {
+    return this.issuing.issueInstallmentFeeInvoice(packageId);
   }
 
   issueMembershipInvoice(membershipPaymentId: string): Promise<void> {

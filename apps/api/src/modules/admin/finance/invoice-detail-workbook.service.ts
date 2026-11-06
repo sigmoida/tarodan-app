@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   buyer_commission: "Alıcı komisyonu",
   buyer_service_fee: "Alıcı koruma hizmet bedeli",
   buyer_shipping: "Kargo bedeli (alıcı payı)",
+  buyer_installment_fee: "Taksit vade farkı",
   seller_commission: "Satıcı komisyonu",
   seller_platform_fee: "Platform hizmet bedeli",
   seller_shipping: "Kargo bedeli (satıcı payı)",

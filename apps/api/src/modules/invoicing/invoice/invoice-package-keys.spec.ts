@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { InvoicingService } from "../invoicing.service";
 import { InvoiceDocumentService } from "../invoice-document.service";
@@ -149,6 +150,8 @@ function makePrisma(over: { ledgers?: Record<string, any> } = {}) {
                 buyerServiceFeeAmount: 25,
                 buyerCommissionAmount: 0,
                 shippingAddress: null,
+                // Single payments: no installment fee (schema default 0).
+                installmentFeeAmount: new Prisma.Decimal(0),
               })),
             }
           : null,
@@ -173,6 +176,7 @@ function makePrisma(over: { ledgers?: Record<string, any> } = {}) {
         orderId: "o1",
         status: "finalized",
         finalizedAt: new Date("2026-08-04T09:00:00.000Z"),
+        installmentFeeAmount: new Prisma.Decimal(0),
       })),
     },
     address: { findFirst: jest.fn(async () => null) },

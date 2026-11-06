@@ -136,4 +136,5 @@ export const ORDER_INVOICE_TYPES: FiscalInvoiceType[] = [
   "seller_platform_fee",
   "seller_shipping",
   "platform_sale",
+  "buyer_installment_fee",
 ];

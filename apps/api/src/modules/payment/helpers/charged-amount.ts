@@ -74,6 +74,13 @@ export function orderInstallmentFeeOf(
   return order.installmentFeeAmount;
 }
 
+/** The installment fee share F_r a refund attempt gave back (0 = none). */
+export function refundInstallmentFeeOf(
+  attempt: Pick<RefundGoodsPartSource, "installmentFeeAmount">,
+): Prisma.Decimal {
+  return attempt.installmentFeeAmount;
+}
+
 /** The fields `refundGoodsPartOf` reads. */
 export interface RefundGoodsPartSource {
   amount: Prisma.Decimal;

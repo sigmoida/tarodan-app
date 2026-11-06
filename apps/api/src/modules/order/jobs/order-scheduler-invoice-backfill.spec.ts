@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { OrderSchedulerService } from "./order-scheduler.service";
 
 /**
@@ -85,6 +86,7 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
         id: "order-1",
         packageId: "pkg-1",
         buyerShippingAmount: 40,
+        installmentFeeAmount: new Prisma.Decimal(0),
         commissionLedger: {
           buyerFee: 30,
           sellerCommission: 100,
@@ -103,6 +105,88 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
     await service.runProcessDeliveredOrders();
 
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The buyer's installment fee document (ADR 0019 D4) is a package document
+   * like the others: an order whose package carries a fee is complete only
+   * with it, for Tarodan's own goods too (AS-F2). Without a fee it is never
+   * looked for.
+   */
+  describe("installment fee document", () => {
+    const packaged = (over: Record<string, unknown> = {}) => ({
+      id: "order-1",
+      packageId: "pkg-1",
+      buyerShippingAmount: 0,
+      sellerShippingAmount: 0,
+      installmentFeeAmount: new Prisma.Decimal("66.38"),
+      commissionLedger: {
+        buyerFee: 30,
+        sellerCommission: 100,
+        componentBreakdownComplete: true,
+        buyerCommissionAmount: 0,
+        buyerPlatformFeeAmount: 30,
+        sellerCommissionAmount: 100,
+        sellerPlatformFeeAmount: 0,
+      },
+      seller: { sellerType: "individual" },
+      ...over,
+    });
+    const feeDocs = [
+      { sourceId: "pkg-1", type: "buyer_service_fee" },
+      { sourceId: "pkg-1", type: "seller_commission" },
+    ];
+
+    it("re-issues an order whose package fee document is missing", async () => {
+      const { service, prisma, orderService } = makeService(
+        packaged(),
+        feeDocs,
+      );
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(orderService.emitDeliveryRevenueInvoices).toHaveBeenCalledWith(
+        "order-1",
+      );
+    });
+
+    it("stamps the order once the fee document exists", async () => {
+      const { service, prisma } = makeService(packaged(), [
+        ...feeDocs,
+        { sourceId: "pkg-1", type: "buyer_installment_fee" },
+      ]);
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "order-1" } }),
+      );
+    });
+
+    it("asks for it on a platform sale too", async () => {
+      const { service, prisma } = makeService(
+        packaged({ seller: { sellerType: "platform" } }),
+        [{ sourceId: "order-1", type: "platform_sale" }],
+      );
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it("does not look for it without a fee (single payment)", async () => {
+      const { service, prisma } = makeService(
+        packaged({ installmentFeeAmount: new Prisma.Decimal(0) }),
+        feeDocs,
+      );
+
+      await service.runProcessDeliveredOrders();
+
+      expect(prisma.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "order-1" } }),
+      );
+    });
   });
 
   /**
