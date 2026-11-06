@@ -20,7 +20,6 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { UPLOAD_MULTER_OPTIONS } from "../../common/upload/multer-options";
 import { CollectionService } from "./collection.service";
 import { MediaService } from "../media/media.service";
-import { StorageService } from "../storage/storage.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import {
   CreateCollectionDto,
@@ -35,6 +34,7 @@ import { Public } from "../auth/decorators/public.decorator";
 import { errorStack } from "../../common/helpers/error-message";
 import { i18nMessage } from "../i18n";
 import { UuidParam } from "../../common/pipes/uuid-param.decorator";
+import { resolveUploadTarget } from "../media/helpers/upload-target";
 
 @Controller("collections")
 export class CollectionController {
@@ -43,7 +43,6 @@ export class CollectionController {
   constructor(
     private readonly collectionService: CollectionService,
     private readonly mediaService: MediaService,
-    private readonly storageService: StorageService,
     private readonly moderationAi: ModerationAiClient,
   ) {}
 
@@ -307,20 +306,34 @@ export class CollectionController {
         userId: req.user?.id,
         field: "item",
       });
+      // Same target as `POST /media/upload?folder=collections`: the collections
+      // bucket is public, so the stored URL is the permanent public URL (a
+      // presigned one expired after 7 days).
+      const target = resolveUploadTarget("collections", req.user.id);
       try {
-        const uploadResult = await this.mediaService.upload(imageFile, {
-          folder: "collection-items",
-          bucket: "collections",
-          resize: { width: 800, height: 800, fit: "cover" },
-        });
-        // Generate presigned URL
-        imageUrl = await this.storageService.getPresignedDownloadUrl(
-          "collections",
-          uploadResult.key,
-          3600 * 24 * 7, // 7 days
+        const uploadResult = await this.mediaService.upload(
+          imageFile,
+          {
+            folder: target.folder,
+            bucket: target.bucket,
+            resize: { width: 800, height: 800, fit: "cover" },
+          },
+          req.user.id,
         );
+        imageUrl = uploadResult.url;
       } catch (error) {
-        this.logger.error("Collection cover upload failed", errorStack(error));
+        this.logger.error(
+          `Collection item image upload failed for collection id=${id}`,
+          errorStack(error),
+        );
+        throw new BadRequestException(
+          i18nMessage("server.collection.imageUploadFailed"),
+        );
+      }
+      if (!imageUrl) {
+        this.logger.error(
+          `Collection item image upload returned no URL for collection id=${id}`,
+        );
         throw new BadRequestException(
           i18nMessage("server.collection.imageUploadFailed"),
         );

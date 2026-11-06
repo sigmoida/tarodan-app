@@ -5931,7 +5931,7 @@
       "tur": "Happy path",
       "pri": "P2",
       "steps": "POST .../items multipart customTitle=\"X\", image= .",
-      "exp": "HTTP 201; customImageUrl presigned URL ile dolu; görsel assertImageClean'den geçer, başarısız upload'da 400 \"Resim yükleme başarısız: ...\".",
+      "exp": "HTTP 201; customImageUrl is the permanent public URL (no presigned X-Amz query); the image passes assertImageClean; a failed upload is 400 server.collection.imageUploadFailed.",
       "gap": false,
       "gapRefs": []
     },

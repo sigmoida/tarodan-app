@@ -36,9 +36,9 @@ import { scenario } from "../../test-utils/scenario";
 
 const RANDOM_UUID = "11111111-2222-4333-8444-555555555555";
 
-// Multipart görsel gövdesi üretici (COL-032). Multer memory storage kullanılır;
-// media.service yalnız file.size + file.mimetype'a bakar (sharp yok → resize atlanır),
-// storage stub uploadFile+getPresignedDownloadUrl her zaman sabit URL döndürür.
+// Multipart image body builder (COL-032). Multer uses memory storage; the
+// storage stub stores every upload at a fixed key and getPublicAssetUrl turns it
+// into a fixed public URL.
 const jpegBuffer = (bytes = 4 * 1024): Buffer => {
   const buf = Buffer.alloc(bytes, 0x00);
   buf[0] = 0xff;
@@ -799,10 +799,9 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
     });
 
     scenario("COL-032", async () => {
-      // Custom item resimle ekleme: multipart image + customTitle → 201.
-      // Moderasyon KAPALI (assertImageClean no-op); mediaService.upload sharp'sız
-      // resize atlar, storage stub uploadFile→key, getPresignedDownloadUrl→sabit URL.
-      // → customImageUrl presigned URL ile dolar; kayıt custom (productId null).
+      // Custom item with a multipart image + customTitle -> 201. Moderation is
+      // off (assertImageClean no-op); the storage stub stores at a fixed key and
+      // getPublicAssetUrl builds the permanent public URL, which is stored.
       const ahmet = await premiumUser();
       const col = await seedCollection({
         userId: ahmet.id,
@@ -820,9 +819,10 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
       expect(res.body.isCustom).toBe(true);
       expect(res.body.productId).toBeUndefined();
       expect(res.body.productTitle).toBe("Nadir Görselli");
-      // Stub getPresignedDownloadUrl her zaman URL döndürür → alan dolu gelir.
-      expect(typeof res.body.customImageUrl).toBe("string");
-      expect(res.body.customImageUrl.length).toBeGreaterThan(0);
+      expect(res.body.customImageUrl).toBe(
+        "https://test-cdn.invalid/test/file.bin",
+      );
+      expect(res.body.customImageUrl).not.toMatch(/X-Amz-|test-presigned/);
       const prisma = getPrisma();
       const item = await prisma.collectionItem.findUnique({
         where: { id: res.body.id },
