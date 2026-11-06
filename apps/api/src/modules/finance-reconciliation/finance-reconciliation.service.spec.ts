@@ -315,10 +315,11 @@ describe("FinanceReconciliationService.build", () => {
         refundAttempt: {
           aggregate: jest
             .fn()
-            .mockImplementation(({ where }: any) =>
-              where.provider
-                ? agg({ amount: 228.55 })
-                : agg({ amount: 228.55, installmentFeeAmount: 26.55 }, 3),
+            .mockImplementation(
+              ({ where }: { where: { provider?: string } }) =>
+                where.provider
+                  ? agg({ amount: 228.55 })
+                  : agg({ amount: 228.55, installmentFeeAmount: 26.55 }, 3),
             ),
         },
         payment: {
@@ -332,7 +333,7 @@ describe("FinanceReconciliationService.build", () => {
           }),
           aggregate: jest
             .fn()
-            .mockImplementation(({ where }: any) =>
+            .mockImplementation(({ where }: { where: { type?: string } }) =>
               where.type === "sale"
                 ? agg({ amount: 2663.58, fee: 80 })
                 : agg({ amount: 228.55 }),
@@ -355,9 +356,7 @@ describe("FinanceReconciliationService.build", () => {
 
     it("S4 compares sales on the charged scale and the fee as psp_fee + installment cost", async () => {
       const r = await makeService(installmentPrisma()).build();
-      const rows = Object.fromEntries(
-        r.comparison.rows.map((x: any) => [x.key, x]),
-      );
+      const rows = Object.fromEntries(r.comparison.rows.map((x) => [x.key, x]));
 
       expect(rows.sales).toMatchObject({
         ours: 2663.58,

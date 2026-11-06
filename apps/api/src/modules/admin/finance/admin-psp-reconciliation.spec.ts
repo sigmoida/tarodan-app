@@ -34,7 +34,11 @@ function makePrisma(opts: {
   linesCount?: number;
   paymentRows?: any[];
   /** The charge attempts of the listed lines' oids (installment forms). */
-  attempts?: any[];
+  attempts?: Array<{
+    paymentId: string;
+    merchantOid: string;
+    chargedAmount: Prisma.Decimal;
+  }>;
   line?: any;
   lineCount?: number;
   /** getMissingPayments: dökümü gelmiş mağazalar (varsayılan: lineCount>0 ise pazaryeri). */

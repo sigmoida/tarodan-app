@@ -36,7 +36,7 @@ describe("FinanceReconciliationService — test lane", () => {
     };
     // A groupBy (the ledger's deduction accounts) is a money aggregate too.
     const groupBy = (model: string) =>
-      jest.fn(async (args: any) => {
+      jest.fn(async (args: { where?: unknown }) => {
         seen.push({ model, where: args?.where });
         return [];
       });
