@@ -231,14 +231,22 @@ export class CollectionItemsService {
       );
     }
 
-    await this.prisma.$transaction(
-      dto.items.map((item) =>
-        this.prisma.collectionItem.update({
-          where: { id: item.itemId },
+    // Every update is scoped to this collection. One id that is not an item of
+    // it (another collection's item, a deleted one) fails the whole request
+    // with 404 and the transaction rolls back, so nothing is reordered.
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of dto.items) {
+        const { count } = await tx.collectionItem.updateMany({
+          where: { id: item.itemId, collectionId },
           data: { sortOrder: item.sortOrder },
-        }),
-      ),
-    );
+        });
+        if (count === 0) {
+          throw new NotFoundException(
+            i18nMessage("server.collection.itemNotFound"),
+          );
+        }
+      }
+    });
   }
 
   /**

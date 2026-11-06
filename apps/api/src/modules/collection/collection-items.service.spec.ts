@@ -260,3 +260,60 @@ describe("CollectionItemsService.removeItemFromCollection", () => {
     });
   });
 });
+
+describe("CollectionItemsService.reorderItems", () => {
+  it("updates the collection's own items, each update scoped to the collection", async () => {
+    const { service, prisma, sortOrders } = makeService();
+    await service.reorderItems(COLLECTION, OWNER, {
+      items: [
+        { itemId: ITEM_A, sortOrder: 2 },
+        { itemId: ITEM_B, sortOrder: 1 },
+      ],
+    });
+    expect(sortOrders.get(ITEM_A)).toBe(2);
+    expect(sortOrders.get(ITEM_B)).toBe(1);
+    for (const [call] of prisma.collectionItem.updateMany.mock.calls) {
+      expect(call.where).toEqual(
+        expect.objectContaining({ collectionId: COLLECTION }),
+      );
+    }
+  });
+
+  it("404s on an item of another collection and changes nothing", async () => {
+    const { service, sortOrders } = makeService();
+    const error = await caught(
+      service.reorderItems(COLLECTION, OWNER, {
+        items: [
+          { itemId: ITEM_A, sortOrder: 5 },
+          { itemId: FOREIGN_ITEM, sortOrder: 0 },
+        ],
+      }),
+    );
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(error.getResponse()).toEqual({
+      i18nKey: "server.collection.itemNotFound",
+    });
+    expect(sortOrders.size).toBe(0);
+  });
+
+  it("refuses a non-owner before any write", async () => {
+    const { service, prisma } = makeService();
+    const error = await caught(
+      service.reorderItems(COLLECTION, OTHER_USER, {
+        items: [{ itemId: ITEM_A, sortOrder: 0 }],
+      }),
+    );
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("404s on an unknown collection", async () => {
+    const { service, prisma } = makeService();
+    prisma.collection.findUnique.mockResolvedValueOnce(null as never);
+    const error = await caught(
+      service.reorderItems(COLLECTION, OWNER, { items: [] }),
+    );
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});

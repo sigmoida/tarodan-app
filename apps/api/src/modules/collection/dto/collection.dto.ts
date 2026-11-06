@@ -5,6 +5,9 @@ import {
   IsUUID,
   IsNumber,
   IsArray,
+  IsInt,
+  ArrayMaxSize,
+  ValidateNested,
   MaxLength,
   MinLength,
   Min,
@@ -136,12 +139,25 @@ export class AddCollectionItemDto {
   isFeatured?: boolean;
 }
 
+export class ReorderCollectionItemDto {
+  @IsUUID()
+  itemId: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder: number;
+}
+
+/** Upper bound on one reorder request; it runs as one transaction. */
+export const MAX_REORDER_ITEMS = 1000;
+
 export class ReorderCollectionItemsDto {
   @IsArray()
-  items: Array<{
-    itemId: string;
-    sortOrder: number;
-  }>;
+  @ArrayMaxSize(MAX_REORDER_ITEMS)
+  @ValidateNested({ each: true })
+  @Type(() => ReorderCollectionItemDto)
+  items: ReorderCollectionItemDto[];
 }
 
 export class CollectionItemResponseDto {

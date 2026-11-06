@@ -738,7 +738,8 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
     });
 
     scenario("COL-029", async () => {
-      // GÖZLEM/BULGU: reorder item aidiyeti kontrol etmez. Yabancı item'ın sortOrder'ı değişir.
+      // Reorder is scoped to the collection: an item of another collection is a
+      // 404 and keeps its sortOrder.
       const ahmet = await premiumUser();
       const colA = await seedCollection({ userId: ahmet.id, name: "A" });
       const colB = await seedCollection({ userId: ahmet.id, name: "B" });
@@ -751,13 +752,12 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
         .post(`/api/collections/${colA.id}/reorder`)
         .set(authHeader(ahmet))
         .send({ items: [{ itemId: itemB.id, sortOrder: 99 }] })
-        .expect(204);
+        .expect(404);
       const prisma = getPrisma();
       const fresh = await prisma.collectionItem.findUnique({
         where: { id: itemB.id },
       });
-      // Cross-collection yan etki: itemB.sortOrder, colA reorder'ından etkilenir (IDOR/bulgu).
-      expect(fresh?.sortOrder).toBe(99);
+      expect(fresh?.sortOrder).toBe(0);
     });
 
     scenario("COL-030", async () => {
@@ -979,7 +979,8 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
     });
 
     scenario("COL-098", async () => {
-      // IDOR matrisi. (1) yabancı item silme → 403. (2) kendi koleksiyonunda yabancı itemId reorder → değişir (bulgu).
+      // IDOR matrix. (1) Removing another user's item -> 403. (2) Reordering
+      // another user's item id inside one's own collection -> 404, unchanged.
       const ahmet = await premiumUser("ahmet@demo.com");
       const ayse = await premiumUser("ayse@demo.com");
       const ahmetCol = await seedCollection({
@@ -999,18 +1000,19 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
         .expect(403);
       expect(del.body.message).toBe("Bu koleksiyonu düzenleme yetkiniz yok");
 
-      // (2) ayse kendi koleksiyonunda ahmet'in itemId'sini reorder'lar → sahip kontrolü geçer → yabancı item değişir.
+      // (2) ayse reorders her own collection with ahmet's item id: the update is
+      // scoped to her collection, so it is a 404 and ahmet's item is unchanged.
       const ayseCol = await seedCollection({ userId: ayse.id, name: "Ayse" });
       await request(server())
         .post(`/api/collections/${ayseCol.id}/reorder`)
         .set(authHeader(ayse))
         .send({ items: [{ itemId: ahmetItem.id, sortOrder: 77 }] })
-        .expect(204);
+        .expect(404);
       const prisma = getPrisma();
       const fresh = await prisma.collectionItem.findUnique({
         where: { id: ahmetItem.id },
       });
-      expect(fresh?.sortOrder).toBe(77); // IDOR riski doğrulandı (bulgu).
+      expect(fresh?.sortOrder).toBe(0);
     });
   });
 
