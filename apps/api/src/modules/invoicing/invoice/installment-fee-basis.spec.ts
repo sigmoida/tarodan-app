@@ -467,7 +467,9 @@ describe("installment fee amounts (properties)", () => {
     expect(broken).toEqual([]);
   });
 
-  it("sums the returns of a fully reversed document to its net and VAT exactly (up to two returns)", () => {
+  it("sums the returns of a fully reversed document to its net and VAT exactly, however many there are", () => {
+    // Partial returns are split cumulatively (`split(prior + due) - priorNet`):
+    // a plain split of each return drifted a kuruş from the third return on.
     const rnd = seeded(66_38);
     const off: string[] = [];
     for (let run = 0; run < 50_000; run++) {
@@ -476,25 +478,35 @@ describe("installment fee amounts (properties)", () => {
         total: total / 100,
         net: splitVatIncluded(total / 100, 20).net,
       };
-      const [first, second] = partition(rnd, total, 2);
+      const shares = partition(rnd, total, 1 + Math.floor(rnd() * 6));
       const prior: Array<{ total: number; net: number }> = [];
-      for (const [share, target] of [
-        [first, second],
-        [second, 0],
-      ]) {
+      let left = total;
+      for (const share of shares) {
+        left -= share;
         const due = installmentFeeReturnOf({
           issued,
           priorReturns: prior,
-          targetGross: target / 100,
+          targetGross: left / 100,
           refundedFee: share / 100,
           vatRatePct: 20,
         });
-        if (due) prior.push({ total: due.total, net: due.net });
+        if (!due) continue;
+        prior.push({ total: due.total, net: due.net });
+        // Every running sum is the split of its own total.
+        const runningTotal = prior.reduce((s, r) => s + kurus(r.total), 0);
+        const runningNet = prior.reduce((s, r) => s + kurus(r.net), 0);
+        if (
+          runningNet !== kurus(splitVatIncluded(runningTotal / 100, 20).net)
+        ) {
+          off.push(
+            `${total} = ${shares.join(" + ")}: running net ${runningNet}`,
+          );
+        }
       }
       const net = prior.reduce((s, r) => s + kurus(r.net), 0);
       const sum = prior.reduce((s, r) => s + kurus(r.total), 0);
       if (sum !== total || net !== kurus(issued.net)) {
-        off.push(`${total} = ${first} + ${second}: net ${net}`);
+        off.push(`${total} = ${shares.join(" + ")}: net ${net}`);
       }
     }
     expect(off).toEqual([]);

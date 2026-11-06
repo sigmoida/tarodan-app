@@ -176,9 +176,14 @@ export interface InstallmentFeeReturn {
  * beyond what it should carry now (`outstanding - target`). The cap makes it
  * safe whatever the order of events: a document cut after the refund already
  * excludes its fee (nothing due), a late handler of an earlier refund still
- * reverses its own share, and a replay finds nothing left. The return that
- * closes the document takes the exact remainder of net and VAT, so the
- * returns of a fully refunded fee sum to the document to the kuruş.
+ * reverses its own share, and a replay finds nothing left.
+ *
+ * Net and VAT are split CUMULATIVELY: a partial return's net is the split of
+ * everything returned so far, this one included, less the net already
+ * returned (`split(prior + due) - priorNet`), and the return that closes the
+ * document takes the document's net less that. However many returns there
+ * are, their net and VAT therefore sum to the document's to the kuruş, and
+ * every partial sum is the split of its total.
  */
 export function installmentFeeReturnOf(
   input: InstallmentFeeReturnInput,
@@ -209,9 +214,9 @@ export function installmentFeeReturnOf(
   const closesDocument = due >= outstanding;
   let net = closesDocument
     ? issuedNet - priorNet
-    : splitKurus(due, input.vatRatePct).net;
-  // A remainder outside [0, due] means the earlier returns were not split
-  // like this one (none are today); fall back to the plain split.
+    : splitKurus(priorTotal + due, input.vatRatePct).net - priorNet;
+  // Outside [0, due] only when the earlier returns or the document were not
+  // split at this rate (a hand-made row): this return alone stays sound.
   if (net < 0 || net > due) net = splitKurus(due, input.vatRatePct).net;
   const tax = due - net;
   return {
