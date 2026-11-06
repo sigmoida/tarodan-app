@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   GoneException,
   Logger,
@@ -1230,6 +1231,10 @@ export class PaymentInitiationService {
         where: {
           id: payment.id,
           status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
+          // Pinned to the T the charge was priced on: a reset that moved
+          // `amount` since the quote must not get a form signed for the old
+          // T (the capture could not link its attempt).
+          amount: charge.baseAmount,
         },
         data: {
           providerConversationId: merchantOid,
@@ -1269,6 +1274,18 @@ export class PaymentInitiationService {
       return claim;
     });
     if (claimed.count === 0) {
+      const current = await this.prisma.payment.findUnique({
+        where: { id: payment.id },
+        select: { amount: true },
+      });
+      if (current && !charge.baseAmount.equals(current.amount)) {
+        this.logger.error(
+          `DIRECT_FORM_AMOUNT_DRIFT payment=${payment.id}: amount moved to ${new Prisma.Decimal(current.amount).toFixed(2)} after pricing at ${charge.baseAmount.toFixed(2)}; form not signed`,
+        );
+        throw new ConflictException(
+          i18nMessage("server.payment.paymentAmountOutOfDate"),
+        );
+      }
       throw new BadRequestException(
         i18nMessage("server.payment.paymentCurrentlyProcessing"),
       );

@@ -282,11 +282,15 @@ export class PaymentFulfillmentService {
    * The charge attempt a capture links: this payment's attempt for the
    * captured oid, not captured yet, priced from the payment's `amount`.
    * Without an oid or an attempt (a form signed before attempts, the dev
-   * bypass) the capture stays legacy (`chargedAmount` NULL = `amount`). An
-   * attempt whose T is not the payment's `amount` cannot be linked (DB CHECK
-   * `charged_amount = amount + fee`): with a fee that would lose it, so the
-   * capture fails loudly and nothing is written; without one the payment is
-   * captured legacy-style.
+   * bypass) the capture stays legacy (`chargedAmount` NULL = `amount`).
+   *
+   * An attempt whose T is not the payment's `amount` cannot be linked (DB
+   * CHECK `charged_amount = amount + fee`; the claim pins `amount`, so this
+   * needs a write outside the card flow). PayTR has charged the buyer, so the
+   * payment still completes, legacy-style: a capture that threw would leave
+   * the order pending on every recovery path until the 24 h kill switch
+   * cancels it with the buyer's money held. The alarm asks for the fee (if
+   * any) to be booked by hand.
    */
   private async capturableAttempt(
     tx: Prisma.TransactionClient,
@@ -303,14 +307,12 @@ export class PaymentFulfillmentService {
     if (attempt.baseAmount.equals(new Prisma.Decimal(payment.amount))) {
       return attempt;
     }
-    const message =
+    this.logger.error(
       `CHARGE_ATTEMPT_BASE_MISMATCH payment=${payment.id} attempt=${attempt.id}: ` +
-      `signed for T=${attempt.baseAmount.toFixed(2)}, payment amount is ${new Prisma.Decimal(payment.amount).toFixed(2)}`;
-    if (attempt.installmentFeeAmount.gt(0)) {
-      this.logger.error(`${message}; capture refused, manual review`);
-      throw new Error(message);
-    }
-    this.logger.error(`${message}; captured without the attempt`);
+        `signed for T=${attempt.baseAmount.toFixed(2)} (fee ${attempt.installmentFeeAmount.toFixed(2)}), ` +
+        `payment amount is ${new Prisma.Decimal(payment.amount).toFixed(2)}; ` +
+        `captured without the attempt, manual review of the fee required`,
+    );
     return null;
   }
 

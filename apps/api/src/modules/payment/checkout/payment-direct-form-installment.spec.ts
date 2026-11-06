@@ -112,10 +112,12 @@ function setup(
   const prisma = {
     order: { findUnique: jest.fn(async () => order) },
     payment: {
-      findUnique: jest.fn(async (args: { select?: unknown }) =>
-        args.select
-          ? { orderId: "order-1", checkoutGroupId: null }
-          : existingPayment,
+      findUnique: jest.fn(async (args: { select?: Record<string, unknown> }) =>
+        !args.select
+          ? existingPayment
+          : "amount" in args.select
+            ? { amount: existingPayment.amount }
+            : { orderId: "order-1", checkoutGroupId: null },
       ),
       updateMany: jest.fn(async (args: { data: { status?: string } }) => {
         calls.push(
@@ -345,6 +347,31 @@ describe("PaymentInitiationService.prepareDirectPayment — installments", () =>
       expect(prisma.paymentChargeAttempt.create).not.toHaveBeenCalled();
     },
   );
+
+  it("pins the claim to the T it was priced on, and refuses 409 when amount moved since the quote", async () => {
+    const { service, prisma } = setup({ quote: THREE_QUOTE, claimCount: 0 });
+    // A reset rewrote the amount between the quote and the claim.
+    prisma.payment.findUnique.mockImplementation(
+      async (args: { select?: unknown }) =>
+        args.select && "amount" in (args.select as object)
+          ? ({ amount: D("990.00") } as never)
+          : ({ orderId: "order-1", checkoutGroupId: null } as never),
+    );
+    await expect(
+      service.prepareDirectPayment("buyer-1", {
+        orderId: "order-1",
+        installment: SELECTION,
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { i18nKey: "server.payment.paymentAmountOutOfDate" },
+    });
+    const claim = prisma.payment.updateMany.mock.calls[0][0] as unknown as {
+      where: { amount: Prisma.Decimal };
+    };
+    expect(claim.where.amount).toEqual(D("1000.00"));
+    expect(prisma.paymentChargeAttempt.create).not.toHaveBeenCalled();
+  });
 
   it("writes no attempt when a concurrent request holds the claim (double submit)", async () => {
     const { service, prisma } = setup({ quote: THREE_QUOTE, claimCount: 0 });

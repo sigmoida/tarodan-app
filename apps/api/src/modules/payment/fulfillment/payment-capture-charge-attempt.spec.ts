@@ -217,20 +217,22 @@ describe("PaymentFulfillmentService capture of a charge attempt", () => {
     expect(tx.paymentChargeAttempt.updateMany).not.toHaveBeenCalled();
   });
 
-  it("refuses to capture an installment attempt priced from another T (nothing written, alarm)", async () => {
+  it("completes an installment charge priced from another T without the attempt, with an alarm (never stuck)", async () => {
     const { tx, paths } = setup();
-    await expect(
-      paths.claimPaymentCompleted(
-        tx,
-        { ...payment, amount: D("990.00") },
-        { capturedMerchantOid: "ORD1A" },
-      ),
-    ).rejects.toThrow(
-      "CHARGE_ATTEMPT_BASE_MISMATCH payment=pay-1 attempt=att-3x",
+    const capture = await paths.claimPaymentCompleted(
+      tx,
+      { ...payment, amount: D("990.00") },
+      { capturedMerchantOid: "ORD1A" },
     );
-    expect(tx.payment.updateMany).not.toHaveBeenCalled();
+    expect(capture).toEqual({ attemptId: null, feeAmount: D("0") });
+    expect(tx.payment.updateMany).toHaveBeenCalledTimes(1);
     expect(errorLog).toHaveBeenCalledWith(
-      expect.stringContaining("capture refused, manual review"),
+      expect.stringContaining(
+        "CHARGE_ATTEMPT_BASE_MISMATCH payment=pay-1 attempt=att-3x",
+      ),
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining("manual review of the fee required"),
     );
   });
 
