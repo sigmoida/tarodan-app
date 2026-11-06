@@ -19,6 +19,12 @@ import {
   isPackageFeeInvoiceType,
 } from "./invoice/package-fee-components";
 import type { PackageFeeDocument } from "./invoice/package-fee-basis";
+import {
+  buildInstallmentFeeDocument,
+  installmentFeeReturnOf,
+  type InstallmentFeeReturn,
+} from "./invoice/installment-fee-basis";
+import { refundInstallmentFeeOf } from "../payment/helpers/charged-amount";
 import { retryOnWriteConflict } from "./helpers/invoice-write-conflict";
 import { refundRequestIdOf } from "./helpers/refund-request-key";
 import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
@@ -35,7 +41,16 @@ import { InvoiceDeliveryService } from "./invoice-delivery.service";
 type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
   finalizedAt: Date;
   refundRequestId?: string;
+  /**
+   * The installment fee share this attempt gave back
+   * (`RefundAttempt.installmentFeeAmount`), read from the attempt: the fee
+   * document is reversed by it, never by the goods `refundRatio` (AS-F3).
+   */
+  installmentFeeRefund: number;
 };
+
+const INSTALLMENT_FEE_TYPE =
+  "buyer_installment_fee" satisfies FiscalInvoiceType;
 
 /**
  * Kesilmiş bir belgenin GERİ ALINMASI — InvoicingService'ten birebir
@@ -87,6 +102,7 @@ export class InvoiceReversalService {
           status: true,
           finalizedAt: true,
           idempotencyKey: true,
+          installmentFeeAmount: true,
         },
       });
       if (
@@ -103,6 +119,7 @@ export class InvoiceReversalService {
         ...adjustment,
         finalizedAt: attempt.finalizedAt,
         refundRequestId: refundRequestIdOf(attempt.idempotencyKey),
+        installmentFeeRefund: refundInstallmentFeeOf(attempt).toNumber(),
       };
     }
     await this.reverseByKeys(await this.relatedInvoiceKeys(orderId), resolved);
@@ -192,6 +209,7 @@ export class InvoiceReversalService {
             { type: "service_fee", sourceId: packageId },
           ]
         : []),
+      ...(packageId ? await this.installmentFeeInvoiceKeys(packageId) : []),
       { type: "commission", sourceId: orderId },
       { type: "service_fee", sourceId: orderId },
       { type: "platform_sale", sourceId: orderId },
@@ -218,6 +236,71 @@ export class InvoiceReversalService {
       if (mp) keys.push({ type: "membership", sourceId: mp.id });
     }
     return keys;
+  }
+
+  /**
+   * The installment fee documents a refund of an order of `packageId` can
+   * touch: its own package's, and, once the payment's whole fee went back,
+   * every package of the payment. The refund that closes the payment takes
+   * the rest of the fee, which can be another package's shortfall; that
+   * package's document has no refund event of its own left to reverse it.
+   * A package with nothing due gets no return (`installmentFeeReturnOf`).
+   * A read error propagates: the outbox retries it.
+   */
+  private async installmentFeeInvoiceKeys(
+    packageId: string,
+  ): Promise<Array<{ type: string; sourceId: string }>> {
+    const basis = await this.documents.resolveInstallmentFeeBasis(packageId);
+    const packageIds = new Set([
+      packageId,
+      ...(basis?.paymentPackageIds ?? []),
+    ]);
+    return [...packageIds].map((sourceId) => ({
+      type: INSTALLMENT_FEE_TYPE,
+      sourceId,
+    }));
+  }
+
+  /**
+   * What the installment fee document of `inv` should carry now (VAT
+   * included), at the document's own VAT rate. 0 when the package has no fee
+   * left.
+   */
+  private async installmentFeeDocumentNow(inv: FiscalInvoice) {
+    const basis = await this.documents.resolveInstallmentFeeBasis(inv.sourceId);
+    if (!basis) return null;
+    return buildInstallmentFeeDocument({
+      orders: basis.orders,
+      paymentFeeFullyRefunded: basis.paymentFeeFullyRefunded,
+      vatRatePct: Number(inv.vatRate),
+    });
+  }
+
+  /**
+   * The return the installment fee document owes this refund: the attempt's
+   * fee share, capped at what the document carries beyond its current
+   * amount. Without an adjustment (a refund event without an attempt)
+   * everything outstanding.
+   */
+  private async installmentFeeReturnFor(
+    inv: FiscalInvoice,
+    adjustment: ResolvedRefundAdjustment | undefined,
+    priorReturns: ReadonlyArray<{
+      total: Prisma.Decimal;
+      netAmount: Prisma.Decimal;
+    }>,
+  ): Promise<InstallmentFeeReturn | null> {
+    const now = adjustment ? await this.installmentFeeDocumentNow(inv) : null;
+    return installmentFeeReturnOf({
+      issued: { total: Number(inv.total), net: Number(inv.netAmount) },
+      priorReturns: priorReturns.map((row) => ({
+        total: Number(row.total),
+        net: Number(row.netAmount),
+      })),
+      targetGross: now?.gross ?? 0,
+      refundedFee: adjustment ? adjustment.installmentFeeRefund : null,
+      vatRatePct: Number(inv.vatRate),
+    });
   }
 
   private async reverseByKeys(
@@ -278,6 +361,9 @@ export class InvoiceReversalService {
     inv: FiscalInvoice,
     adjustment?: ResolvedRefundAdjustment,
   ): Promise<void> {
+    if (inv.type === INSTALLMENT_FEE_TYPE) {
+      return this.repriceUnsentInstallmentFeeInvoice(inv, adjustment);
+    }
     const gross = adjustment ? await this.resolveCurrentInvoiceGross(inv) : 0;
     if (gross <= 0.009) {
       await this.prisma.fiscalInvoice.update({
@@ -314,6 +400,43 @@ export class InvoiceReversalService {
               discountTotal: invoiceDiscountFromLines(doc.lines),
             }
           : {}),
+      },
+    });
+  }
+
+  /**
+   * An unsent installment fee document follows the fee left after refunds:
+   * repriced in place (amounts and its single line, at its own VAT rate), or
+   * cancelled locally when nothing is left. Like the other documents, a
+   * refund event without an attempt cancels it.
+   */
+  private async repriceUnsentInstallmentFeeInvoice(
+    inv: FiscalInvoice,
+    adjustment?: ResolvedRefundAdjustment,
+  ): Promise<void> {
+    const now = adjustment ? await this.installmentFeeDocumentNow(inv) : null;
+    if (!now || now.gross <= 0.009) {
+      await this.prisma.fiscalInvoice.update({
+        where: { id: inv.id },
+        data: {
+          status: "cancelled",
+          cancelledAt: new Date(),
+          cancelReason: "refunded_before_issue",
+          refundAdjustedAt: adjustment?.finalizedAt,
+        },
+      });
+      return;
+    }
+    await this.prisma.fiscalInvoice.update({
+      where: { id: inv.id },
+      data: {
+        netAmount: now.net,
+        taxAmount: now.tax,
+        total: now.gross,
+        status: "pending",
+        providerResultMsg: null,
+        refundAdjustedAt: adjustment?.finalizedAt,
+        lineItems: now.lines as unknown as Prisma.InputJsonValue,
       },
     });
   }
@@ -506,7 +629,7 @@ export class InvoiceReversalService {
         billingReference: inv.invoiceNumber,
         status: { not: "cancelled" },
       },
-      select: { total: true },
+      select: { total: true, netAmount: true },
     });
     const alreadyReversed = this.documents.round2(
       priorReturns.reduce((sum, row) => sum + Number(row.total), 0),
@@ -516,12 +639,23 @@ export class InvoiceReversalService {
     );
     if (remaining <= 0.009) return;
 
-    const invoiceAdjustment = await this.resolveInvoiceAdjustment(
-      inv,
-      adjustment,
-    );
+    // The installment fee document is reversed by the fee refunded, not by
+    // the goods ratio (AS-F3); its return is decided before the cancel check
+    // because "fully refunded" means "this return takes all that is left".
+    const isInstallmentFee = inv.type === INSTALLMENT_FEE_TYPE;
+    const installmentReturn = isInstallmentFee
+      ? await this.installmentFeeReturnFor(inv, adjustment, priorReturns)
+      : null;
+    const invoiceAdjustment = isInstallmentFee
+      ? {
+          refundRatio: 0,
+          fullyRefunded: installmentReturn?.closesDocument ?? false,
+        }
+      : await this.resolveInvoiceAdjustment(inv, adjustment);
     const canCancel =
-      (!adjustment || invoiceAdjustment.fullyRefunded) &&
+      (isInstallmentFee
+        ? invoiceAdjustment.fullyRefunded
+        : !adjustment || invoiceAdjustment.fullyRefunded) &&
       alreadyReversed <= 0.009 &&
       inv.documentType === "EARCHIVE" &&
       this.provider.eArchiveReversalStrategy(inv.issuedAt) === "CANCEL";
@@ -611,6 +745,27 @@ export class InvoiceReversalService {
       return;
     }
 
+    if (isInstallmentFee) {
+      if (!installmentReturn) return;
+      if (
+        adjustment &&
+        installmentReturn.total + 0.009 < adjustment.installmentFeeRefund &&
+        !installmentReturn.closesDocument
+      ) {
+        // Less than the attempt's fee share is due: an earlier return or the
+        // document's own amount already covers the rest. Traceable, no PII.
+        this.logger.warn(
+          `INSTALLMENT_FEE_RETURN_CAPPED invoice=${inv.invoiceNumber} attempt=${adjustment.refundAttemptId} share=${adjustment.installmentFeeRefund} due=${installmentReturn.total}`,
+        );
+      }
+      await this.createReturnInvoice(inv, reversalSourceId, {
+        total: installmentReturn.total,
+        net: installmentReturn.net,
+        lines: installmentReturn.lines,
+      });
+      return;
+    }
+
     const baseGross = adjustment
       ? await this.resolveInvoiceRefundBase(inv)
       : Number(inv.total);
@@ -657,6 +812,27 @@ export class InvoiceReversalService {
       ? Math.min(componentTotals.net, returnTotal)
       : this.documents.round2(returnTotal * netRatio);
 
+    await this.createReturnInvoice(inv, reversalSourceId, {
+      total: returnTotal,
+      net: returnNet,
+      lines: componentLines,
+    });
+  }
+
+  /**
+   * Cuts the RETURN invoice of `inv` under `reversalSourceId` (one per refund
+   * attempt, idempotent through `(type, sourceId)`) and sends it.
+   */
+  private async createReturnInvoice(
+    inv: FiscalInvoice,
+    reversalSourceId: string,
+    amounts: { total: number; net: number; lines: InvoiceLineItem[] },
+  ): Promise<void> {
+    const {
+      total: returnTotal,
+      net: returnNet,
+      lines: componentLines,
+    } = amounts;
     const now = new Date();
     // Aynı sayaç satırında başka bir kesimle çakışırsa (P2034) yeniden dene;
     // kaybeden transaction numara tüketmez. Bkz. invoice-write-conflict.ts.
