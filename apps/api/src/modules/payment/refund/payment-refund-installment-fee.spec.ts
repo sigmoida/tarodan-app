@@ -32,7 +32,14 @@ interface Attempt {
   providerResponse: Prisma.JsonValue | null;
 }
 
-function world(opts: { fee?: string; isTest?: boolean } = {}) {
+function world(
+  opts: {
+    fee?: string;
+    isTest?: boolean;
+    /** Overrides of the order row (e.g. a pre-ship `iptal`). */
+    order?: Record<string, unknown>;
+  } = {},
+) {
   const fee = d(opts.fee ?? "66.38");
   const state = {
     metadata: {} as Record<string, unknown>,
@@ -143,6 +150,7 @@ function world(opts: { fee?: string; isTest?: boolean } = {}) {
     cancellationType: "iade",
     buyer: { id: "b1", email: "b@x", displayName: "B" },
     seller: { id: "s1", email: "s@x", displayName: "S" },
+    ...opts.order,
   };
   const payment = {
     id: "pay-1",
@@ -234,6 +242,10 @@ function world(opts: { fee?: string; isTest?: boolean } = {}) {
     emitPaymentRefunded: jest.fn().mockResolvedValue(undefined),
   };
   const providerEvents = { record: jest.fn().mockResolvedValue(undefined) };
+  const notifications = {
+    notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
+    notifyOrderCancelledByPlatform: jest.fn().mockResolvedValue(undefined),
+  };
   const commissionLedger = {
     applyRefund: jest.fn().mockResolvedValue(undefined),
     applyRefundAmounts: jest.fn().mockResolvedValue(undefined),
@@ -243,9 +255,7 @@ function world(opts: { fee?: string; isTest?: boolean } = {}) {
     { get: jest.fn().mockReturnValue(undefined) } as never,
     { resolve: () => paytr } as never,
     events as never,
-    {
-      notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
-    } as never,
+    notifications as never,
     commissionLedger as never,
     { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as never,
     { cancelSuratShipmentIfExists: jest.fn() } as never,
@@ -263,6 +273,8 @@ function world(opts: { fee?: string; isTest?: boolean } = {}) {
       cancelledBy: CancellationActor.buyer,
     });
   return {
+    service,
+    notifications,
     state,
     payment,
     paytr,
@@ -399,6 +411,63 @@ describe("processRefund of an installment payment (the vade farkı share, D7)", 
     ]);
   });
 
+  it("prices a refused attempt's fee share again from the refunds done meanwhile", async () => {
+    const w = world();
+    // 400.00 refused by PayTR (no money moved): priced 26.55 at the time.
+    w.paytr.createRefund.mockRejectedValueOnce(
+      new ProviderRefundNotSentException("not sent", "ECONNREFUSED"),
+    );
+    await expect(w.refund(400, "part-1")).rejects.toThrow();
+    expect(w.state.attempts[0].installmentFeeAmount.toFixed(2)).toBe("26.55");
+    // 300.00 goes out meanwhile: round2(66.38 x 0.3) = 19.91.
+    await w.refund(300, "part-2");
+    expect(w.state.attempts[1].installmentFeeAmount.toFixed(2)).toBe("19.91");
+    // The refused 400.00 again, now on top of the 300.00: cumulatively
+    // round2(66.38 x 0.7) = 46.47, minus 19.91 = 26.56 (a kuruş more than
+    // its first price, which would leave the cumulative share short).
+    await w.refund(400, "part-1");
+    expect(w.state.attempts[0].installmentFeeAmount.toFixed(2)).toBe("26.56");
+    expect(w.state.attempts[0].amount.toFixed(2)).toBe("426.56");
+    // The last 300.00 completes the order: the rest, 66.38 - 46.47.
+    await w.refund(300, "part-3");
+    expect(w.state.attempts[2].installmentFeeAmount.toFixed(2)).toBe("19.91");
+    expect(w.paytr.createRefund.mock.calls.map((c) => c[1])).toEqual([
+      426.55, 319.91, 426.56, 319.91,
+    ]);
+    const feeBack = w.state.attempts
+      .filter((a) => a.status === RefundAttemptStatus.finalized)
+      .reduce((sum, a) => sum.plus(a.installmentFeeAmount), d(0));
+    expect(feeBack.toFixed(2)).toBe("66.38");
+  });
+
+  it("tells the buyer of a pre-ship cancel the cash back with the fee share", async () => {
+    const w = world({
+      order: { status: "preparing", cancellationType: "iptal" },
+    });
+    await w.refund(1000, "cancel-1");
+    expect(w.notifications.notifyOrderCancelledParties).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ORDER_ID }),
+      1066.38,
+    );
+    expect(w.events.emitPaymentRefunded).not.toHaveBeenCalled();
+  });
+
+  it("tells the buyer of a platform cancel the cash back with the fee share", async () => {
+    const w = world({ order: { status: "preparing" } });
+    await w.service.processRefund(ORDER_ID, 1000, {
+      idempotencyKey: "platform-cancel-1",
+      cancelledBy: CancellationActor.platform,
+      adminCancelReasonCode: "stock_error",
+    });
+    expect(w.notifications.notifyOrderCancelledByPlatform).toHaveBeenCalledWith(
+      {
+        orderId: ORDER_ID,
+        reasonCode: "stock_error",
+        refundAmount: 1066.38,
+      },
+    );
+  });
+
   it("a single payment is unchanged: PayTR gets the goods amount, no fee share", async () => {
     const w = world({ fee: "0" });
     const result = await w.refund(400, "part-1");
@@ -420,6 +489,11 @@ describe("processRefund of an installment payment (the vade farkı share, D7)", 
     await w.refund(1000, "full-1");
     expect(w.paytr.createRefund).not.toHaveBeenCalled();
     expect(w.state.attempts[0].amount.toFixed(2)).toBe("1066.38");
+    // The simulated PayTR answer carries the same return_amount.
+    expect(w.state.metadata.refundResult).toMatchObject({
+      return_amount: 1066.38,
+      testLane: true,
+    });
     expect(w.ledger.recordRefund).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ installmentFeeRefund: 66.38 }),
