@@ -228,6 +228,7 @@ export class PaytrReportMatchingService {
     merchantOid: string;
     type: PaytrStatementLineType;
     amount: unknown;
+    installment?: number | null;
     cardBrand?: string | null;
     maskedPan?: string | null;
     feeRate?: Prisma.Decimal.Value | null;
@@ -488,9 +489,32 @@ export class PaytrReportMatchingService {
    * `INSTALLMENT_CARD_MISMATCH`, since the fee may be under-recovered; a
    * deduction rate far from the priced one is a warning,
    * `INSTALLMENT_RATE_DRIFT`. The money is collected and the count is right:
-   * nothing is changed. No card digits are logged.
+   * nothing is changed. No card digits are logged. Best effort: the line is
+   * already matched, so a failure here is a warning and never stops the run.
+   * A line PayTR reports as a single payment is not looked up.
    */
   private async checkInstallmentCard(
+    line: {
+      id: string;
+      merchantOid: string;
+      installment?: number | null;
+      cardBrand?: string | null;
+      maskedPan?: string | null;
+      feeRate?: Prisma.Decimal.Value | null;
+    },
+    paymentId: string,
+  ): Promise<void> {
+    if (line.installment != null && line.installment <= 1) return;
+    try {
+      await this.compareInstallmentCard(line, paymentId);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Installment card check failed for sale line ${line.id} (payment ${paymentId}): ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  private async compareInstallmentCard(
     line: {
       id: string;
       merchantOid: string;
@@ -575,11 +599,15 @@ export class PaytrReportMatchingService {
           },
         })
       : [];
+    const costByPaymentOid = new Map(
+      attempts.map((a) => [
+        `${a.paymentId}\u0000${a.merchantOid}`,
+        a.platformCostAmount,
+      ]),
+    );
     const expectedCostOf = (line: (typeof lines)[number]) =>
-      attempts.find(
-        (a) =>
-          a.merchantOid === line.merchantOid && a.paymentId === line.paymentId,
-      )?.platformCostAmount ?? null;
+      costByPaymentOid.get(`${line.paymentId}\u0000${line.merchantOid}`) ??
+      null;
 
     let recorded = 0;
     let failed = 0;

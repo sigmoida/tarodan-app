@@ -261,6 +261,46 @@ describe("PaytrReportMatchingService.matchStatementLines", () => {
       );
     });
 
+    it("a failing card check never stops the run: the line stays matched, a warning is logged", async () => {
+      const prisma = makePrisma({
+        lines: [makeLine({ amount: 100, cardBrand: "BONUS" })],
+        payment: { id: "pay-1", amount: 100, chargedAmount: null },
+      });
+      // The amount lookup answers; the card lookup that follows fails.
+      prisma.paymentChargeAttempt.findFirst
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error("db timeout"));
+      const warnLog = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+
+      const r = await new PaytrReportMatchingService(
+        prisma as never,
+      ).matchStatementLines();
+
+      expect(r.matched).toBe(1);
+      expect(warnLog).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Installment card check failed for sale line line-1",
+        ),
+      );
+      warnLog.mockRestore();
+    });
+
+    it("does not look up the attempt for a line PayTR reports as a single payment", async () => {
+      const prisma = makePrisma({
+        lines: [makeLine({ amount: 100, installment: 0 })],
+        payment: { id: "pay-1", amount: 100, chargedAmount: null },
+      });
+
+      await new PaytrReportMatchingService(
+        prisma as never,
+      ).matchStatementLines();
+
+      // Only the amount lookup (expectedPaytrChargeFor), no card lookup.
+      expect(prisma.paymentChargeAttempt.findFirst).toHaveBeenCalledTimes(1);
+    });
+
     it("says nothing when the quoted card paid at the priced rate", async () => {
       const { errors, warnings } = await run({
         cardBrand: "WORLD",
