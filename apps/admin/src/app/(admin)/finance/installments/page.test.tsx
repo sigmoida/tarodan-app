@@ -405,11 +405,14 @@ describe("rule form", () => {
     await open();
     await click(button(`${L}.rules.new`));
     await debounce();
+    expect(lastDialog().textContent).toContain("₺1.066,38");
     const calls = h.preview.mock.calls.length;
     await type(input("platformSharePct", lastDialog()), "abc");
     await debounce();
     expect(lastDialog().textContent).toContain(`${L}.preview.draftNeedsFix`);
     expect(h.preview.mock.calls.length).toBe(calls);
+    // The last valid draft's prices are not left on screen as if they held.
+    expect(lastDialog().textContent).not.toContain("₺1.066,38");
   });
 
   it("warns before saving when the rule overlaps a current one", async () => {

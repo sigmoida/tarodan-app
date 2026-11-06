@@ -9,6 +9,7 @@ import {
   ruleFieldOfErrorKey,
   ruleFormSchema,
   ruleToForm,
+  STALE_RULE_KEYS,
   type InstallmentRuleFormValues,
 } from "./rule-form";
 
@@ -99,6 +100,22 @@ describe("parseRuleForm", () => {
     );
     expect(input.platformSharePct).toBeNaN();
     expect(input.priority).toBeNaN();
+  });
+
+  it("never reads an empty or non-decimal share as a number (Number() would)", () => {
+    // Number("") is 0, Number("1e1") is 10, Number("0x10") is 16: each would
+    // pass the validator as a real share.
+    for (const text of ["", "  ", "1e1", "0x10", "+5", "-0", "Infinity"]) {
+      expect(
+        parseRuleForm(valid({ platformSharePct: text })).platformSharePct,
+      ).toBeNaN();
+      expect(errorsOf(valid({ platformSharePct: text }))).toEqual({
+        platformSharePct: "server.admin.installments.rule.shareRange",
+      });
+    }
+    for (const text of ["", "1e1", "0x10"]) {
+      expect(parseRuleForm(valid({ priority: text })).priority).toBeNaN();
+    }
   });
 });
 
@@ -222,5 +239,14 @@ describe("ruleFieldOfErrorKey", () => {
     ).toBe(null);
     expect(ruleFieldOfErrorKey("server.common.error")).toBe(null);
     expect(ruleFieldOfErrorKey(null)).toBe(null);
+  });
+});
+
+describe("STALE_RULE_KEYS", () => {
+  it("treats a version that is not current or no longer exists as stale", () => {
+    expect([...STALE_RULE_KEYS].sort()).toEqual([
+      "server.admin.installments.rule.notCurrent",
+      "server.admin.installments.rule.notFound",
+    ]);
   });
 });

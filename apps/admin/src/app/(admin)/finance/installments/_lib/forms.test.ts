@@ -25,6 +25,10 @@ describe("minimum amount form", () => {
     expect(messageOf("0")).toBeNull();
     expect(messageOf("1250,50")).toBeNull();
     expect(minAmountOf({ minAmount: "1250,50" })).toBe(1250.5);
+    // A dot is a decimal point, never grouping: "1.50" is 1,50 TL.
+    expect(minAmountOf({ minAmount: "1.50" })).toBe(1.5);
+    expect(minAmountOf({ minAmount: "0" })).toBe(0);
+    expect(() => minAmountOf({ minAmount: "1.000" })).toThrow();
   });
 
   it("refuses grouping (1.000 is never 1 TL) and an empty field", () => {
@@ -56,6 +60,12 @@ describe("preview query", () => {
       previewParamsOf({ segment: "free", amountText: "1000", family: "" }),
     ).toBeNull();
     expect(previewAmountOf("1000000,01")).toEqual({ status: "aboveMax" });
+    // The maximum itself is priced (the API's @Max is inclusive).
+    expect(previewAmountOf("1000000")).toEqual({
+      status: "ok",
+      amount: 1_000_000,
+    });
+    expect(previewAmountOf("0,01")).toEqual({ status: "ok", amount: 0.01 });
     // A well-formed 0 asks for an amount; it is not a refused format.
     expect(previewAmountOf("0,00")).toEqual({ status: "empty" });
     expect(previewAmountOf("1.000")).toEqual({ status: "refused" });
