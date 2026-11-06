@@ -323,10 +323,10 @@ describe("invoice double reversal on a real database (E2E)", () => {
     expect(full.fullyRefunded).toBe(true);
     let calls = 0;
     cancelHook = async () => {
-      calls++;
+      const call = ++calls;
       // eLogo is slow; a second cancel of the same document is refused.
       await new Promise((resolve) => setTimeout(resolve, 200));
-      return calls === 1
+      return call === 1
         ? { success: true }
         : { success: false, resultMsg: "already cancelled" };
     };
