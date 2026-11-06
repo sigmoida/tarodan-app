@@ -405,8 +405,7 @@ describe.each(["grid", "list"] as const)(
       expect(text).not.toContain("%38");
       expect(text).not.toContain("product.discount");
       expect(actionButtons()).toHaveLength(0);
-      // The other badges stay (trade), and the label is plain readable text.
-      expect(container.querySelector("a")!.textContent).toContain("faq.trade");
+      // The label is plain readable text, not hidden from screen readers.
       const label = Array.from(container.querySelectorAll("p")).find(
         (p) => p.textContent === "Satışta değil",
       )!;
@@ -434,32 +433,60 @@ describe.each(["grid", "list"] as const)(
   },
 );
 
-describe("ProductCard not-for-sale grid badges", () => {
-  it("drops only the discount from the stack and keeps two other badges", () => {
-    act(() =>
-      root.render(
-        <ProductCard
-          product={{
-            ...product,
-            oldPrice: 400,
-            discountPercent: 38,
-            isBoosted: true,
-            tradeAvailable: true,
-            feeCampaigns: ["Komisyonsuz"],
-          }}
-          noPriceLabel="Satışta değil"
-        />,
-      ),
-    );
-    const stack = container.querySelector<HTMLElement>(
-      '[data-testid="product-card-badges"]',
-    )!;
-    expect(Array.from(stack.children).map((c) => c.textContent)).toEqual([
-      "product.boostedBadge",
-      "faq.trade",
-    ]);
-    expect(container.querySelector("a .sr-only")!.textContent).toBe(
-      " product.boostedBadgeHint, faq.trade",
-    );
-  });
-});
+describe.each(["grid", "list"] as const)(
+  "ProductCard not-for-sale listing state (%s)",
+  (layout) => {
+    it("draws no listing badge and no out-of-stock state", () => {
+      act(() =>
+        root.render(
+          <ProductCard
+            product={{
+              ...product,
+              status: "sold",
+              oldPrice: 400,
+              discountPercent: 38,
+              isBoosted: true,
+              tradeAvailable: true,
+              feeCampaigns: ["Komisyonsuz"],
+            }}
+            layout={layout}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      const text = container.textContent ?? "";
+      expect(
+        container.querySelector('[data-testid="product-card-badges"]'),
+      ).toBeNull();
+      expect(container.querySelector(".absolute.top-1.left-1")).toBeNull();
+      expect(text).not.toContain("product.boostedBadge");
+      expect(text).not.toContain("faq.trade");
+      expect(text).not.toContain("Komisyonsuz");
+      expect(container.querySelector(".opacity-50")).toBeNull();
+      expect(container.querySelector("a .sr-only")).toBeNull();
+    });
+
+    it("own boosted listing: no boost action and no boost end date", () => {
+      const own: Product = {
+        ...product,
+        seller: { id: "me" },
+        isBoosted: true,
+        boostedUntil: "2099-01-01T00:00:00Z",
+      };
+      act(() => root.render(<ProductCard product={own} layout={layout} />));
+      expect(container.textContent).toContain("product.boostEndsAt");
+
+      act(() =>
+        root.render(
+          <ProductCard
+            product={own}
+            layout={layout}
+            noPriceLabel="Satışta değil"
+          />,
+        ),
+      );
+      expect(container.textContent).not.toContain("product.boostEndsAt");
+      expect(container.querySelector("button")).toBeNull();
+    });
+  },
+);

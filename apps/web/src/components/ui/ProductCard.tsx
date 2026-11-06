@@ -72,9 +72,10 @@ import { listingPath } from "@tarodan/types";
  * stays beside the price.
  *
  * `noPriceLabel` is the not-for-sale variant (a collection's custom item): the
- * price row shows that text instead of the price, and the card has no discount
- * badge and no action. The row keeps its height, so a grid of mixed cards
- * stays aligned.
+ * price row shows that text instead of the price, and the card has no listing
+ * badge (discount, boosted, trade, campaign), no out-of-stock treatment, no
+ * action and no boost end date. The row keeps its height, so a grid of mixed
+ * cards stays aligned. The heart still follows `href` / `showFavorite`.
  */
 
 function cardImageUrl(image: ProductImage | string | undefined): string {
@@ -127,7 +128,8 @@ export interface ProductCardProps {
   showFavorite?: boolean;
   /**
    * Not-for-sale variant: this text (e.g. "Satışta değil") replaces the price
-   * row's old price, price and discount badge, and the card shows no action.
+   * row's old price, price and discount badge; the card shows no listing
+   * badge, stock state or action.
    * For items that have no price at all; never pass a price of 0 to show.
    */
   noPriceLabel?: string;
@@ -168,16 +170,15 @@ export default function ProductCard({
   const withAction = forSale && linkHref !== null && !footer;
   const listing = toProductCardListing(product);
 
-  const outOfStock = isProductOutOfStock(product);
+  // Stock and the listing badges describe something for sale; the
+  // not-for-sale card shows neither.
+  const outOfStock = forSale && isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
   const salePercent = forSale ? getProductDiscountPercent(product) : 0;
-  // The badge selection without the discount when the card shows no price.
   const cardBadges = (max: number) =>
-    selectProductCardBadges(product, Infinity)
-      .filter((badge) => forSale || badge.kind !== "sale")
-      .slice(0, max);
+    forSale ? selectProductCardBadges(product, max) : [];
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
     : undefined;
@@ -304,6 +305,7 @@ export default function ProductCard({
             listing={listing}
             layout="list"
             withAction={withAction}
+            forSale={forSale}
           >
             {forSale ? (
               <>
@@ -395,6 +397,7 @@ export default function ProductCard({
             listing={listing}
             layout="grid"
             withAction={withAction}
+            forSale={forSale}
           >
             {forSale ? (
               <>
