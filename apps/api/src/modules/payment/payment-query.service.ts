@@ -21,6 +21,10 @@ import {
 import { dateRangeWhere } from "../../common/list";
 import { PaymentQueryDto } from "./dto";
 import { virtualOrderKind } from "./helpers/virtual-order-kind";
+import {
+  PAYMENT_CHARGE_CARD_INCLUDE,
+  paymentInstallmentFieldsOf,
+} from "./helpers/payment-installment-view";
 
 // Aktif (devam eden) iade talebi durumları — order-common.pickActiveRefundRequest
 // ile aynı liste. "refunded" burada YOK; tamamlanmış iade ayrı ele alınır.
@@ -77,6 +81,7 @@ export class PaymentQueryService {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
+        ...PAYMENT_CHARGE_CARD_INCLUDE,
         order: {
           select: {
             buyerId: true,
@@ -149,12 +154,16 @@ export class PaymentQueryService {
         );
       }
       const tcp = payment.tradeCashPayment;
+      // The payer's own view: the recipient sees no card or fee details.
+      const payerView =
+        capabilityAuthorized || (!!userId && tcp.payerId === userId);
       return {
         id: payment.id,
         orderId: null,
         tradeId: tcp.tradeId,
         status: payment.status,
         amount: Number(payment.amount),
+        ...(payerView ? paymentInstallmentFieldsOf(payment) : {}),
         currency: payment.currency,
         provider: payment.provider,
         // Grup ödemesindeki `pricing` ile aynı rol: ödeme sayfası tutarı tek
@@ -204,6 +213,8 @@ export class PaymentQueryService {
         groupNumber: group.groupNumber,
         status: payment.status,
         amount: Number(payment.amount),
+        // Only the cart's buyer (or the guest's capability) gets here.
+        ...paymentInstallmentFieldsOf(payment),
         currency: payment.currency,
         provider: payment.provider,
         providerTransactionId:
@@ -277,11 +288,16 @@ export class PaymentQueryService {
       virtualOrderKind(payment.order),
     );
 
+    // The buyer's own view (or the guest's capability); the seller, who may
+    // read the status too, sees no card or fee details.
+    const buyerView =
+      capabilityAuthorized || (!!userId && payment.order.buyerId === userId);
     return {
       id: payment.id,
       orderId: payment.orderId,
       status: payment.status,
       amount: Number(payment.amount),
+      ...(buyerView ? paymentInstallmentFieldsOf(payment) : {}),
       currency: payment.currency,
       provider: payment.provider,
       providerTransactionId:
@@ -492,6 +508,7 @@ export class PaymentQueryService {
         skip,
         take: limit,
         include: {
+          ...PAYMENT_CHARGE_CARD_INCLUDE,
           order: {
             include: {
               product: {
@@ -624,6 +641,11 @@ export class PaymentQueryService {
             tradeCash?.trade?.tradeNumber ??
             null,
           amount: Number(p.amount),
+          // The payer's own rows only: a seller's sale shows no card or fee.
+          ...((p.order?.buyerId ?? group?.buyerId ?? tradeCash?.payerId) ===
+          userId
+            ? paymentInstallmentFieldsOf(p)
+            : {}),
           currency: p.currency,
           provider: p.provider,
           status: p.status,

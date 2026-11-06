@@ -15,6 +15,7 @@ import { deriveOrderCancelCategory } from "./helpers/order-cancel-reasons";
 import { escrowReleaseAtOf } from "./helpers/order-escrow-release";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 import { orderKindOf } from "../payment/helpers/virtual-order-kind";
+import { paymentInstallmentFieldsOf } from "../payment/helpers/payment-installment-view";
 
 /**
  * Sipariş modülü ortak yardımcıları (sipariş yanıtı formatlama + ürün cache
@@ -426,6 +427,10 @@ export class OrderCommonService {
               id: p.id,
               status: p.status,
               amount: Number(p.amount),
+              // Installment count, fee and card: the buyer's view only.
+              ...(order.buyerId === userId
+                ? paymentInstallmentFieldsOf(p)
+                : {}),
               provider: p.provider,
               failureReason: p.failureReason ?? undefined,
             }
