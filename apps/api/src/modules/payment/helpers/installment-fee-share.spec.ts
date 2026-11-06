@@ -230,6 +230,52 @@ describe("installmentFeeShareOf: no fee to give", () => {
       ).toFixed(2),
     ).toBe("0.00");
   });
+
+  it("is 0 without goods money, even when an earlier refund gave less than its share", () => {
+    // The pro rata catch-up only rides on goods money: a zero-cash
+    // settlement never pays out the share an earlier refund did not take.
+    expect(
+      installmentFeeShareOf(
+        single("66.38", "1000.00", "0", [prior("o1", "400.00", "0.00")]),
+      ).toFixed(2),
+    ).toBe("0.00");
+  });
+});
+
+describe("installmentFeeShareOf: rounding and the payment's fee left", () => {
+  it("rounds a half kuruş up, not to even", () => {
+    // 10.01 x 500.00 / 1,000.00 = 5.005 -> 5.01 (half even would give 5.00).
+    expect(
+      installmentFeeShareOf(single("10.01", "1000.00", "500.00")).toFixed(2),
+    ).toBe("5.01");
+  });
+
+  it("never gives an order more than the payment's fee left", () => {
+    // Cart F 66.38 (39.83 / 26.55): a hand repair gave 60.00 back with the
+    // big order's 300.00, so 6.38 is all the payment has left for the small
+    // order, partial or full.
+    const small = (goodsRefund: string): InstallmentFeeShareInput => ({
+      orderId: "small",
+      orderFee: d("26.55"),
+      orderGoodsTotal: d("400.00"),
+      paymentFee: d("66.38"),
+      paymentGoodsTotal: d("1000.00"),
+      priorRefunds: [prior("big", "300.00", "60.00")],
+      goodsRefund: d(goodsRefund),
+    });
+    expect(installmentFeeShareOf(small("200.00")).toFixed(2)).toBe("6.38");
+    expect(installmentFeeShareOf(small("400.00")).toFixed(2)).toBe("6.38");
+  });
+
+  it("never goes negative when the payment's fee was over-given", () => {
+    // 70.00 of a 66.38 fee already went back (a hand repair): the refund
+    // that completes the payment gives nothing more, never a negative share.
+    expect(
+      installmentFeeShareOf(
+        single("66.38", "1000.00", "600.00", [prior("o1", "400.00", "70.00")]),
+      ).toFixed(2),
+    ).toBe("0.00");
+  });
 });
 
 describe("installmentFeeShareOf: a cart (F allocated per order)", () => {
@@ -330,6 +376,27 @@ describe("refundFeeShareFor (reads the inputs in the claim transaction)", () => 
     expect(fee.toFixed(2)).toBe("0.00");
     expect(findMany).not.toHaveBeenCalled();
     expect(orderFind).not.toHaveBeenCalled();
+  });
+
+  it("prices with the order's own fee share, not the payment's fee", async () => {
+    // Cart: F 66.38, the small order's share 26.55 of its 400.00. Half of
+    // its goods back -> round2(26.55 / 2) = 13.28 (the payment's fee would
+    // give 33.19).
+    const { db, orderFind } = reader({
+      payment: { amount: "1000.00", installmentFeeAmount: "66.38" },
+      orderFee: "26.55",
+    });
+    const fee = await refundFeeShareFor(db, {
+      paymentId: "p1",
+      orderId: "small",
+      orderGoodsTotal: "400.00",
+      goodsRefund: "200.00",
+    });
+    expect(fee.toFixed(2)).toBe("13.28");
+    expect(orderFind).toHaveBeenCalledWith({
+      where: { id: "small" },
+      select: { installmentFeeAmount: true },
+    });
   });
 
   it("reads every non-failed order refund of the payment, the attempt itself left out", async () => {
