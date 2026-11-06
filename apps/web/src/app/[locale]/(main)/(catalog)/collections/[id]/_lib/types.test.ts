@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   isNotForSale,
   itemCardProps,
+  itemDisplayTitle,
   itemToProduct,
+  orderCollectionItems,
+  sortCollectionItems,
   type CollectionItem,
 } from "./types";
 
@@ -55,5 +58,60 @@ describe("itemCardProps", () => {
     expect(props.href).toBeUndefined();
     expect(props.noPriceLabel).toBeUndefined();
     expect(props.product.price).toBe(100);
+  });
+});
+
+describe("orderCollectionItems / sortCollectionItems", () => {
+  const items = [
+    item({ id: "a", sortOrder: 2 }),
+    item({ id: "hidden", productStatus: "hidden", sortOrder: 1 }),
+    item({ id: "deleted", productStatus: "deleted", sortOrder: 3 }),
+    item({ id: "featured", isFeatured: true, sortOrder: 9 }),
+    item({ id: "custom", isCustom: true, productId: undefined, sortOrder: 0 }),
+  ];
+
+  it("the owner's order keeps hidden and deleted items, featured first", () => {
+    expect(orderCollectionItems(items).map((i) => i.id)).toEqual([
+      "featured",
+      "custom",
+      "hidden",
+      "a",
+      "deleted",
+    ]);
+  });
+
+  it("the public detail order still drops hidden and deleted listings", () => {
+    expect(sortCollectionItems(items).map((i) => i.id)).toEqual([
+      "featured",
+      "custom",
+      "a",
+    ]);
+  });
+
+  it("returns an empty list when there are no items", () => {
+    expect(orderCollectionItems(undefined)).toEqual([]);
+  });
+});
+
+describe("itemDisplayTitle", () => {
+  it("falls back when the listing has no usable title", () => {
+    expect(itemDisplayTitle(item({ productTitle: "  " }), "Untitled")).toBe(
+      "Untitled",
+    );
+    expect(
+      itemDisplayTitle(
+        item({ productTitle: undefined as unknown as string }),
+        "Untitled",
+      ),
+    ).toBe("Untitled");
+  });
+
+  it("prefers a custom item's own title", () => {
+    expect(
+      itemDisplayTitle(
+        item({ isCustom: true, customTitle: "Mine", productTitle: "" }),
+        "Untitled",
+      ),
+    ).toBe("Mine");
   });
 });

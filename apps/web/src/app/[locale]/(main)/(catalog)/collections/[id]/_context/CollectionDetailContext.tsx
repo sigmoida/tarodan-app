@@ -21,7 +21,7 @@ import { collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useAuthGate } from "@/hooks/useAuthGate";
-import { useConfirm } from "@/components/ConfirmProvider";
+import { useRemoveCollectionItem } from "../_hooks/useRemoveCollectionItem";
 import { isUUID, sortCollectionItems, type Collection } from "../_lib/types";
 
 function useCollectionDetailValue() {
@@ -32,7 +32,6 @@ function useCollectionDetailValue() {
   const { requireAuth, authModal } = useAuthGate();
   const t = useTranslations();
   const locale = useLocale();
-  const confirm = useConfirm();
   const collectionIdOrSlug = params.id as string;
   const collectionKey = queryKeys.collection.detail(collectionIdOrSlug);
 
@@ -118,19 +117,9 @@ function useCollectionDetailValue() {
     },
   });
 
-  const removeItemMutation = useMutation({
-    mutationFn: (itemId: string) =>
-      collectionsApi.removeItem(collection!.id, itemId),
-    onSuccess: async () => {
-      toast.success(t("collection.productRemoved"));
-      await invalidateCollection();
-    },
-    onError: (error: any) => {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to remove item:", error);
-      toast.error(t("collection.productRemoveFailed"));
-    },
-  });
+  const { requestRemove: handleRemoveItem } = useRemoveCollectionItem(
+    collection?.id,
+  );
 
   const handleLike = () => {
     requireAuth(
@@ -156,21 +145,6 @@ function useCollectionDetailValue() {
   const handleReport = () => {
     if (!requireAuth({ message: t("auth.authRequiredMessage") })) return;
     setShowReportModal(true);
-  };
-
-  const handleRemoveItem = async (itemId: string) => {
-    if (!collection) return;
-    if (
-      !(await confirm({
-        title: t("collection.removeProduct"),
-        description: t("collection.removeProductConfirm"),
-        confirmLabel: t("common.remove"),
-        cancelLabel: t("common.cancel"),
-        destructive: true,
-      }))
-    )
-      return;
-    removeItemMutation.mutate(itemId);
   };
 
   return {

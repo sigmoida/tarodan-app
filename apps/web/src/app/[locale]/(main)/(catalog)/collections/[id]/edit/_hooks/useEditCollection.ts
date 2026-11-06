@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,8 @@ import { useWebMutation } from "@/hooks/useWebMutation";
 import { queryKeys } from "@/lib/query/keys";
 import { useTranslations } from "next-intl";
 import type { Collection } from "../_lib/types";
+import { orderCollectionItems } from "../../_lib/types";
+import { useRemoveCollectionItem } from "../../_hooks/useRemoveCollectionItem";
 import { isUUID } from "../_lib/constants";
 import {
   collectionEditSchema,
@@ -121,7 +123,16 @@ export function useEditCollection() {
     },
   });
 
+  const { requestRemove, removingId } = useRemoveCollectionItem(collection?.id);
+  const items = useMemo(
+    () => orderCollectionItems(collection?.items),
+    [collection?.items],
+  );
+
   return {
+    items,
+    requestRemove,
+    removingId,
     router,
     authLoading,
     isAuthenticated,

@@ -1912,6 +1912,7 @@
     "characters": "karakter",
     "collection": "Koleksiyon",
     "removeProduct": "Ürünü kaldır",
+    "untitledItem": "Adsız ürün",
     "collectionsCount": "{count} koleksiyon",
     "startBuildingToday": "Koleksiyonunuzu bugün oluşturmaya başlayın",
     "membershipRequired": "Üyelik Yükseltme Gerekli",

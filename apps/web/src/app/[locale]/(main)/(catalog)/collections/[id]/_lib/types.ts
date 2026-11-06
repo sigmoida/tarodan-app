@@ -111,27 +111,46 @@ export const itemCardProps = (
 export const hasItemBadges = (item: CollectionItem): boolean =>
   item.isCustom || item.productStatus === "sold";
 
+/** Listing statuses a collection keeps showing; any other is hidden or deleted. */
+const SHOWN_LISTING_STATUSES = ["active", "sold", "reserved", "inactive"];
+
+/**
+ * Every item in display order, hidden and deleted listings too: featured items
+ * float to the top, then `sortOrder`. The owner's edit list uses it, so an item
+ * the detail page hides stays removable somewhere.
+ */
+export const orderCollectionItems = (
+  items: Collection["items"],
+): CollectionItem[] =>
+  items
+    ? [...items].sort((a, b) => {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        return a.sortOrder - b.sortOrder;
+      })
+    : [];
+
 /**
  * Visible + ordered items. Hidden/deleted listings are dropped, but sold/reserved
  * ones stay (shown with a SOLD badge) so a collection never looks empty after a
- * product sells. Featured items float to the top, then `sortOrder`.
+ * product sells.
  */
 export const sortCollectionItems = (
   items: Collection["items"],
 ): CollectionItem[] =>
-  items
-    ? [...items]
-        .filter(
-          (item) =>
-            item.isCustom ||
-            !item.productStatus ||
-            ["active", "sold", "reserved", "inactive"].includes(
-              item.productStatus,
-            ),
-        )
-        .sort((a, b) => {
-          if (a.isFeatured && !b.isFeatured) return -1;
-          if (!a.isFeatured && b.isFeatured) return 1;
-          return a.sortOrder - b.sortOrder;
-        })
-    : [];
+  orderCollectionItems(items).filter(
+    (item) =>
+      item.isCustom ||
+      !item.productStatus ||
+      SHOWN_LISTING_STATUSES.includes(item.productStatus),
+  );
+
+/** The title an item row shows; a listing without a usable title gets the fallback. */
+export const itemDisplayTitle = (
+  item: CollectionItem,
+  fallback: string,
+): string =>
+  (item.isCustom
+    ? item.customTitle || item.productTitle
+    : item.productTitle
+  )?.trim() || fallback;
