@@ -638,13 +638,12 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
       // A legacy single payment: the charged amount is the goods total.
       ["250.00", "250.00"],
     ]);
-    expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledWith({
-      where: {
-        paymentId: { in: ["pay-1", "pay-2"] },
-        merchantOid: { in: ["GRP1I", "ORD2"] },
-      },
-      select: { paymentId: true, merchantOid: true, chargedAmount: true },
-    });
+    expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.paymentChargeAttempt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { paymentId: { in: ["pay-1", "pay-2"] } },
+      }),
+    );
   });
 
   it("filters by an explicit status and can include resolved rows", async () => {

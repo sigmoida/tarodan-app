@@ -1,4 +1,5 @@
 import { Prisma, RefundAttemptStatus } from "@prisma/client";
+import { MONEY_EPSILON } from "./payment.constants";
 
 /**
  * The two money scales of a payment (ADR 0019):
@@ -95,10 +96,10 @@ export function refundGoodsPartOf(
 
 /**
  * Below this much goods money left, an order (or a payment) counts as fully
- * refunded: the same tolerance as the refund flow's "fully refunded" check
- * (`MONEY_EPSILON`), so the fee remainder goes with the refund that closes it.
+ * refunded: the refund flow's own "fully refunded" tolerance, so the fee
+ * remainder goes with the refund that closes it.
  */
-const GOODS_COMPLETION_EPSILON = new Prisma.Decimal("0.01");
+const GOODS_COMPLETION_EPSILON = new Prisma.Decimal(MONEY_EPSILON);
 
 /** An earlier refund attempt of the payment, as the fee share reads it. */
 export interface PriorFeeRefund extends RefundGoodsPartSource {
