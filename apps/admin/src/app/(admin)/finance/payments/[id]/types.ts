@@ -1,3 +1,5 @@
+import type { AdminPaymentInstallment } from "@tarodan/types";
+
 export interface PaymentDetail {
   id: string;
   sourceType: "order" | "checkout_group" | "trade" | "unlinked";
@@ -42,6 +44,8 @@ export interface PaymentDetail {
     }>;
   } | null;
   trade?: TradePaymentDetail | null;
+  /** Installment block (ADR 0019); absent on an older API. */
+  installment?: AdminPaymentInstallment;
   /** Ödemeye karşı başarıyla sonuçlanmış iade denemelerinin toplamı. */
   refundedTotal?: number;
   paymentHolds?: Array<{

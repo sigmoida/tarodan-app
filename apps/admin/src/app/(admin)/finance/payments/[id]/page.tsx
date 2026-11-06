@@ -32,6 +32,11 @@ import { type PaymentDetail } from "./types";
 import { RefundPaymentModal } from "./_modals/RefundPaymentModal";
 import { ForceCancelPaymentModal } from "./_modals/ForceCancelPaymentModal";
 import { TradePaymentSection } from "./_components/TradePaymentSection";
+import {
+  ChargeAttemptsSection,
+  PaymentInstallmentField,
+  PaymentInstallmentSection,
+} from "./_components/PaymentInstallmentSection";
 import { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -113,6 +118,12 @@ export default function PaymentDetailPage() {
                         </span>
                       </Field>
                     )}
+                    {p.installment && (
+                      <PaymentInstallmentField
+                        installment={p.installment}
+                        paidAt={p.paidAt}
+                      />
+                    )}
                     <Field label={t("admin.finance.payments.currency")}>
                       {p.currency}
                     </Field>
@@ -154,6 +165,18 @@ export default function PaymentDetailPage() {
                     </Alert>
                   )}
                 </SectionCard>
+
+                {p.installment && (
+                  <>
+                    <PaymentInstallmentSection
+                      installment={p.installment}
+                      paidAt={p.paidAt}
+                    />
+                    <ChargeAttemptsSection
+                      attempts={p.installment.chargeAttempts}
+                    />
+                  </>
+                )}
 
                 {p.trade ? (
                   <TradePaymentSection trade={p.trade} />
