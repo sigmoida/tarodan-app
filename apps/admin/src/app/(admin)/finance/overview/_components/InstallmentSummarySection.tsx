@@ -9,7 +9,10 @@ import { useTranslations } from "next-intl";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { CellMoney, CellNumber, col } from "@/components/table";
-import { installmentSegmentLabel } from "@/app/(admin)/finance/installments/_lib/segments";
+import {
+  installmentSegmentLabel,
+  isBuyerSegment,
+} from "@/app/(admin)/finance/installments/_lib/segments";
 import { installmentCountLabel } from "@/lib/payment-installment";
 import type { Translate } from "@/lib/statusLabels";
 import type {
@@ -46,7 +49,11 @@ const columns = (t: Translate) => [
   ),
   col.text<InstallmentSummaryRow>(
     t("admin.finance.installments.rules.columns.segment"),
-    (row) => installmentSegmentLabel(t, row.segment),
+    // A segment this build does not know shows its code, never a crash.
+    (row) =>
+      isBuyerSegment(row.segment)
+        ? installmentSegmentLabel(t, row.segment)
+        : row.segment,
     { sortable: false },
   ),
   col.number<InstallmentSummaryRow>(

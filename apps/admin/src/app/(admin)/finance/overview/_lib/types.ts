@@ -1,7 +1,5 @@
 /** @format */
 
-import type { InstallmentBuyerSegment } from "@tarodan/types";
-
 /** `GET /admin/finance/overview`, the API shape one to one (finance-reconciliation.types). */
 export interface ReconciliationLine {
   key: string;
@@ -55,8 +53,11 @@ export interface ComparisonSection {
  */
 export interface InstallmentSummaryRow {
   installmentCount: number;
-  /** The captured attempt's buyer segment (never the `all` wildcard). */
-  segment: InstallmentBuyerSegment;
+  /**
+   * The captured attempt's buyer segment as the database text: a buyer
+   * segment, but not narrowed on the wire, so the screen checks it.
+   */
+  segment: string;
   /** Captured installment payments. */
   payments: number;
   /** Σ installment fee the buyers paid, VAT included. */

@@ -115,6 +115,16 @@ describe("InstallmentSummarySection", () => {
     ]);
   });
 
+  it("shows the code of a segment this build does not know instead of crashing", () => {
+    view = mount(
+      <InstallmentSummarySection
+        summary={{ ...summary, rows: [row({ segment: "enterprise" })] }}
+        syncEnabled
+      />,
+    );
+    expect(tableRows()[0][1]).toBe("enterprise");
+  });
+
   it("adds a totals row under the columns", () => {
     view = mount(<InstallmentSummarySection summary={summary} syncEnabled />);
 
