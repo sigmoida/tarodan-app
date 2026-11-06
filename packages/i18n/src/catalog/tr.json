@@ -7228,7 +7228,7 @@
         "refundInstallment": {
           "amountLabel": "İade edilecek ürün tutarı, vade farkı hariç (boş bırakırsanız tam iade)",
           "noticeTitle": "Vade farkı da iade edilir",
-          "notice": "Girdiğiniz tutar vade farkı hariç ürün tutarıdır. Alıcıya bununla birlikte vade farkının orantılı payı da iade edilir; tam iadede vade farkının tamamı ({fee}) geri verilir.",
+          "notice": "Girdiğiniz tutar vade farkı hariç ürün tutarıdır. Alıcıya bununla birlikte vade farkının orantılı payı da iade edilir; ödemeyi tamamen kapatan iade, vade farkından kalanın tamamını geri verir.",
           "started": "İade başlatıldı: alıcıya {cash} iade edilecek ({fee} vade farkı dahil)."
         }
       },

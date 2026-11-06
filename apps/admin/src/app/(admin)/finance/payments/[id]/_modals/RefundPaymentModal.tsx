@@ -77,7 +77,8 @@ export function RefundPaymentModal({
     {
       invalidates: ["payments"],
       successMessage: ({ data }) =>
-        fee && data.cashRefunded != null && data.installmentFeeRefunded != null
+        // The split only when a fee share actually went back with it.
+        data.cashRefunded != null && (data.installmentFeeRefunded ?? 0) > 0
           ? t("admin.finance.payments.refundInstallment.started", {
               cash: fmtTry(data.cashRefunded) ?? "",
               fee: fmtTry(data.installmentFeeRefunded) ?? "",
@@ -158,9 +159,7 @@ export function RefundPaymentModal({
                   "admin.finance.payments.refundInstallment.noticeTitle",
                 )}
               >
-                {t("admin.finance.payments.refundInstallment.notice", {
-                  fee: fmtTry(fee.installmentFeeAmount) ?? "",
-                })}
+                {t("admin.finance.payments.refundInstallment.notice")}
               </Alert>
             </>
           ) : (

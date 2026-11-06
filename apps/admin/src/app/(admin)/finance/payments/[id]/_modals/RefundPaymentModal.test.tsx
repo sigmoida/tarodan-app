@@ -194,9 +194,9 @@ describe("RefundPaymentModal for an installment payment (ADR 0019)", () => {
     expect(text).toContain("admin.finance.payments.installment.chargedAmount");
     expect(text).toContain(fmtTry(1054.35));
     expect(text).toContain(`${R}.noticeTitle`);
-    expect(text).toContain(
-      `${R}.notice|${JSON.stringify({ fee: fmtTry(54.35) })}`,
-    );
+    // No fixed fee amount: after a partial refund less than F is left.
+    expect(text).toContain(`${R}.notice`);
+    expect(text).not.toContain(`${R}.notice|`);
     expect(text).toContain(`${R}.amountLabel`);
     expect(text).not.toContain("admin.finance.payments.totalPaymentAmount");
   });
@@ -236,6 +236,23 @@ describe("RefundPaymentModal for an installment payment (ADR 0019)", () => {
       })}`,
     );
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("keeps the plain message when no fee share went back", async () => {
+    h.manualRefund.mockResolvedValue({
+      data: {
+        success: true,
+        refundAmount: 0.4,
+        installmentFeeRefunded: 0,
+        cashRefunded: 0.4,
+      },
+    });
+    await type(amount(), "0,40");
+    await click(button(SUBMIT, dialogs()[0]));
+
+    expect(h.toast.success.mock.calls[0][0]).toBe(
+      "admin.finance.payments.refundStarted",
+    );
   });
 
   it("falls back to the plain message when an older API sends no split", async () => {

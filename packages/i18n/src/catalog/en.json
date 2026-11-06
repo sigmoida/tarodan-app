@@ -7228,7 +7228,7 @@
         "refundInstallment": {
           "amountLabel": "Goods amount to refund, before the installment fee (leave empty for a full refund)",
           "noticeTitle": "The installment fee is refunded too",
-          "notice": "The amount you enter is the goods amount before the installment fee. The buyer also gets the proportional share of the installment fee back; a full refund returns all of it ({fee}).",
+          "notice": "The amount you enter is the goods amount before the installment fee. The buyer also gets the proportional share of the installment fee back; the refund that closes the payment gives back all of the fee that is left.",
           "started": "Refund initiated: the buyer gets {cash} back ({fee} installment fee included)."
         }
       },
