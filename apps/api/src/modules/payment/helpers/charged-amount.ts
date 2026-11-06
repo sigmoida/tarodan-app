@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, RefundAttemptStatus } from "@prisma/client";
 
 /**
  * The two money scales of a payment (ADR 0019):
@@ -89,6 +89,175 @@ export function refundGoodsPartOf(
   attempt: RefundGoodsPartSource,
 ): Prisma.Decimal {
   return attempt.amount.minus(attempt.installmentFeeAmount);
+}
+
+// ── The installment fee share of a refund (ADR 0019, D7) ────────────────────
+
+/**
+ * Below this much goods money left, an order (or a payment) counts as fully
+ * refunded: the same tolerance as the refund flow's "fully refunded" check
+ * (`MONEY_EPSILON`), so the fee remainder goes with the refund that closes it.
+ */
+const GOODS_COMPLETION_EPSILON = new Prisma.Decimal("0.01");
+
+/** An earlier refund attempt of the payment, as the fee share reads it. */
+export interface PriorFeeRefund extends RefundGoodsPartSource {
+  orderId: string | null;
+}
+
+export interface InstallmentFeeShareInput {
+  /** The order this refund is for. */
+  orderId: string;
+  /** F_o: the order's share of the installment fee (`Order.installmentFeeAmount`). */
+  orderFee: Prisma.Decimal;
+  /** T_o: the order's goods total the refund flow caps against. */
+  orderGoodsTotal: Prisma.Decimal;
+  /** F: the payment's installment fee (`Payment.installmentFeeAmount`). */
+  paymentFee: Prisma.Decimal;
+  /** T: the payment's goods total (`Payment.amount`). */
+  paymentGoodsTotal: Prisma.Decimal;
+  /**
+   * Earlier refunds of the payment that took or may take money out (every
+   * status but `failed`), this attempt excluded. Each has its goods part and
+   * its fee share; legacy refunds without an attempt never carry a fee.
+   */
+  priorRefunds: readonly PriorFeeRefund[];
+  /** This refund's goods part (the refund flow's amount). */
+  goodsRefund: Prisma.Decimal;
+}
+
+function sumOf(rows: readonly PriorFeeRefund[]): {
+  goods: Prisma.Decimal;
+  fee: Prisma.Decimal;
+} {
+  return rows.reduce(
+    (acc, row) => ({
+      goods: acc.goods.plus(refundGoodsPartOf(row)),
+      fee: acc.fee.plus(row.installmentFeeAmount),
+    }),
+    { goods: new Prisma.Decimal(0), fee: new Prisma.Decimal(0) },
+  );
+}
+
+function atLeastZero(value: Prisma.Decimal): Prisma.Decimal {
+  return value.isNegative() ? new Prisma.Decimal(0) : value;
+}
+
+/**
+ * The installment fee (vade farkı) to give back with a refund of `goodsRefund`
+ * goods money, in kuruş. THE one rule (AS-L2: change it here only):
+ *
+ * - the fee follows the cash refunded, pro rata per order, whatever the
+ *   fault: cumulatively, `round2(F_o * goodsRefundedSoFar / T_o)` minus the
+ *   fee already given back, so many partial refunds never drift;
+ * - the refund that brings the order's goods refunds to T_o takes the rest of
+ *   F_o, so the fee refunds of a fully refunded order sum to F_o;
+ * - the refund that brings the PAYMENT's goods refunds to T takes the rest of
+ *   F: a cart refund can give back a sibling's shipping with the order that
+ *   closes the package, and the buyer still gets all of F back;
+ * - no goods money, no fee (a zero-cash settlement); a refund that closes the
+ *   order with goods money kept (return shipping charged) keeps the fee share
+ *   of the money kept.
+ *
+ * Worked examples (plan 4.4; `k = 0`: T 1,000.00, F 54.35): full refund
+ * 1,054.35; 400.00 then 600.00 -> 421.74 then 632.61; 940.00 with 60.00
+ * return shipping kept -> 991.09.
+ */
+export function installmentFeeShareOf(
+  input: InstallmentFeeShareInput,
+): Prisma.Decimal {
+  const zero = new Prisma.Decimal(0);
+  if (!input.paymentFee.gt(0) || !input.goodsRefund.gt(0)) return zero;
+
+  const payment = sumOf(input.priorRefunds);
+  const paymentRemaining = atLeastZero(input.paymentFee.minus(payment.fee));
+  if (
+    payment.goods
+      .plus(input.goodsRefund)
+      .gte(input.paymentGoodsTotal.minus(GOODS_COMPLETION_EPSILON))
+  ) {
+    return paymentRemaining;
+  }
+
+  if (!input.orderFee.gt(0) || !input.orderGoodsTotal.gt(0)) return zero;
+  const order = sumOf(
+    input.priorRefunds.filter((row) => row.orderId === input.orderId),
+  );
+  const orderRemaining = Prisma.Decimal.min(
+    atLeastZero(input.orderFee.minus(order.fee)),
+    paymentRemaining,
+  );
+  const goodsSoFar = order.goods.plus(input.goodsRefund);
+  if (goodsSoFar.gte(input.orderGoodsTotal.minus(GOODS_COMPLETION_EPSILON))) {
+    return orderRemaining;
+  }
+  const shareSoFar = input.orderFee
+    .times(goodsSoFar)
+    .div(input.orderGoodsTotal)
+    .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  return Prisma.Decimal.min(
+    atLeastZero(shareSoFar.minus(order.fee)),
+    orderRemaining,
+  );
+}
+
+/** The client the refund claim reads the fee share inputs with. */
+export interface FeeShareReader {
+  payment: Pick<Prisma.TransactionClient["payment"], "findUnique">;
+  order: Pick<Prisma.TransactionClient["order"], "findUnique">;
+  refundAttempt: Pick<Prisma.TransactionClient["refundAttempt"], "findMany">;
+}
+
+/**
+ * `installmentFeeShareOf` with its inputs read: the payment's and the
+ * order's fee and the payment's earlier refunds (every order, every status
+ * but `failed`, `excludeAttemptId` left out). Run it inside the refund claim
+ * transaction, with the payment row locked, so two refunds never count the
+ * same fee. A payment without a fee costs one query and returns 0.
+ */
+export async function refundFeeShareFor(
+  db: FeeShareReader,
+  input: {
+    paymentId: string;
+    orderId: string;
+    orderGoodsTotal: Prisma.Decimal.Value;
+    goodsRefund: Prisma.Decimal.Value;
+    excludeAttemptId?: string;
+  },
+): Promise<Prisma.Decimal> {
+  const payment = await db.payment.findUnique({
+    where: { id: input.paymentId },
+    select: { amount: true, installmentFeeAmount: true },
+  });
+  if (!payment || !payment.installmentFeeAmount.gt(0)) {
+    return new Prisma.Decimal(0);
+  }
+  const [order, priorRefunds] = await Promise.all([
+    db.order.findUnique({
+      where: { id: input.orderId },
+      select: { installmentFeeAmount: true },
+    }),
+    db.refundAttempt.findMany({
+      where: {
+        paymentId: input.paymentId,
+        orderId: { not: null },
+        status: { not: RefundAttemptStatus.failed },
+        ...(input.excludeAttemptId
+          ? { id: { not: input.excludeAttemptId } }
+          : {}),
+      },
+      select: { orderId: true, amount: true, installmentFeeAmount: true },
+    }),
+  ]);
+  return installmentFeeShareOf({
+    orderId: input.orderId,
+    orderFee: order?.installmentFeeAmount ?? new Prisma.Decimal(0),
+    orderGoodsTotal: new Prisma.Decimal(input.orderGoodsTotal),
+    paymentFee: payment.installmentFeeAmount,
+    paymentGoodsTotal: payment.amount,
+    priorRefunds,
+    goodsRefund: new Prisma.Decimal(input.goodsRefund),
+  });
 }
 
 // ── Charge attempts (one per signed form, keyed by merchant_oid) ────────────
