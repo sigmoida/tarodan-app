@@ -389,6 +389,7 @@ export default function PaymentDetailPage() {
             <RefundPaymentModal
               paymentId={p.id}
               amount={p.amount}
+              installment={p.installment}
               trade={
                 p.trade
                   ? {

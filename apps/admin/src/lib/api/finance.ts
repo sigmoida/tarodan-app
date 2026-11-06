@@ -22,6 +22,21 @@ export interface MarkPayoutTransferPaidBody {
 }
 
 /**
+ * `POST /admin/payments/:id/manual-refund` response. An order payment's
+ * refund carries both scales (ADR 0019): `refundAmount` is the goods part
+ * the admin entered, `cashRefunded` what PayTR gives back (goods plus the
+ * installment fee share, `installmentFeeRefunded`). A trade cash refund
+ * answers with `refundedAmount` only.
+ */
+export interface ManualRefundResponse {
+  success: boolean;
+  refundAmount?: number;
+  installmentFeeRefunded?: number;
+  cashRefunded?: number;
+  refundedAmount?: number;
+}
+
+/**
  * Finance domain: commission config, payments & invoices, seller
  * payouts, and tax (VAT/withholding) settings.
  */
@@ -145,7 +160,8 @@ export const financeApi = {
       reason?: string;
       idempotencyKey: string;
     },
-  ) => api.post(`/admin/payments/${id}/manual-refund`, data),
+  ) =>
+    api.post<ManualRefundResponse>(`/admin/payments/${id}/manual-refund`, data),
   getRefundAttempts: (status = "manual_review") =>
     api.get("/admin/refund-attempts", { params: { status } }),
   resolveRefundAttempt: (
