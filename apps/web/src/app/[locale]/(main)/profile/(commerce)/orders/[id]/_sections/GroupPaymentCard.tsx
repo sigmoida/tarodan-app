@@ -5,11 +5,13 @@
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { formatDate, formatPrice } from "@/lib/format";
+import InstallmentPaidLines from "@/components/payment/InstallmentPaidLines";
 import type { ServerOrderGroup } from "../../_lib/types";
 
 /**
- * Grubun TEK ödemesi (sepetin tamamı tek çekimdir) — alıcı görünümünde
- * kart ekstresiyle mutabakatın yapıldığı yer. Satıcı dilimi ödeme görmez.
+ * The group's ONE payment (the whole cart is one charge): in the buyer's view
+ * the place to reconcile with the card statement, installments included.
+ * The seller's slice sees no payment.
  */
 export default function GroupPaymentCard({
   group,
@@ -33,6 +35,19 @@ export default function GroupPaymentCard({
             {formatPrice(payment.amount)}
           </span>
         </div>
+        {/* The cart's one payment: its installment count, fee and charged
+            total are payment-level, so they belong here (not per order). */}
+        <InstallmentPaidLines
+          payment={payment}
+          renderRow={(row) => (
+            <div className="flex justify-between">
+              <span className="text-muted">{row.label}</span>
+              <span className="font-semibold text-heading tabular-nums">
+                {row.value}
+              </span>
+            </div>
+          )}
+        />
         {payment.paidAt && (
           <div className="flex justify-between">
             <span className="text-muted">{t("order.paidAtLabel")}</span>
