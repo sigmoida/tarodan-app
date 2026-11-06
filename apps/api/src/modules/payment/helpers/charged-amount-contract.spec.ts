@@ -32,13 +32,24 @@ const READS_STATEMENT_LINES = /\bpaytrStatementLine\b|PaytrStatementLine/;
 
 const OPERATOR = String.raw`(?:===|!==|==|!=|<=|>=|<|>|-(?!-))`;
 
+/**
+ * What may sit between a PSP amount and the operator that compares it: the
+ * closing paren of a wrapper (`Number(x)`), a scale (`x / 100`) or a method
+ * (`x.toFixed(2)`).
+ */
+const WRAPPED = String.raw`(?:\s*\)|\s*[/*]\s*\d+|\s*\.\s*\w+\s*\([^()]*\))*`;
+
 /** `x - y`, `x < y`, `x === y` ... with a PSP amount on either side. */
 function operatorNextTo(token: RegExp): RegExp {
   return new RegExp(
-    String.raw`(?:${token.source})\s*${OPERATOR}\s*[\w(.]` +
+    String.raw`(?:${token.source})${WRAPPED}\s*${OPERATOR}\s*[\w(.]` +
       String.raw`|[\w).]\s*${OPERATOR}\s*(?:[\w$]+(?:\?)?\.)*(?:${token.source})`,
   );
 }
+
+/** A Decimal comparison (`a.equals(b)`, `a.minus(b).abs()`, `a.lte(b)`). */
+const DECIMAL_COMPARISON =
+  /\.\s*(?:equals|eq|minus|sub|lt|lte|gt|gte|comparedTo|cmp)\s*\(/;
 
 /** A null or undefined check is not an amount comparison. */
 function withoutNullChecks(line: string): string {
@@ -80,8 +91,11 @@ export interface PspComparisonFinding {
 
 /**
  * Comparisons of a PayTR amount written outside the helper: a `Math.abs`
- * over one, or an operator next to one. Lines (or the line above) carrying
- * `psp-amount-ok:` are allowed.
+ * over one, an operator next to one (also through `Number(...)`, `/ 100` or
+ * `.toFixed(2)`), or a Decimal comparison on its line. Lines (or the line
+ * above) carrying `psp-amount-ok:` are allowed. A heuristic over names: an
+ * amount first copied into a local of another name is not seen, which is
+ * why the call sites import the helper (the second test below).
  */
 export function findPspAmountComparisons(
   source: string,
@@ -112,6 +126,7 @@ export function findPspAmountComparisons(
   }
   codeLines.forEach((line, i) => {
     if (nextToOperator.test(withoutNullChecks(line))) add(i);
+    if (tokens.test(line) && DECIMAL_COMPARISON.test(line)) add(i);
   });
   return [...findings.values()].sort((a, b) => a.line - b.line);
 }
@@ -188,6 +203,22 @@ describe("charged-amount contract: PayTR amounts are compared only through the h
       [
         "a statement line",
         "await this.prisma.paytrStatementLine.findMany();\nif (Math.abs(Number(line.amount) - ours) <= 0.05) {",
+      ],
+      [
+        "a kuruş amount scaled before the comparison",
+        "if (Number(dto.total_amount) / 100 !== Number(payment.amount)) {",
+      ],
+      [
+        "a formatted comparison",
+        "if (inquiry.paymentTotalTl.toFixed(2) !== Number(payment.amount).toFixed(2)) {",
+      ],
+      [
+        "a Decimal equality",
+        "if (!new Prisma.Decimal(inquiry.paymentTotalTl).equals(payment.amount)) {",
+      ],
+      [
+        "a Decimal difference",
+        "const off = new Prisma.Decimal(inquiry.paymentTotalTl).minus(payment.amount).abs().gt(tol);",
       ],
     ])("flags %s", (_case, source) => {
       expect(findPspAmountComparisons(source)).toHaveLength(1);
