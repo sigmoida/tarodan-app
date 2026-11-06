@@ -39,6 +39,7 @@ import { PaytrReportMatchingService } from "../../src/modules/payment/reconcilia
 import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
 import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
 import { PaymentProviderRegistry } from "../../src/modules/payment-providers/payment-provider.registry";
+import { RefundAttemptInFlightException } from "../../src/modules/payment-providers/refund-errors";
 import { PayTRCredentials } from "../../src/modules/payment-providers/paytr/paytr-credentials.service";
 import { PayTRReportService } from "../../src/modules/payment-providers/paytr/paytr-report.service";
 import { PayTRTransferService } from "../../src/modules/payment-providers/paytr/paytr-transfer.service";
@@ -588,6 +589,111 @@ describe("installment refunds and reconciliation on a real database (E2E)", () =
     ).rejects.toMatchObject({ status: 400 });
     expect(paytrRefunds).toHaveLength(1);
     expect(await attemptsOf(target.paymentId)).toHaveLength(1);
+  });
+
+  it("concurrent refunds of the cart's two orders hand out F exactly once", async () => {
+    const target = await capturedCart();
+
+    // Both orders at once: each order gives back its own share, so the sum
+    // is F whichever claim runs first (the lock itself is pinned by the
+    // same-order race below).
+    const results = await Promise.allSettled([
+      refunds.processRefund(target.orders.big, undefined, {
+        cancelledBy: CancellationActor.platform,
+      }),
+      refunds.processRefund(target.orders.small, undefined, {
+        cancelledBy: CancellationActor.platform,
+      }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual(["fulfilled", "fulfilled"]);
+
+    const attempts = await attemptsOf(target.paymentId);
+    expect(
+      attempts
+        .map((a) => [
+          a.orderId,
+          a.amount.toFixed(2),
+          a.installmentFeeAmount.toFixed(2),
+          a.status,
+        ])
+        .sort(),
+    ).toEqual(
+      [
+        [target.orders.big, "639.83", "39.83", RefundAttemptStatus.finalized],
+        [target.orders.small, "426.55", "26.55", RefundAttemptStatus.finalized],
+      ].sort(),
+    );
+    expect(
+      paytrRefunds
+        .map(([, amount]) => amount)
+        .reduce((sum, amount) => sum.plus(amount), D(0))
+        .toFixed(2),
+    ).toBe("1066.38");
+    for (const orderId of [target.orders.big, target.orders.small]) {
+      const l = await ledgerOf(orderId);
+      expect(l.unbalancedGroups).toBe(0);
+      expect(l.balance(LedgerAccount.installment_fee)).toBe("0.00");
+      expect(l.balance(LedgerAccount.seller_escrow)).toBe("0.00");
+    }
+    expect(
+      (
+        await prisma.payment.findUniqueOrThrow({
+          where: { id: target.paymentId },
+        })
+      ).status,
+    ).toBe(PaymentStatus.refunded);
+  });
+
+  it("concurrent partial refunds of one order: a second one in flight is refused, the fee still sums to F", async () => {
+    const target = await singleOrder();
+    const fields = await sign(target, 1066.38);
+    await callbacks.handlePayTRCallback(
+      signedCallback(fields.merchant_oid, "106638"),
+    );
+    await finalize(target.paymentId);
+
+    // 400.00 and 600.00 under their own keys at the same time. Under the
+    // payment lock a claim that finds the other attempt of the order still
+    // unresolved is refused before anything is sent (RefundAttemptInFlight);
+    // if the first one has already finished, both go through.
+    const parts = [
+      { goods: 400, key: `e2e-a5-race-1:${target.paymentId}` },
+      { goods: 600, key: `e2e-a5-race-2:${target.paymentId}` },
+    ];
+    const send = (part: (typeof parts)[number]) =>
+      refunds.processRefund(target.orderId, part.goods, {
+        idempotencyKey: part.key,
+        cancelledBy: CancellationActor.buyer,
+      });
+    const results = await Promise.allSettled(parts.map(send));
+    expect(results.some((r) => r.status === "fulfilled")).toBe(true);
+    for (const [i, result] of results.entries()) {
+      if (result.status === "fulfilled") continue;
+      expect(result.reason).toBeInstanceOf(RefundAttemptInFlightException);
+      // The refused one is sent again once the other one has finished.
+      await send(parts[i]);
+    }
+
+    const attempts = await attemptsOf(target.paymentId);
+    expect(attempts.map((a) => a.status)).toEqual([
+      RefundAttemptStatus.finalized,
+      RefundAttemptStatus.finalized,
+    ]);
+    expect(
+      attempts
+        .reduce((sum, a) => sum.plus(a.installmentFeeAmount), D(0))
+        .toFixed(2),
+    ).toBe("66.38");
+    expect(
+      paytrRefunds
+        .map(([, amount]) => amount)
+        .reduce((sum, amount) => sum.plus(amount), D(0))
+        .toFixed(2),
+    ).toBe("1066.38");
+    const l = await ledgerOf(target.orderId);
+    expect(l.unbalancedGroups).toBe(0);
+    expect(l.balance(LedgerAccount.installment_fee)).toBe("0.00");
+    expect(l.balance(LedgerAccount.refund)).toBe("1066.38");
   });
 
   it("auto-refunds an order cancelled before its capture with T_o + F_o", async () => {
