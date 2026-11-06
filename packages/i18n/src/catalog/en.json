@@ -3028,6 +3028,28 @@
         "retry": "Try again"
       },
       "cancelled": "The boost payment was cancelled."
+    },
+    "installments": {
+      "title": "Installment options",
+      "single": "Single payment",
+      "count": "{count} installments",
+      "monthly": "{count} x {amount}",
+      "total": "Total {amount}",
+      "fee": "Installment fee {amount}",
+      "noFee": "No installment fee",
+      "enterCard": "Enter your card number to see installment options.",
+      "loading": "Loading installment options",
+      "notEligible": "This card can only be used for a single payment.",
+      "notOffered": "Only a single payment is available for this payment.",
+      "belowMinimum": "Installments are available for payments of {amount} or more.",
+      "unavailable": "Installment options cannot be shown right now. You can pay in a single payment.",
+      "terms": "{count} installments: {monthly} per month, installment fee {fee}, total {total}.",
+      "refundNote": "A refund of an installment payment may reach your card in installments, depending on your bank."
+    },
+    "summary": {
+      "installments": "Installments",
+      "installmentFee": "Installment fee",
+      "chargedTotal": "Charged to card"
     }
   },
   "bankAccount": {
@@ -3658,7 +3680,10 @@
       "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
       "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
       "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
-      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz."
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz.",
+      "installmentTermsField": "For an installment payment: the number of installments, the monthly installment amount, the installment fee (VAT included) and the total amount charged to the card",
+      "installmentPaymentTerms": "A credit card payment in installments is possible only with the options offered on the payment screen for the Buyer's card and the payment amount; a single payment can always be chosen and carries no installment fee. If the Buyer chooses installments, the number of installments, the monthly installment amount, the installment fee and the total amount charged to the card are shown on the payment screen before the payment is confirmed. The installment fee is the price of paying in installments: it is added to the total amount payable as a separate line, collected by the Platform and invoiced to the Buyer on a separate document, VAT included. How the installments appear on the card statement depends on the issuing bank.",
+      "installmentRefundTerms": "If an order paid in installments is withdrawn from, returned or cancelled, the installment fee is refunded to the Buyer in proportion to the amount refunded; when the whole order is refunded, the whole installment fee is refunded. Depending on the issuing bank, the refund may reach the Buyer's card in installments."
     },
     "terms": {
       "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
@@ -4174,7 +4199,8 @@
       "security": "Security",
       "securityDesc": "Your card details are encrypted with 256-bit SSL. We do not store your card number on our payment page.",
       "installments": "Installments",
-      "installmentsDesc": "Installment options are shown at checkout according to bank promotions."
+      "installmentsDesc": "Card payments are currently taken as a single payment.",
+      "installmentsDescEnabled": "Installment options for eligible credit cards are shown on the payment screen once you enter your card number."
     },
     "returns": {
       "title": "Returns & Exchanges",
@@ -11790,7 +11816,7 @@
       "installmentUnavailable": "Installments are unavailable right now. You can continue with a single payment.",
       "installmentOptionsInvalidRequest": "Send one card (the first card digits or a saved card) and one payment or amount to get installment options.",
       "installmentOptionsTooManyRequests": "Installment options were requested too often. Please try again shortly.",
-      "paymentAmountOutOfDate": "The payment amount is out of date. Please refresh the page and try again.",
+      "paymentAmountOutOfDate": "The payment amount has changed; your payment is being prepared again.",
       "installmentMail": {
         "label": "Installments",
         "summary": "{count} installments: {monthly} TL per month, installment fee {fee} TL, total {total} TL"

@@ -3028,6 +3028,28 @@
         "retry": "Tekrar dene"
       },
       "cancelled": "Öne çıkarma ödemesi iptal edildi."
+    },
+    "installments": {
+      "title": "Taksit seçenekleri",
+      "single": "Tek çekim",
+      "count": "{count} taksit",
+      "monthly": "{count} x {amount}",
+      "total": "Toplam {amount}",
+      "fee": "Vade farkı {amount}",
+      "noFee": "Vade farksız",
+      "enterCard": "Taksit seçeneklerini görmek için kart numaranızı girin.",
+      "loading": "Taksit seçenekleri yükleniyor",
+      "notEligible": "Bu kartla yalnız tek çekim ödeme yapılabilir.",
+      "notOffered": "Bu ödeme için yalnız tek çekim kullanılabilir.",
+      "belowMinimum": "Taksit, {amount} ve üzeri ödemelerde kullanılabilir.",
+      "unavailable": "Taksit seçenekleri şu an gösterilemiyor. Tek çekim ile ödeyebilirsiniz.",
+      "terms": "{count} taksit: aylık {monthly}, vade farkı {fee}, toplam {total}.",
+      "refundNote": "Taksitli ödemelerin iadesi, bankanızın uygulamasına göre kartınıza taksitler hâlinde yansıyabilir."
+    },
+    "summary": {
+      "installments": "Taksit",
+      "installmentFee": "Vade farkı",
+      "chargedTotal": "Karttan çekilen tutar"
     }
   },
   "bankAccount": {
@@ -3658,7 +3680,10 @@
       "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
       "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
       "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
-      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz."
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım > Siparişlerim alanından erişebilirsiniz.",
+      "installmentTermsField": "Taksitli ödemede: taksit sayısı, aylık taksit tutarı, vade farkı (KDV dahil) ve karttan çekilecek toplam tutar",
+      "installmentPaymentTerms": "Kredi kartıyla taksitli ödeme, yalnız ödeme ekranında Alıcı'nın kartı ve ödeme tutarı için sunulan seçeneklerle yapılabilir; tek çekim her zaman seçilebilir ve tek çekimde vade farkı alınmaz. Alıcı taksitli ödemeyi seçerse taksit sayısı, aylık taksit tutarı, vade farkı ve karttan çekilecek toplam tutar ödeme onayından önce ödeme ekranında gösterilir. Vade farkı, taksitlendirmenin bedeli olarak ödenecek toplam tutara ayrı bir kalem olarak eklenir, Platform tarafından tahsil edilir ve Alıcı'ya KDV dahil ayrı bir belgeyle faturalandırılır. Taksitlerin kart ekstresine yansıması kartı veren bankanın uygulamasına tabidir.",
+      "installmentRefundTerms": "Taksitli ödenen bir siparişte cayma, iade veya iptal halinde vade farkı, iade edilen tutarla orantılı olarak Alıcı'ya geri ödenir; siparişin tamamı iade edildiğinde vade farkının tamamı iade edilir. İade tutarı, kartı veren bankanın uygulamasına göre Alıcı'nın kartına taksitler hâlinde yansıyabilir."
     },
     "terms": {
       "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
@@ -4174,7 +4199,8 @@
       "security": "Güvenlik",
       "securityDesc": "Kart bilgileriniz 256-bit SSL ile şifrelenir. Ödeme sayfamızda kart numaranız bizde saklanmaz.",
       "installments": "Taksit",
-      "installmentsDesc": "Banka kampanyalarına göre taksit seçenekleri ödeme ekranında sunulmaktadır."
+      "installmentsDesc": "Kartla ödemeler şu an tek çekim olarak alınır.",
+      "installmentsDescEnabled": "Uygun kredi kartlarıyla taksit seçenekleri, kart numaranızı girdiğinizde ödeme ekranında gösterilir."
     },
     "returns": {
       "title": "İade ve Değişim",
@@ -11790,7 +11816,7 @@
       "installmentUnavailable": "Taksit şu an kullanılamıyor. Tek çekim ile devam edebilirsiniz.",
       "installmentOptionsInvalidRequest": "Taksit seçenekleri için bir kart (kart numarasının ilk haneleri ya da kayıtlı kart) ve bir ödeme ya da tutar gönderilmelidir.",
       "installmentOptionsTooManyRequests": "Taksit seçenekleri çok sık istendi. Lütfen biraz sonra tekrar deneyin.",
-      "paymentAmountOutOfDate": "Ödeme tutarı güncel değil. Lütfen sayfayı yenileyip tekrar deneyin.",
+      "paymentAmountOutOfDate": "Ödeme tutarı güncellendi; ödemeniz yeniden hazırlanıyor.",
       "installmentMail": {
         "label": "Taksit",
         "summary": "{count} taksit: aylık {monthly} TL, vade farkı {fee} TL, toplam {total} TL"
