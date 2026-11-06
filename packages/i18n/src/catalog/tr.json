@@ -7733,7 +7733,7 @@
           "validUntil": "Bitiş (isteğe bağlı)",
           "timeZoneHint": "Saatler İstanbul saatidir.",
           "validUntilHint": "Boş bırakılırsa süresiz. Bitiş anı dahil değildir.",
-          "timeLabel": "Saat",
+          "timeLabel": "{field} saati",
           "submitCreate": "Kuralı oluştur",
           "submitVersion": "Yeni sürümü kaydet"
         }

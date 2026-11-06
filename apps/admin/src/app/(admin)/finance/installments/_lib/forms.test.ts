@@ -4,6 +4,7 @@ import { fakeT } from "@/test-utils/dom";
 import type { Translate } from "@/lib/statusLabels";
 import { overlappingRules } from "./overlaps";
 import { previewAmountOf, previewParamsOf } from "./preview";
+import { fmtShare } from "./preview-columns";
 import { parseRuleForm } from "./rule-form";
 import {
   minAmountFormValues,
@@ -55,6 +56,9 @@ describe("preview query", () => {
       previewParamsOf({ segment: "free", amountText: "1000", family: "" }),
     ).toBeNull();
     expect(previewAmountOf("1000000,01")).toEqual({ status: "aboveMax" });
+    // A well-formed 0 asks for an amount; it is not a refused format.
+    expect(previewAmountOf("0,00")).toEqual({ status: "empty" });
+    expect(previewAmountOf("1.000")).toEqual({ status: "refused" });
   });
 
   it("carries the draft and the replaced version", () => {
@@ -160,5 +164,13 @@ describe("overlappingRules", () => {
     expect(
       overlappingRules({ ...input, minCount: 9, maxCount: 2 }, [existing({})]),
     ).toEqual([]);
+  });
+});
+
+describe("fmtShare", () => {
+  it("shows a share as typed", () => {
+    expect(fmtShare(100)).toBe("%100");
+    expect(fmtShare(12.5)).toBe("%12,5");
+    expect(fmtShare(33.33)).toBe("%33,33");
   });
 });

@@ -85,7 +85,7 @@ export function InstallmentRuleFormModal({
 
   const onSubmit = (submitted: InstallmentRuleFormValues) => {
     if (staleMessage) return;
-    write.mutate(parseRuleForm(submitted), {
+    write.mutate(submitted, {
       onSuccess: (result) => onSaved(result.overlaps),
       onError: (error) => {
         const message = extractErrorMessage(error, t("common.operationFailed"));
@@ -104,7 +104,6 @@ export function InstallmentRuleFormModal({
     locale,
     todayLabel: t("common.today"),
     clearLabel: t("common.clear"),
-    timeLabel: t(`${L}.timeLabel`),
   };
 
   return (
@@ -177,6 +176,7 @@ export function InstallmentRuleFormModal({
           name="validFrom"
           label={t(`${L}.validFrom`)}
           helperText={t(`${L}.timeZoneHint`)}
+          timeLabel={t(`${L}.timeLabel`, { field: t(`${L}.validFrom`) })}
           {...pickerLabels}
         />
         <FormDateTimePicker
@@ -184,6 +184,7 @@ export function InstallmentRuleFormModal({
           name="validUntil"
           label={t(`${L}.validUntil`)}
           helperText={t(`${L}.validUntilHint`)}
+          timeLabel={t(`${L}.timeLabel`, { field: t(`${L}.validUntil`) })}
           {...pickerLabels}
         />
       </div>

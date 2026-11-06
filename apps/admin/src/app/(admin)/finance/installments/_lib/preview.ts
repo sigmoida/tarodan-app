@@ -1,4 +1,4 @@
-import { STRICT_TL_AMOUNT, parseTlAmount } from "@tarodan/shared";
+import { ZERO_TL_AMOUNT, parseTlAmount } from "@tarodan/shared";
 import type { InstallmentBuyerSegment } from "@tarodan/types";
 import type { AdminInstallmentPreviewParams } from "@/lib/api/installments";
 import type { InstallmentRuleDraft } from "./rule-form";
@@ -13,10 +13,15 @@ export type PreviewAmount =
   | { status: "ok"; amount: number }
   | { status: "refused" | "empty" | "aboveMax" };
 
-/** The typed goods total: a TL amount above 0 and at most the maximum. */
+/**
+ * The typed goods total: a TL amount above 0 and at most the maximum. A
+ * well-formed 0 reads as no amount ("enter an amount"), not as a refused
+ * format.
+ */
 export function previewAmountOf(text: string): PreviewAmount {
-  const parsed = parseTlAmount(text, STRICT_TL_AMOUNT);
+  const parsed = parseTlAmount(text, ZERO_TL_AMOUNT);
   if (parsed.status !== "ok") return { status: parsed.status };
+  if (parsed.amount === 0) return { status: "empty" };
   if (parsed.amount > PREVIEW_AMOUNT_MAX) return { status: "aboveMax" };
   return parsed;
 }

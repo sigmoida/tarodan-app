@@ -50,7 +50,8 @@ export const ruleColumns = (t: Translate, actions: RuleRowActions | null) => [
   col.text<AdminInstallmentRule>(
     t(`${L}.columns.segment`),
     (rule) => installmentSegmentLabel(t, rule.segment),
-    { sortKey: "segment" },
+    // The label is translated; sorting the enum code would look random.
+    { sortable: false },
   ),
   col.text<AdminInstallmentRule>(
     t(`${L}.columns.counts`),
@@ -76,7 +77,7 @@ export const ruleColumns = (t: Translate, actions: RuleRowActions | null) => [
   col.status<AdminInstallmentRule>(
     t("common.status"),
     (rule) => ruleStatusBadge(t, rule.status),
-    { sortKey: "status" },
+    { sortable: false },
   ),
   col.stacked<AdminInstallmentRule>(
     t(`${L}.columns.created`),

@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import type {
   AdminInstallmentRule,
   AdminInstallmentRuleWriteResponse,
-  InstallmentRuleInput,
 } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { extractErrorI18nKey } from "@/lib/error";
@@ -18,7 +17,12 @@ import {
   INSTALLMENT_PREVIEW_RESOURCE,
   INSTALLMENT_RULES_RESOURCE,
 } from "../_lib/resources";
-import { STALE_RULE_KEYS, ruleFieldOfErrorKey } from "../_lib/rule-form";
+import {
+  STALE_RULE_KEYS,
+  parseRuleForm,
+  ruleFieldOfErrorKey,
+  type InstallmentRuleFormValues,
+} from "../_lib/rule-form";
 
 /** A write the API refused because the version is not current any more. */
 export const isStaleRuleError = (error: unknown) =>
@@ -67,12 +71,15 @@ export function useInstallmentRuleWrite(replaces?: AdminInstallmentRule) {
   const mutation = useRefreshOnStale();
   return useAdminMutation(
     async (
-      input: InstallmentRuleInput,
-    ): Promise<AdminInstallmentRuleWriteResponse> =>
-      (replaces
-        ? await adminApi.createInstallmentRuleVersion(replaces.id, input)
-        : await adminApi.createInstallmentRule(input)
-      ).data,
+      values: InstallmentRuleFormValues,
+    ): Promise<AdminInstallmentRuleWriteResponse> => {
+      const input = parseRuleForm(values);
+      return (
+        replaces
+          ? await adminApi.createInstallmentRuleVersion(replaces.id, input)
+          : await adminApi.createInstallmentRule(input)
+      ).data;
+    },
     {
       invalidates: RULE_WRITE_INVALIDATES,
       successMessage: replaces

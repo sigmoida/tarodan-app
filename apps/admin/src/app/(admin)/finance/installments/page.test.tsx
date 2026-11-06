@@ -324,6 +324,15 @@ describe("minimum amount", () => {
     expect(h.updateSettings).toHaveBeenCalledWith({ minAmount: 750.5 });
   });
 
+  it("is clean after saving the stored amount written differently", async () => {
+    await open();
+    await type(input("minAmount"), "500,00");
+    await click(button(`${L}.general.minAmountSave`));
+    expect(h.updateSettings).toHaveBeenCalledWith({ minAmount: 500 });
+    expect(input("minAmount").value).toBe("500");
+    expect(button(`${L}.general.minAmountSave`).disabled).toBe(true);
+  });
+
   it("refuses grouped text before any request", async () => {
     await open();
     await type(input("minAmount"), "1.000,00");

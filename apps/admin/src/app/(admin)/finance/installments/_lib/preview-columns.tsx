@@ -9,7 +9,10 @@ const NOT_SORTABLE = { sortable: false } as const;
 
 /** A share as typed: whole percents plain, others with two decimals. */
 export const fmtShare = (share: number) =>
-  fmtPercent(share, Number.isInteger(share) ? 0 : 2);
+  fmtPercent(
+    share,
+    Number.isInteger(share) ? 0 : Number.isInteger(share * 10) ? 1 : 2,
+  );
 
 /**
  * The preview table: per count whether it is offered and, if so, the

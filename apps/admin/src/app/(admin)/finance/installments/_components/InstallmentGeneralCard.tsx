@@ -16,7 +16,6 @@ import { useInstallmentSettingsWrites } from "../_hooks/useInstallmentSettings";
 import {
   isMinAmountErrorKey,
   minAmountFormValues,
-  minAmountOf,
   minAmountSchema,
   type MinAmountFormValues,
 } from "../_lib/settings-form";
@@ -41,6 +40,7 @@ export function InstallmentGeneralCard({
   const { enable, disable, saveMinAmount } = useInstallmentSettingsWrites();
   const switching = enable.isPending || disable.isPending;
 
+  // `values` follows the stored amount (it resets only when that changes).
   const form = useZodForm(minAmountSchema(t), {
     values: minAmountFormValues(settings.minAmount),
   });
@@ -74,7 +74,10 @@ export function InstallmentGeneralCard({
   };
 
   const onSaveMinAmount = (values: MinAmountFormValues) =>
-    saveMinAmount.mutate(minAmountOf(values), {
+    saveMinAmount.mutate(values, {
+      // The saved amount may be the stored one written differently
+      // ("500,00"), which `values` would not reset: reset to what was saved.
+      onSuccess: (saved) => form.reset(minAmountFormValues(saved.minAmount)),
       onError: (error) => {
         if (isMinAmountErrorKey(extractErrorI18nKey(error))) {
           form.setError("minAmount", {

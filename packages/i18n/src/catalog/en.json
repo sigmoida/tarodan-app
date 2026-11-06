@@ -7733,7 +7733,7 @@
           "validUntil": "Ends (optional)",
           "timeZoneHint": "Times are Istanbul time.",
           "validUntilHint": "Leave it empty for no end. The end time itself is not included.",
-          "timeLabel": "Time",
+          "timeLabel": "{field} time",
           "submitCreate": "Create rule",
           "submitVersion": "Save new version"
         }

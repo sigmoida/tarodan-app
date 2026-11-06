@@ -7,7 +7,11 @@ import { extractErrorI18nKey } from "@/lib/error";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { INSTALLMENT_SETTINGS_RESOURCE } from "../_lib/resources";
-import { isMinAmountErrorKey } from "../_lib/settings-form";
+import {
+  isMinAmountErrorKey,
+  minAmountOf,
+  type MinAmountFormValues,
+} from "../_lib/settings-form";
 
 /** The kill switch, the minimum amount and the latest rate snapshot. */
 export function useInstallmentSettings() {
@@ -40,7 +44,12 @@ export function useInstallmentSettingsWrites() {
     },
   );
   const saveMinAmount = useAdminMutation(
-    (minAmount: number) => adminApi.updateInstallmentSettings({ minAmount }),
+    async (values: MinAmountFormValues) =>
+      (
+        await adminApi.updateInstallmentSettings({
+          minAmount: minAmountOf(values),
+        })
+      ).data,
     {
       ...options,
       successMessage: t("admin.finance.installments.general.minAmountSaved"),
