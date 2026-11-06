@@ -35,6 +35,14 @@ import {
   refundInstallmentFeeOf,
 } from "../payment/helpers/charged-amount";
 import type { InstallmentFeeOrderRow } from "./invoice/installment-fee-basis";
+import {
+  REFUND_REQUEST_KEY_PREFIX,
+  refundRequestIdOf,
+} from "./helpers/refund-request-key";
+import {
+  buildPlatformSaleLines,
+  type InvoiceLineItem,
+} from "./invoice/invoice-lines";
 
 /** What the installment fee document of a package is built from. */
 export interface InstallmentFeeBasis {
@@ -60,6 +68,35 @@ const FEE_PAYMENT_SELECT = {
   installmentFeeAmount: true,
   chargeAttempt: { select: { feeVatRatePct: true } },
 } satisfies Prisma.PaymentSelect;
+
+/** How the reversal reads a package's fee basis (the cut uses the defaults). */
+export interface PackageFeeBasisOptions {
+  /** The rate the document was cut with; default: today's service rate. */
+  vatRate?: number;
+  /**
+   * Count every refund request with a FINALIZED refund attempt as refunded,
+   * not only those already stamped `refundedAt` (stamped after the money
+   * commits, in a separate write that can lag or fail).
+   */
+  countFinalizedRefunds?: boolean;
+  /** Read errors propagate instead of reading as "nothing refunded". */
+  strict?: boolean;
+}
+
+/** The platform sale document of an order: what it carries and its lines. */
+export interface PlatformSaleDocument {
+  order: {
+    sellerId: string;
+    buyerId: string;
+    orderNumber: string;
+    shippingAddress: Prisma.JsonValue;
+  };
+  categoryId: string | null;
+  /** The order total less what was refunded (VAT included). */
+  netSaleAmount: number;
+  /** Empty when the product line cannot be built (single-line document). */
+  lines: InvoiceLineItem[];
+}
 
 /**
  * Faturanın GÖVDESİNİ kuran katman — InvoicingService'ten birebir taşındı.
@@ -354,6 +391,23 @@ export class InvoiceDocumentService {
       .catch(() => null);
   }
 
+  /** Refund requests of the orders whose refund attempt is finalized. */
+  private async finalizedRefundRequestIds(
+    orderIds: string[],
+  ): Promise<string[]> {
+    const attempts = await this.prisma.refundAttempt.findMany({
+      where: {
+        orderId: { in: orderIds },
+        status: "finalized",
+        idempotencyKey: { startsWith: REFUND_REQUEST_KEY_PREFIX },
+      },
+      select: { idempotencyKey: true },
+    });
+    return attempts
+      .map((attempt) => refundRequestIdOf(attempt.idempotencyKey))
+      .filter((id): id is string => !!id);
+  }
+
   /**
    * Alıcıya GERİ VERİLMİŞ gidiş kargosu — PAKET toplamı.
    *
@@ -370,21 +424,44 @@ export class InvoiceDocumentService {
    */
   private async refundedBuyerShippingForOrders(
     orderIds: string[],
+    opts: PackageFeeBasisOptions = {},
   ): Promise<number> {
-    try {
-      const rows = await this.prisma.refundFinancialComponent.findMany({
+    // A refund request's `refundedAt` is stamped AFTER its money transaction
+    // commits, so a refund's invoice handler can run before it (its own, or
+    // a sibling's that lags): the reversal counts every request whose refund
+    // attempt is finalized.
+    const read = async () => {
+      const refundedRequestIds = opts.countFinalizedRefunds
+        ? await this.finalizedRefundRequestIds(orderIds)
+        : [];
+      return this.prisma.refundFinancialComponent.findMany({
         where: {
           componentCode: "outbound_shipping",
           treatment: "buyer_refund",
           refundRequest: {
             orderId: { in: orderIds },
-            refundedAt: { not: null },
+            ...(refundedRequestIds.length
+              ? {
+                  OR: [
+                    { refundedAt: { not: null } },
+                    { id: { in: refundedRequestIds } },
+                  ],
+                }
+              : { refundedAt: { not: null } }),
           },
         },
         select: { netAmount: true },
       });
+    };
+    try {
+      const rows = await read();
       return rows.reduce((sum, row) => sum + Number(row.netAmount), 0);
-    } catch {
+    } catch (error: unknown) {
+      // The reversal reads strictly: 0 here would make the document look
+      // like it should still carry the refunded shipping, and its return
+      // would be capped away for good. The error propagates, the outbox
+      // retries.
+      if (opts.strict) throw error;
       // İade bileşenleri okunamadı — kargo matrahı iade DÜŞÜLMEDEN kesilir ve
       // fazlası iade faturasıyla dengelenir; belgeyi hiç kesmemek daha kötüdür.
       return 0;
@@ -403,7 +480,10 @@ export class InvoiceDocumentService {
    * yoktur (v2 öncesi kayıt): kalem bazlı belge üretilemez, çağıran LEGACY
    * birleşik belgeye düşer.
    */
-  async resolvePackageFeeBasis(packageId: string): Promise<{
+  async resolvePackageFeeBasis(
+    packageId: string,
+    opts: PackageFeeBasisOptions = {},
+  ): Promise<{
     sellerId: string;
     buyerId: string;
     /** Koli kodu — belgeye "Sipariş No" olarak basılır. */
@@ -444,7 +524,10 @@ export class InvoiceDocumentService {
           },
         },
       })
-      .catch(() => null);
+      .catch((error: unknown) => {
+        if (opts.strict) throw error;
+        return null;
+      });
     if (!pkg || pkg.orders.length === 0) return null;
 
     // Alıcıya GERİ VERİLMİŞ gidiş kargosu: kargo payının kesinti defterinde
@@ -456,6 +539,7 @@ export class InvoiceDocumentService {
     // siparişten doğmuş olabilir ve orada düşülürse (matrahı 0) yok olurdu.
     const refundedBuyerShipping = await this.refundedBuyerShippingForOrders(
       pkg.orders.map((o) => o.id),
+      opts,
     );
     const shippingCarrierId =
       pkg.orders.find((o) => Number(o.buyerShippingAmount ?? 0) > 0)?.id ??
@@ -502,7 +586,8 @@ export class InvoiceDocumentService {
 
     // Oran TEK kez çözülür: altı kalem de aynı hizmet KDV'sine tabidir ve kalem
     // başına ayrı okumak, ayar kesim ortasında değişirse belgeleri ayrıştırırdı.
-    const vatRate = await this.resolveVatRate("buyer_service_fee");
+    const vatRate =
+      opts.vatRate ?? (await this.resolveVatRate("buyer_service_fee"));
 
     return {
       sellerId: pkg.sellerId,
@@ -596,6 +681,91 @@ export class InvoiceDocumentService {
   }
 
   /**
+   * The platform sale document of an order (the platform sells its own
+   * product): the order total less what was refunded, and its lines. The ONE
+   * source of the cut (`InvoiceIssuingService`), the reprice of an unsent
+   * document and what a sent one should carry now (`InvoiceReversalService`).
+   *
+   * `rates` pins the VAT rates (the reversal passes the ones the document was
+   * cut with); missing ones are today's. Null when the order does not exist.
+   * Read errors propagate.
+   */
+  async resolvePlatformSaleDocument(
+    orderId: string,
+    rates: {
+      productVatRate?: number | null;
+      serviceVatRate?: number | null;
+    } = {},
+  ): Promise<PlatformSaleDocument | null> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        sellerId: true,
+        buyerId: true,
+        orderNumber: true,
+        totalAmount: true,
+        checkoutGroupId: true,
+        shippingAddress: true,
+        quantity: true,
+        subtotal: true,
+        buyerShippingAmount: true,
+        buyerFeeAmount: true,
+        product: { select: { title: true, categoryId: true } },
+      },
+    });
+    if (!order) return null;
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        OR: [
+          { orderId },
+          ...(order.checkoutGroupId
+            ? [{ checkoutGroupId: order.checkoutGroupId }]
+            : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metadata: true },
+    });
+    const refundedOrders =
+      ((payment?.metadata as Record<string, unknown> | null)?.refundedOrders as
+        Record<string, number> | undefined) ?? {};
+    const orderTotal = Number(order.totalAmount);
+    const netSaleAmount = Math.max(
+      0,
+      orderTotal - Number(refundedOrders[orderId] ?? 0),
+    );
+
+    const categoryId = order.product?.categoryId ?? null;
+    const [productVatRate, serviceVatRate] = await Promise.all([
+      rates.productVatRate ?? this.resolveVatRate("platform_sale", categoryId),
+      rates.serviceVatRate ?? this.resolveVatRate("service_fee"),
+    ]);
+    // On a partial refund every line shrinks by the same ratio: the document
+    // always shows what the platform actually keeps.
+    const lines = buildPlatformSaleLines({
+      productName: order.product?.title ?? "",
+      quantity: Number(order.quantity ?? 1),
+      productGross: Number(order.subtotal ?? 0),
+      shippingNet: Number(order.buyerShippingAmount ?? 0),
+      buyerFeeNet: Number(order.buyerFeeAmount ?? 0),
+      productVatRate,
+      serviceVatRate,
+      ratio: orderTotal > 0 ? netSaleAmount / orderTotal : 0,
+    });
+    return {
+      order: {
+        sellerId: order.sellerId,
+        buyerId: order.buyerId,
+        orderNumber: order.orderNumber,
+        shippingAddress: order.shippingAddress,
+      },
+      categoryId,
+      netSaleAmount,
+      lines,
+    };
+  }
+
+  /**
    * The OTHER packages of an order's payment whose fee documents a refund of
    * the order must also reconcile: every package of the payment once the
    * payment's whole fee went back (the refund that closes the payment takes
@@ -671,7 +841,10 @@ export class InvoiceDocumentService {
    * kayıtlarda SİPARİŞ id'si olabilir. İki nesil de buradan çözülür, böylece
    * çağıranlar anahtarın hangi nesil olduğunu bilmek zorunda kalmaz.
    */
-  async resolveFeeLedgerTotals(sourceId: string): Promise<{
+  async resolveFeeLedgerTotals(
+    sourceId: string,
+    opts: { strict?: boolean } = {},
+  ): Promise<{
     sellerCommission: number;
     netSellerCommission: number;
     buyerFee: number;
@@ -682,7 +855,12 @@ export class InvoiceDocumentService {
         where: { id: sourceId },
         select: { orders: { select: { id: true } } },
       })
-      .catch(() => null);
+      .catch((error: unknown) => {
+        // The reversal reads strictly: a failed package read must not turn
+        // the package id into an order id and lose the document's target.
+        if (opts.strict) throw error;
+        return null;
+      });
     const orderIds = pkg?.orders.length
       ? pkg.orders.map((o) => o.id)
       : [sourceId];

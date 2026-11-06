@@ -2,9 +2,9 @@ import { Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { InvoiceReversalService } from "./invoice-reversal.service";
 import {
-  formatInstallmentFeeCancelClaim,
-  INSTALLMENT_FEE_CANCEL_LEASE_MS,
-} from "./helpers/installment-fee-cancel-claim";
+  formatInvoiceCancelClaim,
+  INVOICE_CANCEL_LEASE_MS,
+} from "./helpers/invoice-cancel-claim";
 import type {
   InstallmentFeeBasis,
   InvoiceDocumentService,
@@ -599,6 +599,53 @@ describe("InvoiceReversalService: installment fee document", () => {
     expect(returns().map((r) => r.sourceId)).toEqual(["fee-1:ra1"]);
   });
 
+  it("reverses both refunds in full when another refund's return lands between the target read and the cut (66.38 -> 26.55)", async () => {
+    const { service, refund, returns, store, db } = makeService();
+    const first = refund("ra1", "o1", 26.55);
+    const transaction = db.$transaction.getMockImplementation();
+    // This handler has read its target (39.83). ra2 finalizes now and its
+    // handler cuts its 13.28 return first; the old target would leave room
+    // for 13.27 only and cap this attempt short for good.
+    db.$transaction.mockImplementationOnce(async (fn) => {
+      await service.handleOrderRefund("o1", refund("ra2", "o1", 13.28));
+      return transaction ? transaction(fn) : fn(db);
+    });
+
+    await service.handleOrderRefund("o1", first);
+
+    expect(returns().map((r) => [r.sourceId, r.total])).toEqual([
+      ["fee-1:ra2", 13.28],
+      ["fee-1:ra1", 26.55],
+    ]);
+    expect(store.refundedFee.pkg1).toBe(39.83);
+  });
+
+  it("cuts no return on the late, replayed or doubled event of a refund the document was cut net of", async () => {
+    const { service, refund, returns, provider } = makeService({
+      strategy: "CANCEL",
+      invoices: [
+        sentFeeInvoice({
+          issuedAt: new Date(),
+          netAmount: D("33.19"),
+          taxAmount: D("6.64"),
+          total: D("39.83"),
+          originalTotal: D("39.83"),
+        }),
+      ],
+    });
+    const late = refund("ra1", "o1", 26.55);
+
+    await service.handleOrderRefund("o1", late);
+    await service.handleOrderRefund("o1", late);
+    await Promise.all([
+      service.handleOrderRefund("o1", late),
+      service.handleOrderRefund("o1", late),
+    ]);
+
+    expect(returns()).toEqual([]);
+    expect(provider.cancelEArchive).not.toHaveBeenCalled();
+  });
+
   it("logs a refund whose whole share was capped away", async () => {
     const { service, refund } = makeService({
       invoices: [
@@ -660,10 +707,7 @@ describe("InvoiceReversalService: installment fee document", () => {
       strategy: "CANCEL",
       invoices: [
         sentFeeInvoice({
-          cancelReason: formatInstallmentFeeCancelClaim(
-            "other-run",
-            new Date(),
-          ),
+          cancelReason: formatInvoiceCancelClaim("other-run", new Date()),
         }),
       ],
     });
@@ -672,7 +716,7 @@ describe("InvoiceReversalService: installment fee document", () => {
     // land on top of the other run's cancel.
     await expect(
       service.handleOrderRefund("o1", refund("ra1", "o1", 26.55)),
-    ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_IN_PROGRESS/);
+    ).rejects.toThrow(/INVOICE_CANCEL_IN_PROGRESS/);
     expect(returns()).toEqual([]);
   });
 
@@ -704,7 +748,7 @@ describe("InvoiceReversalService: installment fee document", () => {
     // Let the first run take the claim and wait on eLogo.
     await new Promise((r) => setImmediate(r));
     await expect(service.handleOrderRefund("o1", adjustment)).rejects.toThrow(
-      /INSTALLMENT_FEE_CANCEL_IN_PROGRESS/,
+      /INVOICE_CANCEL_IN_PROGRESS/,
     );
     release();
     await first;
@@ -755,13 +799,13 @@ describe("InvoiceReversalService: installment fee document", () => {
       const adjustment = made.refund("ra1", "o1", 66.38, 1);
       await expect(
         made.service.handleOrderRefund("o1", adjustment),
-      ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN/);
+      ).rejects.toThrow(/INVOICE_CANCEL_OUTCOME_UNKNOWN/);
       expect(String(made.store.invoices[0].cancelReason)).toMatch(
         /^refund_cancelling:\d+:/,
       );
       // The outbox retries after the lease and the 8-day window.
       jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
-      jest.setSystemTime(Date.now() + INSTALLMENT_FEE_CANCEL_LEASE_MS + 1);
+      jest.setSystemTime(Date.now() + INVOICE_CANCEL_LEASE_MS + 1);
       made.provider.eArchiveReversalStrategy.mockReturnValue("RETURN_INVOICE");
       const error = jest
         .spyOn(Logger.prototype, "error")
@@ -782,7 +826,7 @@ describe("InvoiceReversalService: installment fee document", () => {
         cancelReason: null,
       });
       expect(error).toHaveBeenCalledWith(
-        expect.stringMatching(/^INSTALLMENT_FEE_CANCEL_CLAIM_STUCK invoice=/),
+        expect.stringMatching(/^INVOICE_CANCEL_CLAIM_STUCK invoice=/),
       );
       error.mockRestore();
     });
@@ -806,7 +850,7 @@ describe("InvoiceReversalService: installment fee document", () => {
       const { service, store, adjustment, returns, error } = await stuck();
 
       await expect(service.handleOrderRefund("o1", adjustment)).rejects.toThrow(
-        /INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN/,
+        /INVOICE_CANCEL_OUTCOME_UNKNOWN/,
       );
       expect(returns()).toEqual([]);
       expect(String(store.invoices[0].cancelReason)).toMatch(
@@ -824,7 +868,7 @@ describe("InvoiceReversalService: installment fee document", () => {
 
         await expect(
           service.handleOrderRefund("o1", adjustment),
-        ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_OUTCOME_UNKNOWN/);
+        ).rejects.toThrow(/INVOICE_CANCEL_OUTCOME_UNKNOWN/);
         expect(returns()).toEqual([]);
         expect(provider.cancelEArchive).toHaveBeenCalledTimes(1);
         expect(String(store.invoices[0].cancelReason)).toMatch(
@@ -857,7 +901,7 @@ describe("InvoiceReversalService: installment fee document", () => {
       // While this run asks eLogo, another run settles the claim and takes
       // a new one.
       provider.getStatus.mockImplementationOnce(async () => {
-        store.invoices[0].cancelReason = formatInstallmentFeeCancelClaim(
+        store.invoices[0].cancelReason = formatInvoiceCancelClaim(
           "other-run",
           new Date(),
         );
@@ -865,7 +909,7 @@ describe("InvoiceReversalService: installment fee document", () => {
       });
 
       await expect(service.handleOrderRefund("o1", adjustment)).rejects.toThrow(
-        /INSTALLMENT_FEE_CANCEL_CLAIM_LOST/,
+        /INVOICE_CANCEL_CLAIM_LOST/,
       );
       expect(returns()).toEqual([]);
       error.mockRestore();
@@ -880,17 +924,15 @@ describe("InvoiceReversalService: installment fee document", () => {
         strategy: "RETURN_INVOICE",
         invoices: [
           sentFeeInvoice({
-            cancelReason: formatInstallmentFeeCancelClaim("dead", claimedAt),
+            cancelReason: formatInvoiceCancelClaim("dead", claimedAt),
           }),
         ],
       });
-      jest.setSystemTime(
-        claimedAt.getTime() + INSTALLMENT_FEE_CANCEL_LEASE_MS - 1,
-      );
+      jest.setSystemTime(claimedAt.getTime() + INVOICE_CANCEL_LEASE_MS - 1);
 
       await expect(
         service.handleOrderRefund("o1", refund("ra1", "o1", 26.55)),
-      ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_IN_PROGRESS/);
+      ).rejects.toThrow(/INVOICE_CANCEL_IN_PROGRESS/);
       expect(provider.getStatus).not.toHaveBeenCalled();
       expect(returns()).toEqual([]);
     } finally {
@@ -902,7 +944,7 @@ describe("InvoiceReversalService: installment fee document", () => {
     const { service, refund, store, returns, db } = makeService();
     const transaction = db.$transaction.getMockImplementation();
     db.$transaction.mockImplementationOnce(async (fn) => {
-      store.invoices[0].cancelReason = formatInstallmentFeeCancelClaim(
+      store.invoices[0].cancelReason = formatInvoiceCancelClaim(
         "closing-run",
         new Date(),
       );
@@ -911,7 +953,7 @@ describe("InvoiceReversalService: installment fee document", () => {
 
     await expect(
       service.handleOrderRefund("o1", refund("ra1", "o1", 26.55)),
-    ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_IN_PROGRESS/);
+    ).rejects.toThrow(/INVOICE_CANCEL_IN_PROGRESS/);
     expect(returns()).toEqual([]);
   });
 
@@ -920,7 +962,7 @@ describe("InvoiceReversalService: installment fee document", () => {
       strategy: "CANCEL",
     });
     provider.cancelEArchive.mockImplementationOnce(async () => {
-      store.invoices[0].cancelReason = formatInstallmentFeeCancelClaim(
+      store.invoices[0].cancelReason = formatInvoiceCancelClaim(
         "other-run",
         new Date(),
       );
@@ -930,7 +972,7 @@ describe("InvoiceReversalService: installment fee document", () => {
 
     await expect(
       service.handleOrderRefund("o1", refund("ra1", "o1", 66.38, 1)),
-    ).rejects.toThrow(/INSTALLMENT_FEE_CANCEL_CLAIM_LOST/);
+    ).rejects.toThrow(/INVOICE_CANCEL_CLAIM_LOST/);
     expect(returns()).toEqual([]);
   });
 

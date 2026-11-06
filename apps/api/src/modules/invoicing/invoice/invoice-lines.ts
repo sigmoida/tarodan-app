@@ -197,3 +197,25 @@ export function buildPlatformSaleLines(
   // Ürün satırı yoksa belge ürün faturası sayılmaz — çağıran tek kaleme düşsün.
   return lines.length > 0 && lines[0].name !== SHIPPING_LINE_NAME ? lines : [];
 }
+
+/**
+ * The VAT rates a platform sale document was cut with, read back from its
+ * line snapshot: the product line (`buildPlatformSaleLines` puts it first)
+ * and a shipping or fee line. A rate the snapshot does not show is null; the
+ * caller falls back to today's rate.
+ *
+ * Rebuilding what the document should carry now at the rates it was CUT with
+ * keeps a later rate change from looking like a refund: the reversal compares
+ * the two totals to the kuruş.
+ */
+export function platformSaleRatesOf(lines: readonly InvoiceLineItem[]): {
+  productVatRate: number | null;
+  serviceVatRate: number | null;
+} {
+  const isService = (l: InvoiceLineItem) =>
+    l.name === SHIPPING_LINE_NAME || l.name === BUYER_FEE_LINE_NAME;
+  return {
+    productVatRate: lines.find((l) => !isService(l))?.vatRate ?? null,
+    serviceVatRate: lines.find(isService)?.vatRate ?? null,
+  };
+}

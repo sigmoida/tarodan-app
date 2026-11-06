@@ -615,6 +615,14 @@ describe("installment fee document on a real database (E2E)", () => {
     // nothing: the document already excludes its fee.
     await reversals.handleOrderRefund(early.orderId, early);
     expect(await returnsOf(small)).toEqual([]);
+    // Nor does the platform sale document, cut net of the same refund: 240.00.
+    const sale = await prisma.fiscalInvoice.findUniqueOrThrow({
+      where: {
+        type_sourceId: { type: "platform_sale", sourceId: target.orders.small },
+      },
+    });
+    expect(sale.total.toFixed(2)).toBe("240.00");
+    expect(await returnsOf(sale)).toEqual([]);
 
     // The big order refunded in full within 8 days: the e-Arşiv is cancelled.
     await refund(target.orders.big, 600, `e2e-a6-cart-big:${target.paymentId}`);
@@ -714,7 +722,7 @@ describe("installment fee document on a real database (E2E)", () => {
       ]);
       const rejected = results.find((r) => r.status === "rejected");
       expect(String((rejected as PromiseRejectedResult).reason)).toMatch(
-        /INSTALLMENT_FEE_CANCEL_IN_PROGRESS/,
+        /INVOICE_CANCEL_IN_PROGRESS/,
       );
       // The outbox retry of the backed-off run.
       await reversals.handleOrderRefund(full.orderId, full);
