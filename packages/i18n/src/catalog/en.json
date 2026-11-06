@@ -1866,6 +1866,7 @@
     "customProductNamePlaceholder": "Product name",
     "image": "Image",
     "removeItem": "Remove item",
+    "notForSale": "Not for sale",
     "productsLoadFailed": "Failed to load products",
     "noProductsToAdd": "No products to add. Create a listing first or all your products are already in this collection.",
     "createNewListing": "Create New Listing",

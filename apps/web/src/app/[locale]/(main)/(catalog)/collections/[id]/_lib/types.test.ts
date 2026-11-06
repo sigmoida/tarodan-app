@@ -1,7 +1,7 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { itemToProduct, type CollectionItem } from "./types";
+import { isNotForSale, itemToProduct, type CollectionItem } from "./types";
 
 const item = (overrides: Partial<CollectionItem> = {}): CollectionItem => ({
   id: "i1",
@@ -22,5 +22,14 @@ describe("itemToProduct — sellerId", () => {
   it("özel öğede / alan yokken sellerId tanımsız kalır", () => {
     expect(itemToProduct(item({ sellerId: null })).sellerId).toBeUndefined();
     expect(itemToProduct(item()).sellerId).toBeUndefined();
+  });
+});
+
+describe("isNotForSale", () => {
+  it("a custom item is not for sale; a listing item is", () => {
+    expect(isNotForSale(item({ isCustom: true, productId: undefined }))).toBe(
+      true,
+    );
+    expect(isNotForSale(item({ productPrice: 100 }))).toBe(false);
   });
 });

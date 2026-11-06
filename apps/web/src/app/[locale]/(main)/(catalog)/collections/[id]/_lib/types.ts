@@ -56,10 +56,20 @@ export const isUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 /**
+ * A custom item (`isCustom`, which the API always sets) is not a listing: it
+ * has no price and is not for sale. Its card shows `collection.notForSale` in
+ * the price row (`ProductCard`'s `noPriceLabel`), never a price; mobile keys
+ * the same rule on the same field.
+ */
+export const isNotForSale = (item: CollectionItem): boolean => item.isCustom;
+
+/**
  * Map a collection item — real listing OR custom entry — to the `Product` shape
  * the shared `ProductCard` consumes, so both render through one component.
  * `status` is intentionally left off: SOLD is shown via the card overlay badge,
- * not the out-of-stock treatment.
+ * not the out-of-stock treatment. `price` is only a placeholder for a custom
+ * item (the card shape needs a number); its card is rendered with
+ * `noPriceLabel` (see `isNotForSale`), so the price is never shown.
  */
 export const itemToProduct = (item: CollectionItem): Product => ({
   id: item.productId ?? item.id,

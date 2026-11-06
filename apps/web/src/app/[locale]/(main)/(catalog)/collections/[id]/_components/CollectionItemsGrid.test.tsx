@@ -10,12 +10,12 @@ import type { CollectionItem } from "../_lib/types";
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const h = vi.hoisted(() => ({ items: [] as unknown[] }));
+const h = vi.hoisted(() => ({ items: [] as unknown[], isOwner: false }));
 
 vi.mock("../_context/CollectionDetailContext", () => ({
   useCollectionDetail: () => ({
     t: (key: string) => key,
-    isOwner: false,
+    isOwner: h.isOwner,
     sortedItems: h.items,
     setShowAddModal: vi.fn(),
     handleRemoveItem: vi.fn(),
@@ -82,6 +82,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  h.isOwner = false;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -116,5 +117,60 @@ describe("CollectionItemsGrid rozetleri", () => {
     act(() => root.render(<CollectionItemsGrid />));
     expect(container.textContent).toContain("collection.collection");
     expect(stacks()).toHaveLength(0);
+  });
+});
+
+describe("CollectionItemsGrid custom items (not for sale)", () => {
+  const custom = item({
+    id: "c1",
+    isCustom: true,
+    productId: undefined,
+    productPrice: undefined,
+    productStatus: undefined,
+    productTitle: "My Camaro",
+    customTitle: "My Camaro",
+  });
+  const cards = () =>
+    Array.from(container.querySelectorAll<HTMLElement>(".\\@container"));
+
+  it("shows the not-for-sale label and the collection badge, never a price", () => {
+    h.items = [custom];
+    act(() => root.render(<CollectionItemsGrid />));
+    const text = container.textContent ?? "";
+    expect(text).toContain("collection.notForSale");
+    expect(text).toContain("collection.collection");
+    expect(text).not.toContain("TL");
+    expect(text).not.toMatch(/0,00/);
+  });
+
+  it("is not tappable: no link, no heart, no card action", () => {
+    h.items = [custom];
+    act(() => root.render(<CollectionItemsGrid />));
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.querySelector("button")).toBeNull();
+  });
+
+  it("a listing item next to it keeps its price, link and heart", () => {
+    h.items = [item({}), custom];
+    act(() => root.render(<CollectionItemsGrid />));
+    const [listing, own] = cards();
+    expect(listing.textContent).toContain("100");
+    expect(listing.textContent).toContain("TL");
+    expect(listing.textContent).not.toContain("collection.notForSale");
+    expect(listing.querySelector("a")).not.toBeNull();
+    expect(
+      listing.querySelector('button[aria-label="product.favorite"]'),
+    ).not.toBeNull();
+    expect(own.textContent).toContain("collection.notForSale");
+    expect(own.textContent).not.toContain("TL");
+  });
+
+  it("the owner keeps the remove control on a custom item", () => {
+    h.isOwner = true;
+    h.items = [custom];
+    act(() => root.render(<CollectionItemsGrid />));
+    const buttons = container.querySelectorAll("button");
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].getAttribute("aria-label")).toBe("collection.removeItem");
   });
 });

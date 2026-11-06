@@ -8,6 +8,7 @@ import { ProductCard } from "@/components/ui";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import {
   hasItemBadges,
+  isNotForSale,
   itemToProduct,
   type CollectionItem,
 } from "../_lib/types";
@@ -80,6 +81,9 @@ export default function CollectionItemsGrid() {
           index={index}
           showMeta={false}
           href={item.productId ? undefined : null}
+          noPriceLabel={
+            isNotForSale(item) ? t("collection.notForSale") : undefined
+          }
           overlayStart={
             hasItemBadges(item) ? <ItemBadges item={item} /> : undefined
           }

@@ -20,6 +20,7 @@ import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import { useCollectionFilters } from "../_hooks/useCollectionFilters";
 import { useCarModels } from "../_hooks/useCarModels";
 import {
+  CUSTOM_ITEM_LIMITS,
   customItemSchema,
   EMPTY_CUSTOM_ITEM,
   type CustomItemForm as CustomItemValues,
@@ -41,7 +42,8 @@ export default function CustomItemForm({
   const { collection, invalidateCollection } = useCollectionDetail();
   const filters = useCollectionFilters(true);
 
-  const form = useZodForm(customItemSchema, {
+  const schema = useMemo(() => customItemSchema(t), [t]);
+  const form = useZodForm(schema, {
     defaultValues: EMPTY_CUSTOM_ITEM,
   });
   const brand = form.watch("brand");
@@ -65,7 +67,8 @@ export default function CustomItemForm({
         customImageUrl: values.imageUrl || undefined,
       }),
     {
-      successMessage: t("collection.productsAddedToCollection"),
+      // One item: the sentence, not the batch toast's count suffix.
+      successMessage: t("product.addedToCollection"),
       errorMessage: t("collection.productsAddFailed"),
       onSuccess: async () => {
         await invalidateCollection();
@@ -146,8 +149,8 @@ export default function CustomItemForm({
           type="number"
           label={t("product.releaseYear")}
           placeholder="2026"
-          min={1900}
-          max={2100}
+          min={CUSTOM_ITEM_LIMITS.yearMin}
+          max={CUSTOM_ITEM_LIMITS.yearMax}
         />
         <FormSelect
           name="scale"
