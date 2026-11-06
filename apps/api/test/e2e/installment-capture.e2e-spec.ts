@@ -23,7 +23,10 @@ import { EscrowHoldService } from "../../src/modules/payment/fulfillment/escrow-
 import { FulfillmentFinalizer } from "../../src/modules/payment/fulfillment/fulfillment-finalizer.service";
 import { PaymentFulfillmentService } from "../../src/modules/payment/fulfillment/payment-fulfillment.service";
 import { InstallmentChargeService } from "../../src/modules/payment/installments/installment-charge.service";
-import { InstallmentOptionsService } from "../../src/modules/payment/installments/installment-options.service";
+import {
+  binCacheKey,
+  InstallmentOptionsService,
+} from "../../src/modules/payment/installments/installment-options.service";
 import { InstallmentRatesService } from "../../src/modules/payment/installments/installment-rates.service";
 import { InstallmentRulesService } from "../../src/modules/payment/installments/installment-rules.service";
 import { InstallmentSettingsService } from "../../src/modules/payment/installments/installment-settings.service";
@@ -72,7 +75,7 @@ describe("installment capture on a real database (E2E)", () => {
   // Redis stand-in; the BIN answer is cached, so PayTR is never asked.
   const store = new Map<string, unknown>([
     [
-      "paytr:bin:45467112",
+      binCacheKey("45467112"),
       {
         outcome: "success",
         bank: "Test Bank",
