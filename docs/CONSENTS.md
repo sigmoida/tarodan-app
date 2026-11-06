@@ -15,7 +15,7 @@ records** and the **Consents** section of the user file.
 | `terms`                  | `2026-08-05`       | yes                      | registration form / re-consent prompt             |
 | `privacy`                | `2026-08-04`       | yes                      | registration form / re-consent prompt             |
 | `kvkk`                   | `2026-08-04`       | yes (separate box)       | registration form / re-consent prompt             |
-| `distance_sales`         | `2026-08-03`       | no (per order)           | cart checkout + payment form (`direct-form`)      |
+| `distance_sales`         | `2026-11-06-draft` | no (per order)           | cart checkout + payment form (`direct-form`)      |
 | `cookies`                | `2026-08-02`       | no                       | cookie banner / cookie preferences panel          |
 | `marketing`              | `2026-10-05`       | no                       | registration, notification settings, unsubscribe  |
 | `platform_service_sales` | `2026-10-21-draft` | no (per order)           | boost purchase dialog (`POST .../boost/initiate`) |
@@ -42,6 +42,12 @@ drafts (tarodan-ops plan `2026-10-21-listing-boost`, decisions D15 and D17).
 The release that sells boost with these consents (API task LB3, web task LB6)
 must not go to production before legal has signed both texts off and their
 versions have lost the `-draft` suffix.
+
+**Release blocker:** `distance_sales` is a draft too: its text gained the
+installment clause (tarodan-ops plan `2026-11-03-installment-payments`,
+AS-L1). The release that turns installments on must not go to production
+before legal has signed the clause off and the version is a date without the
+`-draft` suffix.
 
 The old `DISTANCE_SALES_CONSENT_VERSION` constant joined this catalogue. The
 old `checkout_groups.distance_sales_accepted_at/_version` columns are no longer
