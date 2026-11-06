@@ -132,7 +132,8 @@
       "select": "Choose File",
       "replace": "Replace File",
       "remove": "Remove"
-    }
+    },
+    "today": "Today"
   },
   "boost": {
     "offer": {
@@ -7584,6 +7585,158 @@
           "productTax": "Product VAT is not zero (code inconsistency)",
           "commissionLedgerDrift": "Order commission vs commission ledger drift"
         }
+      },
+      "installments": {
+        "title": "Installments",
+        "subtitle": "The installment master switch, the minimum amount, the PayTR rates, the installment rules per user group and the price preview.",
+        "readOnly": "You can only view this screen. Only a super admin can change the installment settings and rules.",
+        "error": {
+          "title": "The installment settings could not be loaded",
+          "description": "Check the connection and try again."
+        },
+        "segments": {
+          "all": "Everyone",
+          "guest": "Guest"
+        },
+        "general": {
+          "title": "General",
+          "enabledLabel": "Installment payments",
+          "enabledOn": "On",
+          "enabledOff": "Off",
+          "enabledHint": "While it is off, buyers see a single payment only. This master switch is the last step of a release: the mobile version that supports installments must be live in the stores first.",
+          "enableConfirm": {
+            "title": "Turn on installment payments?",
+            "description": "Buyers start to see installment options for eligible credit cards. Release rule: flags are turned on last. Before you turn it on, confirm that the mobile version that supports installments is live in the stores and that the release checklist is complete.",
+            "staleRates": "There is no fresh PayTR rate snapshot: until the rates are fetched, buyers still see a single payment only.",
+            "confirm": "Turn on installments"
+          },
+          "disableConfirm": {
+            "title": "Turn off installment payments?",
+            "description": "From now on buyers are offered a single payment only and no new installment payment is accepted.",
+            "confirm": "Turn off installments"
+          },
+          "enabledSaved": "Installment payments are on.",
+          "disabledSaved": "Installment payments are off.",
+          "minAmountLabel": "Minimum amount (TL)",
+          "minAmountHint": "Installments are offered when the goods total is at least this amount. Default: {amount}.",
+          "minAmountSave": "Save amount",
+          "minAmountSaved": "The minimum amount was saved."
+        },
+        "rates": {
+          "title": "PayTR rates",
+          "status": "Status",
+          "fresh": "Fresh",
+          "stale": "Stale",
+          "staleHint": "The latest rate snapshot is not fresh: until a new one is fetched, buyers see a single payment only. The preview uses the latest snapshot.",
+          "fetchedAt": "Fetched at",
+          "maxCount": "Maximum installments (non-business cards)",
+          "families": "Card families",
+          "none": {
+            "title": "No PayTR rates have been fetched yet",
+            "description": "Until the first rate snapshot is fetched, buyers see a single payment only and the price preview cannot be calculated."
+          }
+        },
+        "preview": {
+          "title": "Price preview",
+          "description": "The installment options a buyer would see for a user group, a goods total and a card family (with the latest rate snapshot and the live rules).",
+          "draftDescription": "Before you save: this draft rule is applied as if it were live now.",
+          "segment": "User group",
+          "amount": "Goods total (TL)",
+          "family": "Card family",
+          "failed": "The preview could not be calculated",
+          "unavailable": "The preview cannot be calculated because there is no rate snapshot.",
+          "cardNotEligible": "PayTR offers no installments for this card family.",
+          "staleRates": "The preview uses a rate snapshot that is not fresh ({fetchedAt}). Until a new one is fetched, buyers see a single payment only.",
+          "draftNeedsFix": "Fix the errors in the rule to see the preview.",
+          "offered": "Offered",
+          "notOffered": "Not offered",
+          "monthlyValue": "{count} x {amount}",
+          "defaultRule": "Default (buyer pays)",
+          "draftRule": "Draft rule",
+          "columns": {
+            "count": "Installments",
+            "offered": "Status",
+            "monthly": "Monthly",
+            "total": "Charged total",
+            "fee": "Installment fee",
+            "share": "Platform share",
+            "platformCost": "Platform cost",
+            "rule": "Rule"
+          }
+        },
+        "rules": {
+          "title": "Installment rules",
+          "description": "A rule makes the platform bear part or all of the installment fee for some installment counts of a user group, or turns those counts off. When no rule matches, the buyer pays the installment fee.",
+          "new": "New rule",
+          "tabs": {
+            "current": "Current",
+            "archived": "Archive"
+          },
+          "empty": "No rules yet: every buyer pays the installment fee.",
+          "emptyArchived": "No archived rules.",
+          "loadFailed": "The installment rules could not be loaded",
+          "columns": {
+            "name": "Rule",
+            "segment": "User group",
+            "counts": "Installment counts",
+            "effect": "Effect",
+            "priority": "Priority",
+            "validity": "Validity",
+            "created": "Created"
+          },
+          "version": "Version {version}",
+          "nameVersion": "{name} (version {version})",
+          "countRange": "{min}-{max} installments",
+          "countSingle": "{count} installments",
+          "effectNotOffered": "Not offered",
+          "effectBuyerPays": "Buyer pays",
+          "effectShare": "Platform share {share}",
+          "until": "Until {date}",
+          "openEnded": "Open-ended",
+          "status": {
+            "active": "Active",
+            "scheduled": "Scheduled",
+            "expired": "Expired",
+            "archived": "Archived"
+          },
+          "actions": {
+            "newVersion": "New version",
+            "archive": "Archive"
+          },
+          "archiveConfirm": {
+            "title": "Archive the rule?",
+            "description": "The rule \"{name}\" no longer applies to new payments. Past payments keep the version they used."
+          },
+          "archived": "The rule was archived.",
+          "created": "The rule was created.",
+          "versionCreated": "The new version of the rule was saved.",
+          "overlap": {
+            "title": "Overlapping rules",
+            "description": "This rule can apply to the same buyer, for the same count, at the same time as these rules of the same priority: {rules}. The tie-break decides which one applies (a specific group before \"Everyone\", then the newest rule). Change the priority if that is not what you want."
+          }
+        },
+        "form": {
+          "createTitle": "New installment rule",
+          "versionTitle": "New version: {name} (version {version})",
+          "versionHint": "When you save, this version is archived and the new version takes its place. Past payments keep the old version.",
+          "name": "Rule name",
+          "segment": "User group",
+          "minCount": "From installments",
+          "maxCount": "To installments",
+          "allowed": "Offer these installment counts",
+          "allowedHint": "When unchecked, these counts are not offered to the group at all.",
+          "share": "Platform share (%)",
+          "shareHint": "The part of the installment fee the platform bears: 0 means the buyer pays, 100 means no installment fee.",
+          "priority": "Priority",
+          "priorityHint": "When several rules match a count, the rule with the higher priority applies.",
+          "validFrom": "Starts",
+          "validUntil": "Ends (optional)",
+          "timeZoneHint": "Times are Istanbul time.",
+          "validUntilHint": "Leave it empty for no end. The end time itself is not included.",
+          "timeLabel": "Time",
+          "submitCreate": "Create rule",
+          "submitVersion": "Save new version"
+        }
       }
     },
     "operations": {
@@ -10217,6 +10370,11 @@
           "name": "Seller trust lab",
           "description": "Explain and recompute seller trust scores and try candidate weights. Nothing is saved.",
           "keywords": "trust score, seller score, weights, simulation, lab"
+        },
+        "installments": {
+          "name": "Installments",
+          "description": "Manage the installment settings, the user group rules and the price preview",
+          "keywords": "installment,installments,taksit,paytr"
         }
       }
     },

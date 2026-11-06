@@ -132,7 +132,8 @@
       "select": "Dosya Seç",
       "replace": "Dosyayı Değiştir",
       "remove": "Kaldır"
-    }
+    },
+    "today": "Bugün"
   },
   "boost": {
     "offer": {
@@ -7584,6 +7585,158 @@
           "productTax": "Ürün KDV'si sıfır değil (kod tutarsızlığı)",
           "commissionLedgerDrift": "Sipariş komisyonu ile komisyon defteri farkı"
         }
+      },
+      "installments": {
+        "title": "Taksit",
+        "subtitle": "Taksit ana anahtarı, en düşük tutar, PayTR oranları, kullanıcı grubuna göre taksit kuralları ve fiyat önizleme.",
+        "readOnly": "Bu ekranı yalnız görüntüleyebilirsiniz. Taksit ayarlarını ve kurallarını yalnız süper yönetici değiştirebilir.",
+        "error": {
+          "title": "Taksit ayarları yüklenemedi",
+          "description": "Bağlantıyı kontrol edip tekrar deneyin."
+        },
+        "segments": {
+          "all": "Herkes",
+          "guest": "Misafir"
+        },
+        "general": {
+          "title": "Genel",
+          "enabledLabel": "Taksitli ödeme",
+          "enabledOn": "Açık",
+          "enabledOff": "Kapalı",
+          "enabledHint": "Kapalıyken alıcılar yalnız tek çekim görür. Bu ana anahtar yayında en son açılır: önce taksiti destekleyen mobil sürüm mağazalarda yayında olmalı.",
+          "enableConfirm": {
+            "title": "Taksitli ödeme açılsın mı?",
+            "description": "Alıcılar uygun kredi kartlarında taksit seçeneklerini görmeye başlar. Yayın kuralı: bayraklar en son açılır. Açmadan önce taksiti destekleyen mobil sürümün mağazalarda yayında olduğunu ve yayın kontrol listesinin tamamlandığını doğrulayın.",
+            "staleRates": "Güncel bir PayTR oran kaydı yok: oranlar alınana kadar alıcılar yine yalnız tek çekim görür.",
+            "confirm": "Taksiti aç"
+          },
+          "disableConfirm": {
+            "title": "Taksitli ödeme kapatılsın mı?",
+            "description": "Bundan sonra alıcılara yalnız tek çekim sunulur ve yeni taksitli ödeme kabul edilmez.",
+            "confirm": "Taksiti kapat"
+          },
+          "enabledSaved": "Taksitli ödeme açıldı.",
+          "disabledSaved": "Taksitli ödeme kapatıldı.",
+          "minAmountLabel": "En düşük tutar (TL)",
+          "minAmountHint": "Taksit, ürün toplamı bu tutar ve üzerindeki ödemelerde sunulur. Varsayılan: {amount}.",
+          "minAmountSave": "Tutarı kaydet",
+          "minAmountSaved": "En düşük tutar kaydedildi."
+        },
+        "rates": {
+          "title": "PayTR oranları",
+          "status": "Durum",
+          "fresh": "Güncel",
+          "stale": "Eski",
+          "staleHint": "Son oran kaydı güncel değil: yenisi alınana kadar alıcılar yalnız tek çekim görür. Önizleme son kayıtla hesaplanır.",
+          "fetchedAt": "Alınma zamanı",
+          "maxCount": "En çok taksit (ticari olmayan kart)",
+          "families": "Kart aileleri",
+          "none": {
+            "title": "Henüz PayTR oranı alınmadı",
+            "description": "İlk oran kaydı alınana kadar alıcılar yalnız tek çekim görür ve fiyat önizlemesi hesaplanamaz."
+          }
+        },
+        "preview": {
+          "title": "Fiyat önizleme",
+          "description": "Bir kullanıcı grubu, ürün toplamı ve kart ailesi için alıcının göreceği taksit seçenekleri (son oran kaydıyla, yürürlükteki kurallarla).",
+          "draftDescription": "Kaydetmeden önce: bu taslak kural şu an yürürlükteymiş gibi uygulanır.",
+          "segment": "Kullanıcı grubu",
+          "amount": "Ürün toplamı (TL)",
+          "family": "Kart ailesi",
+          "failed": "Önizleme hesaplanamadı",
+          "unavailable": "Oran kaydı olmadığı için önizleme hesaplanamıyor.",
+          "cardNotEligible": "PayTR bu kart ailesi için taksit sunmuyor.",
+          "staleRates": "Önizleme güncel olmayan bir oran kaydıyla hesaplandı ({fetchedAt}). Yeni kayıt alınana kadar alıcılar yalnız tek çekim görür.",
+          "draftNeedsFix": "Önizlemeyi görmek için kuraldaki hataları düzeltin.",
+          "offered": "Sunulur",
+          "notOffered": "Sunulmaz",
+          "monthlyValue": "{count} x {amount}",
+          "defaultRule": "Varsayılan (alıcı öder)",
+          "draftRule": "Taslak kural",
+          "columns": {
+            "count": "Taksit",
+            "offered": "Durum",
+            "monthly": "Aylık",
+            "total": "Toplam çekim",
+            "fee": "Vade farkı",
+            "share": "Platform payı",
+            "platformCost": "Platform maliyeti",
+            "rule": "Kural"
+          }
+        },
+        "rules": {
+          "title": "Taksit kuralları",
+          "description": "Bir kural, bir kullanıcı grubunun belirli taksit sayılarında vade farkının bir kısmını ya da tamamını platformun üstlenmesini sağlar veya o taksit sayılarını kapatır. Eşleşen kural yoksa vade farkını alıcı öder.",
+          "new": "Yeni kural",
+          "tabs": {
+            "current": "Geçerli",
+            "archived": "Arşiv"
+          },
+          "empty": "Henüz kural yok: bütün alıcılar vade farkını kendisi öder.",
+          "emptyArchived": "Arşivlenmiş kural yok.",
+          "loadFailed": "Taksit kuralları yüklenemedi",
+          "columns": {
+            "name": "Kural",
+            "segment": "Kullanıcı grubu",
+            "counts": "Taksit sayısı",
+            "effect": "Etki",
+            "priority": "Öncelik",
+            "validity": "Geçerlilik",
+            "created": "Oluşturma"
+          },
+          "version": "Sürüm {version}",
+          "nameVersion": "{name} (sürüm {version})",
+          "countRange": "{min}-{max} taksit",
+          "countSingle": "{count} taksit",
+          "effectNotOffered": "Sunulmaz",
+          "effectBuyerPays": "Alıcı öder",
+          "effectShare": "Platform payı {share}",
+          "until": "Bitiş {date}",
+          "openEnded": "Süresiz",
+          "status": {
+            "active": "Yürürlükte",
+            "scheduled": "Planlandı",
+            "expired": "Süresi doldu",
+            "archived": "Arşivlendi"
+          },
+          "actions": {
+            "newVersion": "Yeni sürüm",
+            "archive": "Arşivle"
+          },
+          "archiveConfirm": {
+            "title": "Kural arşivlensin mi?",
+            "description": "\"{name}\" kuralı yeni ödemelere uygulanmaz. Geçmiş ödemeler kullandıkları sürümü korur."
+          },
+          "archived": "Kural arşivlendi.",
+          "created": "Kural oluşturuldu.",
+          "versionCreated": "Kuralın yeni sürümü kaydedildi.",
+          "overlap": {
+            "title": "Çakışan kurallar",
+            "description": "Bu kural aynı öncelikteki şu kurallarla aynı alıcıya, aynı taksit sayısında, aynı anda uygulanabilir: {rules}. Hangisinin geçerli olacağını eşitlik kuralı belirler (belirli bir grup \"Herkes\"ten önce gelir, sonra en yeni kural). İstemiyorsanız önceliği değiştirin."
+          }
+        },
+        "form": {
+          "createTitle": "Yeni taksit kuralı",
+          "versionTitle": "Yeni sürüm: {name} (sürüm {version})",
+          "versionHint": "Kaydettiğinizde bu sürüm arşivlenir ve yerine yeni sürüm geçer. Geçmiş ödemeler eski sürümü korur.",
+          "name": "Kural adı",
+          "segment": "Kullanıcı grubu",
+          "minCount": "En az taksit",
+          "maxCount": "En çok taksit",
+          "allowed": "Bu taksit sayılarını sun",
+          "allowedHint": "İşaretli değilse bu taksit sayıları bu gruba hiç sunulmaz.",
+          "share": "Platform payı (%)",
+          "shareHint": "Vade farkının platformun üstlendiği kısmı: 0 ise alıcı öder, 100 ise vade farksız.",
+          "priority": "Öncelik",
+          "priorityHint": "Bir taksit sayısına birden çok kural uyuyorsa yüksek öncelikli kural geçerli olur.",
+          "validFrom": "Başlangıç",
+          "validUntil": "Bitiş (isteğe bağlı)",
+          "timeZoneHint": "Saatler İstanbul saatidir.",
+          "validUntilHint": "Boş bırakılırsa süresiz. Bitiş anı dahil değildir.",
+          "timeLabel": "Saat",
+          "submitCreate": "Kuralı oluştur",
+          "submitVersion": "Yeni sürümü kaydet"
+        }
       }
     },
     "operations": {
@@ -10217,6 +10370,11 @@
           "name": "Güven skoru laboratuvarı",
           "description": "Satıcı güven skorunu açıkla, yeniden hesapla ve aday ağırlıkları dene. Hiçbir şey kaydedilmez.",
           "keywords": "güven skoru, satıcı skoru, ağırlık, simülasyon, laboratuvar"
+        },
+        "installments": {
+          "name": "Taksit",
+          "description": "Taksit ayarlarını, kullanıcı grubu kurallarını ve fiyat önizlemesini yönetin",
+          "keywords": "taksit,vade farkı,installment,paytr"
         }
       }
     },

@@ -422,6 +422,18 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "commission",
         },
         {
+          // Installment settings, segment rules and the price preview (ADR
+          // 0019). API: PERMISSION_MAP.installments = ["payments"]; writes
+          // are also @Roles(super_admin).
+          name: t("admin.nav.items.installments.name"),
+          href: "/finance/installments",
+          description: t("admin.nav.items.installments.description"),
+          keywords: t("admin.nav.items.installments.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "payments",
+        },
+        {
           name: t("admin.nav.items.payouts.name"),
           href: "/finance/payouts",
           description: t("admin.nav.items.payouts.description"),
