@@ -253,6 +253,11 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
             "—"
           )}
         </Field>
+        {(f.installmentFeeAmount ?? 0) > 0 && (
+          <Field label={t("admin.operations.orders.file.installmentFeeShare")}>
+            {fmtTry(f.installmentFeeAmount)}
+          </Field>
+        )}
         {entry.ledger && (
           <Field label={t("admin.operations.orders.file.ledgerTitle")}>
             {t(

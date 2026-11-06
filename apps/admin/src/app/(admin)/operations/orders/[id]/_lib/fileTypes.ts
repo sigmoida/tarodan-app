@@ -1,4 +1,7 @@
-import type { CancellationActorValue } from "@tarodan/types";
+import type {
+  CancellationActorValue,
+  PaymentInstallmentFields,
+} from "@tarodan/types";
 
 /**
  * GET /admin/orders/:id/file — grup dosyası payload'ı. Sipariş id'si sunucuda
@@ -29,6 +32,11 @@ export interface OrderFileFinance {
   /** Tahsil anındaki hizmet KDV oranı (%) — kalem bazında KDV bununla türetilir. */
   serviceVatRate: number;
   totalAmount: number;
+  /**
+   * The order's share of the payment's installment fee (vade farkı), PSP
+   * scale only; 0 = single payment or legacy. Absent on an older API.
+   */
+  installmentFeeAmount?: number;
   sellerNetAmount: number;
 }
 
@@ -167,19 +175,22 @@ export interface OrderGroupFile {
     isVerified?: boolean;
     isGuest?: boolean;
   } | null;
-  payment: {
-    id: string;
-    status: string;
-    amount: number;
-    provider: string | null;
-    providerPaymentId: string | null;
-    /** PayTR "sipariş no" (güncel) + önceki denemeler (en yenisi başta). */
-    paytrOid: string | null;
-    paytrOidHistory: string[];
-    paidAt: string | null;
-    coversWholeGroup: boolean;
-    refundedTotal: number;
-  } | null;
+  payment:
+    | ({
+        id: string;
+        status: string;
+        amount: number;
+        provider: string | null;
+        providerPaymentId: string | null;
+        /** PayTR "sipariş no" (güncel) + önceki denemeler (en yenisi başta). */
+        paytrOid: string | null;
+        paytrOidHistory: string[];
+        paidAt: string | null;
+        coversWholeGroup: boolean;
+        /** PSP scale: the succeeded refund attempts (fee share included). */
+        refundedTotal: number;
+      } & PaymentInstallmentFields)
+    | null;
   packages: OrderFilePackage[];
 }
 

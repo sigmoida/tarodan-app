@@ -24,6 +24,9 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
   const t = useTranslations();
   const { payment } = file;
   if (!payment) return null;
+  // PSP scale (C): what the card was charged, like `refundedTotal`.
+  const charged = payment.chargedAmount ?? payment.amount;
+  const installmentCount = payment.installmentCount ?? 1;
 
   return (
     <SectionCard title={t("admin.operations.orders.paymentTitle")}>
@@ -32,8 +35,20 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
           {enumLabel(statusConfig(paymentStatusConfig, t), payment.status)}
         </Field>
         <Field label={t("admin.operations.orders.file.chargedTotal")}>
-          {fmtTry(payment.amount)}
+          {fmtTry(charged)}
         </Field>
+        {installmentCount > 1 && (
+          <>
+            <Field label={t("admin.finance.payments.installment.title")}>
+              {t("admin.finance.installments.rules.countSingle", {
+                count: installmentCount,
+              })}
+            </Field>
+            <Field label={t("admin.finance.installments.preview.columns.fee")}>
+              {fmtTry(payment.installmentFeeAmount ?? 0)}
+            </Field>
+          </>
+        )}
         {payment.refundedTotal > 0 && (
           <Field label={t("admin.operations.orders.file.refundedTotal")}>
             <span className="text-danger-600">
@@ -41,14 +56,13 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
             </span>
           </Field>
         )}
-        {payment.refundedTotal > 0 &&
-          payment.refundedTotal < payment.amount && (
-            <Field
-              label={t("admin.operations.orders.file.remainingChargedTotal")}
-            >
-              {fmtTry(payment.amount - payment.refundedTotal)}
-            </Field>
-          )}
+        {payment.refundedTotal > 0 && payment.refundedTotal < charged && (
+          <Field
+            label={t("admin.operations.orders.file.remainingChargedTotal")}
+          >
+            {fmtTry(charged - payment.refundedTotal)}
+          </Field>
+        )}
         <Field label={t("admin.operations.orders.provider")}>
           {enumLabel(
             statusConfig(paymentProviderConfig, t),
