@@ -206,8 +206,11 @@ export function parsePaytrRate(value: unknown): string | null {
  * - a family value that is an array of such count-keyed objects (merged);
  * - `oranlar` itself an array of family-keyed objects (merged).
  *
- * `tumu` is read for the single-payment rate only; any other key in it is
- * ignored (an all-cards installment row would have no family to price).
+ * `tumu` is read for the single-payment rate only, and only as the plain
+ * object the capture shows (an array or a scalar is ignored as `oranlar.tumu`
+ * and the answer has no single rate: fail closed, visible in the warn log).
+ * Any other key in it is ignored (an all-cards installment row would have no
+ * family to price).
  * A plain list of numbers is ambiguous (does index 0 mean 1 or 2
  * installments?) and is ignored, as are unknown families and keys, values
  * that are not a decimal in [0, 100), and a count or a single rate that two

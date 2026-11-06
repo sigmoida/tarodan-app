@@ -9,8 +9,8 @@ import { PayTRTransferService } from "./paytr-transfer.service";
 import {
   paytrTaksitOranlariStagingBody,
   PAYTR_STAGING_FAMILIES,
-  PAYTR_STAGING_FAMILY_RATES,
   PAYTR_STAGING_REQUEST_ID,
+  PAYTR_STAGING_SINGLE_RATE_PCT,
 } from "../../../../test/fixtures/paytr-taksit-oranlari-staging";
 
 /**
@@ -398,27 +398,30 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
     it("parses the staging capture: single rate 3.46, nine families, nothing ignored", async () => {
       const text = paytrTaksitOranlariStagingBody();
       fetchSpy.mockResolvedValue({ text: async () => text });
-      const warn = jest.spyOn(Logger.prototype, "warn");
+      const warn = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      try {
+        const r = await service.getInstallmentRates(PAYTR_STAGING_REQUEST_ID, {
+          singleRatio: true,
+        });
 
-      const r = await service.getInstallmentRates(PAYTR_STAGING_REQUEST_ID, {
-        singleRatio: true,
-      });
-
-      expect(r.ok).toBe(true);
-      if (!r.ok) return;
-      expect(r.requestId).toBe(PAYTR_STAGING_REQUEST_ID);
-      expect(r.maxInstallmentNonBusiness).toBe(12);
-      expect(r.singleRatePct).toBe("3.46");
-      expect(Object.keys(r.rates).sort()).toEqual(
-        [...PAYTR_STAGING_FAMILIES].sort(),
-      );
-      for (const family of PAYTR_STAGING_FAMILIES) {
-        expect(r.rates[family]).toEqual(PAYTR_STAGING_FAMILY_RATES);
+        // The row values are pinned in paytr-installments.spec.ts; here the
+        // service passes the parser's result through.
+        expect(r.ok).toBe(true);
+        if (!r.ok) return;
+        expect(r.requestId).toBe(PAYTR_STAGING_REQUEST_ID);
+        expect(r.maxInstallmentNonBusiness).toBe(12);
+        expect(r.singleRatePct).toBe(PAYTR_STAGING_SINGLE_RATE_PCT);
+        expect(Object.keys(r.rates).sort()).toEqual(
+          [...PAYTR_STAGING_FAMILIES].sort(),
+        );
+        expect(r.ignored).toEqual([]);
+        expect(r.raw).toEqual(JSON.parse(text));
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
       }
-      expect(r.ignored).toEqual([]);
-      expect(r.raw).toEqual(JSON.parse(text));
-      expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it("aborts after the caller's timeout when one is given", async () => {

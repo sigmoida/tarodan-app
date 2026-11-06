@@ -759,10 +759,11 @@ export class PayTRService implements IPaymentProvider {
    * by `parsePaytrInstallmentRates`; `max_inst_non_bus` is the store's
    * maximum count for non-business cards. "Oranlar gunluk olarak
    * degisebilir": the caller stores a snapshot with `raw` and prices from it.
-   * Where `single_ratio=1` / `abroad_ratio=1` put their rates is not
-   * documented; they stay in `raw` until the staging capture (hub plan S0)
-   * shows the field, rather than being guessed (an echoed "1" flag must not
-   * be read as a 1% rate).
+   * With `single_ratio=1` the single-payment rate comes in
+   * `oranlar.tumu.tek_cekim` (staging capture, hub plan S0), read by the same
+   * parser; top-level fields are never read as a rate (an echoed "1" flag is
+   * not a 1% rate). Where `abroad_ratio=1` puts its rates is not known; they
+   * stay in `raw` rather than being guessed.
    * Never throws: a failure is `{ ok: false }`.
    */
   async getInstallmentRates(

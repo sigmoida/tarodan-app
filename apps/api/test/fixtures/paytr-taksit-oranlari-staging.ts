@@ -30,6 +30,12 @@ export const PAYTR_STAGING_FAMILIES = [
 
 export const PAYTR_STAGING_REQUEST_ID = "895754eaac7d4018be69afd985c577b2";
 
+/**
+ * `oranlar.tumu.tek_cekim`: written into the body below as a bare JSON
+ * number, and the text the parser must return for it.
+ */
+export const PAYTR_STAGING_SINGLE_RATE_PCT = "3.46";
+
 /** The answer with `request_id` set to `requestId` (PayTR echoes it). */
 export function paytrTaksitOranlariStagingBody(
   requestId: string = PAYTR_STAGING_REQUEST_ID,
@@ -39,7 +45,7 @@ export function paytrTaksitOranlariStagingBody(
   ).join(",");
   return (
     `{"status":"success","request_id":"${requestId}","max_inst_non_bus":12,` +
-    `"oranlar":{${families},"tumu":{"tek_cekim":3.46}}}`
+    `"oranlar":{${families},"tumu":{"tek_cekim":${PAYTR_STAGING_SINGLE_RATE_PCT}}}}`
   );
 }
 
@@ -57,5 +63,3 @@ export const PAYTR_STAGING_FAMILY_RATES: Readonly<Record<string, string>> = {
   "11": "25.76",
   "12": "27.8",
 };
-
-export const PAYTR_STAGING_SINGLE_RATE_PCT = "3.46";

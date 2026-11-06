@@ -10,7 +10,6 @@ import {
   paytrTaksitOranlariStagingBody,
   PAYTR_STAGING_FAMILIES,
   PAYTR_STAGING_FAMILY_RATES,
-  PAYTR_STAGING_SINGLE_RATE_PCT,
 } from "../../../../test/fixtures/paytr-taksit-oranlari-staging";
 
 /**
@@ -61,11 +60,9 @@ describe("parsePaytrInstallmentRates: staging capture (single_ratio=1, S0)", () 
     JSON.parse(paytrTaksitOranlariStagingBody()) as { oranlar: unknown }
   ).oranlar;
 
-  it("reads the single-payment rate from oranlar.tumu.tek_cekim", () => {
-    expect(parsePaytrInstallmentRates(oranlar).singleRatePct).toBe(
-      PAYTR_STAGING_SINGLE_RATE_PCT,
-    );
-    expect(PAYTR_STAGING_SINGLE_RATE_PCT).toBe("3.46");
+  it("reads the single-payment rate 3.46 from oranlar.tumu.tek_cekim (a JSON number)", () => {
+    expect((oranlar as { tumu: unknown }).tumu).toEqual({ tek_cekim: 3.46 });
+    expect(parsePaytrInstallmentRates(oranlar).singleRatePct).toBe("3.46");
   });
 
   it("parses all nine families, 2-12 each, float noise normalized", () => {
