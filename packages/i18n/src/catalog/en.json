@@ -3347,7 +3347,7 @@
       "alisverisVeTakasRehberi": "Alışveriş ve Takas Rehberi",
       "nasilSiparisOlusturabilirim": "Nasıl sipariş oluşturabilirim?",
       "koleksiyonunuzaDahilEtmekIstediginizModelAraclari": "Koleksiyonunuza dahil etmek istediğiniz model araçları sepetinize ekleyerek alışverişe hemen başlayabilirsiniz. Sepetinize tıkladıktan sonra aktif indirimlerden yararlanabilir, varsa indirim kuponu kodunuzu ilgili alana girebilirsiniz.",
-      "odemeyeGecButonunaTikladiktanSonraTeslimat": "“Ödemeye geç” butonuna tıkladıktan sonra teslimat adresinizi kontrol edebilir; farklı bir adrese gönderim yapacaksanız yeni bir adres ekleyebilir veya mevcut bilgilerinizi güncelleyebilirsiniz. Ödeme adımında kart bilgilerinizi girdikten ve dilerseniz size uygun taksit seçeneğini seçtikten sonra “Alışverişi tamamla” butonuna basarak siparişinizi güvenle oluşturabilirsiniz.",
+      "odemeyeGecButonunaTikladiktanSonraTeslimat": "After clicking the “Proceed to payment” button, you can check your delivery address; if you will ship to a different address, you can add a new one or update your existing details. On the payment step, after entering your card details, you can place your order securely by pressing the “Complete purchase” button.",
       "takasIslemleriniNasilYapiyoruz": "Takas işlemlerini nasıl yapıyoruz?",
       "heyecanVericiBirDigerDetayIse": "Heyecan verici bir diğer detay ise: koleksiyonlar arası takas da yapılabiliyor! Takas sürecinde her iki taraf da model araçlarını Tarodan deposuna gönderiyor. Uzman ekibimiz depoda gerekli kontrolleri sağlıyor; ürünler ilanla tamamen eşleşiyorsa takas işlemini güvenle başlatıyoruz. Eğer beklenmeyen kusurlu veya yanlış bir ürünle karşılaşırsak hemen taraflara bilgi veriyor, onayınızla süreci düzenliyor veya ürünleri güvenle sizlere iade ediyoruz. Böylece garaj değiştirmek tamamen güvence altında ilerliyor!",
       "siparisiminVeyaTakasiminDurumunuNasilTakip": "Siparişimin veya takasımın durumunu nasıl takip edebilirim?",
@@ -4174,7 +4174,7 @@
       "security": "Security",
       "securityDesc": "Your card details are encrypted with 256-bit SSL. We do not store your card number on our payment page.",
       "installments": "Installments",
-      "installmentsDesc": "Installment options are shown at checkout according to bank promotions."
+      "installmentsDesc": "Card payments are currently taken as a single payment."
     },
     "returns": {
       "title": "Returns & Exchanges",
@@ -13454,7 +13454,7 @@
     "paymentOptions": {
       "page": {
         "odemeSecenekleriTarodan": "Ödeme Seçenekleri · Tarodan",
-        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Tarodan üzerinde kabul edilen ödeme yöntemleri, güvenli ödeme altyapısı ve taksit seçenekleri hakkında bilgi alın."
+        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Learn about the payment methods accepted on Tarodan and the secure payment infrastructure."
       }
     },
     "sell": {
