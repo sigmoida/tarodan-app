@@ -14,6 +14,7 @@ import {
   Max,
 } from "class-validator";
 import { Type } from "class-transformer";
+import type { CollectionItemSummary } from "@tarodan/types";
 import { FormBoolean, ListingIdField } from "../../../common/transforms";
 
 export class CreateCollectionDto {
@@ -160,31 +161,36 @@ export class ReorderCollectionItemsDto {
   items: ReorderCollectionItemDto[];
 }
 
-export class CollectionItemResponseDto {
+/** The wire shape is `CollectionItemSummary` (`@tarodan/types`); `addedAt` is serialised to ISO. */
+export class CollectionItemResponseDto implements Omit<
+  CollectionItemSummary,
+  "addedAt"
+> {
   id: string;
   productId?: string;
   productTitle: string;
   productImage?: string;
+  /** Absent on a custom item: it is not for sale. */
   productPrice?: number;
   productStatus?: string;
-  // Ürünün satıcısı (özel öğede null) — istemci "kendi ilanında kalp yok" kuralı için.
+  /** The listing's seller (null on a custom item): clients hide the heart on one's own listing. */
   sellerId?: string | null;
   sortOrder: number;
   isFeatured: boolean;
-  // Ürünün KENDİ ilan öne çıkarması (boost) aktif mi — koleksiyon içi öne çıkarma değil.
+  /** Whether the listing's OWN boost is active (not an in-collection feature flag). */
   isBoosted?: boolean;
   addedAt: Date;
   isCustom: boolean;
-  // Custom product fields
-  customTitle?: string;
-  customDescription?: string;
-  customBrand?: string;
-  customModel?: string;
-  customYear?: number;
-  customScale?: string;
-  customManufacturer?: string;
-  customMaterial?: string;
-  customImageUrl?: string;
+  // Custom item fields (null when not filled in)
+  customTitle?: string | null;
+  customDescription?: string | null;
+  customBrand?: string | null;
+  customModel?: string | null;
+  customYear?: number | null;
+  customScale?: string | null;
+  customManufacturer?: string | null;
+  customMaterial?: string | null;
+  customImageUrl?: string | null;
 }
 
 export class CollectionResponseDto {
