@@ -832,6 +832,29 @@ describe("05 — Koleksiyon & Favori (Wishlist) (COL)", () => {
       expect(item?.customImageUrl).toBe(res.body.customImageUrl);
     });
 
+    scenario("COL-106", async () => {
+      // A customImageUrl that is not our own collection upload is refused before
+      // anything is written (SSRF and unmoderated image guard).
+      const ahmet = await premiumUser();
+      const col = await seedCollection({
+        userId: ahmet.id,
+        name: "Foreign-Image",
+      });
+      const res = await request(server())
+        .post(`/api/collections/${col.id}/items`)
+        .set(authHeader(ahmet))
+        .send({
+          customTitle: "Foreign",
+          customImageUrl: "https://evil.example.com/a.webp",
+        })
+        .expect(400);
+      expect(res.body.i18nKey).toBe("server.collection.invalidImageUrl");
+      const prisma = getPrisma();
+      expect(
+        await prisma.collectionItem.count({ where: { collectionId: col.id } }),
+      ).toBe(0);
+    });
+
     scenario("COL-033", async () => {
       const ahmet = await premiumUser();
       const col = await seedCollection({

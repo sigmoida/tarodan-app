@@ -6885,6 +6885,19 @@
       "gapRefs": []
     },
     {
+      "id": "COL-106",
+      "code": "05",
+      "prefix": "COL",
+      "domTitle": "05 — Koleksiyon & Favori (Wishlist) i",
+      "title": "Custom item with a customImageUrl that is not our own upload",
+      "tur": "Güvenlik / Negatif",
+      "pri": "P0",
+      "steps": "POST /api/collections/{id}/items as the owner with customTitle and customImageUrl on another host (https://evil.example.com/a.webp).",
+      "exp": "HTTP 400 server.collection.invalidImageUrl; no collection item is stored. Only URLs on our public storage in the caller's collections folder are accepted (folder rule covered by the unit spec; the e2e storage stub has one fixed key).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
       "id": "SRC-001",
       "code": "06",
       "prefix": "SRC",
