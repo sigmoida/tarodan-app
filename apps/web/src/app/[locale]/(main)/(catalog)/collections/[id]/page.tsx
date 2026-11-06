@@ -18,8 +18,15 @@ type Props = { params: Promise<{ id: string; locale: string }> };
  * to the SAME shape the client query stores (`response.data.collection ||
  * response.data`), so the result can seed the cache. `revalidate: 60` lets Next
  * dedupe the `generateMetadata` and page fetches into a single request.
+ *
+ * `fetchedAt` is when the API produced the body (the Data Cache keeps its `date`
+ * header). The body can be older than the owner's last write, so the seed must
+ * carry its real age: stamped "now", it would overwrite the fresher client cache
+ * on hydration and bring back a removed item with no refetch.
  */
-async function getCollection(idOrSlug: string): Promise<any | null> {
+async function getCollection(
+  idOrSlug: string,
+): Promise<{ collection: any; fetchedAt?: number } | null> {
   try {
     const res = await fetch(
       `${API_BASE}/api/collections/${encodeURIComponent(idOrSlug)}`,
@@ -27,7 +34,13 @@ async function getCollection(idOrSlug: string): Promise<any | null> {
     );
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.collection ?? json?.data ?? json;
+    const collection = json?.collection ?? json?.data ?? json;
+    if (!collection) return null;
+    const fetchedAt = Date.parse(res.headers.get("date") ?? "");
+    return {
+      collection,
+      fetchedAt: Number.isNaN(fetchedAt) ? undefined : fetchedAt,
+    };
   } catch {
     return null;
   }
@@ -36,7 +49,7 @@ async function getCollection(idOrSlug: string): Promise<any | null> {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations();
   const { id, locale } = await params;
-  const collection = await getCollection(id);
+  const collection = (await getCollection(id))?.collection;
   if (!collection?.name)
     return { title: t("page.collections.page.koleksiyonBulunamadiTarodan") };
 
@@ -79,9 +92,11 @@ export default async function CollectionPage({ params }: Props) {
   // (`queryKeys.collection.detail(idOrSlug)`) so the body ships in the first HTML for crawlers
   // and the client hydrates without a refetch flash.
   const queryClient = getServerQueryClient();
-  const collection = await getCollection(id);
-  if (collection)
-    queryClient.setQueryData(queryKeys.collection.detail(id), collection);
+  const seed = await getCollection(id);
+  if (seed)
+    queryClient.setQueryData(queryKeys.collection.detail(id), seed.collection, {
+      updatedAt: seed.fetchedAt,
+    });
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
