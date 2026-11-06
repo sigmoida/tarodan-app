@@ -7,6 +7,7 @@ import {
   PaytrMerchant,
   PaytrStatementLineType,
   PaymentStatus,
+  Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
@@ -18,6 +19,10 @@ import { LedgerService } from "../../ledger/ledger.service";
 import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
 import { paymentOids } from "../helpers/payment-oids";
 import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
+import {
+  expectedPaytrChargeFor,
+  paytrAmountMatches,
+} from "../helpers/charged-amount";
 
 /** Tutar eşlemesi toleransı (kuruş yuvarlamaları). Gün kartı farkı da bunu kullanır. */
 export const MATCH_TOLERANCE_TL = 0.05;
@@ -35,10 +40,15 @@ const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
 const REVERSE_SWEEP_DAYS = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Döküm satırının bizdeki karşılığı: sipariş/sepet/takas ödemesi ya da üyelik yenilemesi. */
+/**
+ * Our side of a statement line: an order, cart or trade cash payment, or a
+ * membership renewal. `amount` is what PayTR must show for the line's oid
+ * (PSP scale): a payment's is the amount signed for that oid (its charge
+ * attempt), else its charged amount (`expectedPaytrChargeFor`).
+ */
 export type StatementCounterpart =
-  | { kind: "payment"; id: string; amount: unknown }
-  | { kind: "membership"; id: string; amount: unknown };
+  | { kind: "payment"; id: string; amount: Prisma.Decimal }
+  | { kind: "membership"; id: string; amount: Prisma.Decimal };
 
 /**
  * Faz 3 — PSP mutabakat fark motoru. Rapor sync'inin (Faz 2) doldurduğu yerel
@@ -73,16 +83,23 @@ export class PaytrReportMatchingService {
   async findCounterpartByOid(
     oid: string,
   ): Promise<StatementCounterpart | null> {
-    const direct = await this.prisma.payment.findFirst({
-      where: { providerConversationId: oid },
-      select: { id: true, amount: true },
-    });
-    if (direct) return { kind: "payment", ...direct };
-    const historical = await this.prisma.payment.findFirst({
-      where: paymentOidHistoryWhere(oid),
-      select: { id: true, amount: true },
-    });
-    if (historical) return { kind: "payment", ...historical };
+    const select = { id: true, amount: true, chargedAmount: true } as const;
+    const payment =
+      (await this.prisma.payment.findFirst({
+        where: { providerConversationId: oid },
+        select,
+      })) ??
+      (await this.prisma.payment.findFirst({
+        where: paymentOidHistoryWhere(oid),
+        select,
+      }));
+    if (payment) {
+      return {
+        kind: "payment",
+        id: payment.id,
+        amount: await expectedPaytrChargeFor(this.prisma, payment, oid),
+      };
+    }
     const membership = await this.prisma.membershipPayment.findFirst({
       where: { merchantOid: oid },
       select: { id: true, amount: true },
@@ -90,8 +107,9 @@ export class PaytrReportMatchingService {
     return membership ? { kind: "membership", ...membership } : null;
   }
 
-  private amountsAgree(a: unknown, b: unknown): boolean {
-    return Math.abs(Number(a) - Number(b)) <= MATCH_TOLERANCE_TL;
+  /** A statement line's amount against ours: the one PayTR comparison rule. */
+  private amountsAgree(ours: Prisma.Decimal, lineAmount: unknown): boolean {
+    return paytrAmountMatches(String(lineAmount), ours, MATCH_TOLERANCE_TL);
   }
 
   async matchStatementLines(): Promise<{
@@ -530,11 +548,13 @@ export class PaytrReportMatchingService {
     const sales = Number(s.salesTotal);
     const returns = Number(s.returnTotal);
     const net = Number(s.netTotal);
+    // psp-amount-ok: PayTR's own totals against each other, not our charge.
     const consistent = Math.abs(sales - returns - net) <= MATCH_TOLERANCE_TL;
     const itemsConsistent =
       s.itemSum == null
         ? null
-        : Math.abs(s.itemSum - sales) <= MATCH_TOLERANCE_TL;
+        : // psp-amount-ok: PayTR's item sum against PayTR's sales total.
+          Math.abs(s.itemSum - sales) <= MATCH_TOLERANCE_TL;
     return { consistent, itemsConsistent };
   }
 

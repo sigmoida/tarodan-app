@@ -4,6 +4,8 @@ import { PrismaService } from "../../../prisma";
 import { EventService } from "../../events";
 import { LedgerService } from "../../ledger/ledger.service";
 import { OrderShipmentProvisioner } from "../../surat-cargo/sync/order-shipment-provisioner.service";
+import { orderInstallmentFeeOf } from "../helpers/charged-amount";
+import { installmentMailLineOf } from "../helpers/installment-mail-line";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -66,9 +68,11 @@ export class FulfillmentFinalizer {
           buyerId: order.buyerId,
           sellerId: order.sellerId,
           gross,
+          // Goods scale: the installment fee never reaches the seller net.
           sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
           commission,
           withholdingTax,
+          installmentFee: await this.installmentFeeOf(order.id),
         });
       }
     } catch (e: any) {
@@ -153,6 +157,9 @@ export class FulfillmentFinalizer {
         buyerSystemEmail: order.buyer.email || "",
         // Sepet: alıcı onayı grup başına TEK kez (emitGroupBuyerOrderPaid) → burada atla.
         skipBuyer: opts.skipBuyer,
+        installment: opts.skipBuyer
+          ? null
+          : await this.installmentMailLine(payment.id),
       });
     } catch (error) {
       this.logger.error(`Failed to emit order.paid event: ${error}`);
@@ -167,6 +174,31 @@ export class FulfillmentFinalizer {
       );
       throw error;
     }
+  }
+
+  /**
+   * The buyer e-mail's installment line, from the captured payment row (the
+   * object the caller passed predates the capture).
+   */
+  private async installmentMailLine(paymentId: string) {
+    const captured = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { amount: true, chargedAmount: true, installmentCount: true },
+    });
+    return captured ? installmentMailLineOf(captured) : null;
+  }
+
+  /**
+   * The order's share of the installment fee, read from the row the capture
+   * wrote (`Order.installmentFeeAmount`), whatever object the caller passed:
+   * the immediate path and the outbox backstop load the order differently.
+   */
+  private async installmentFeeOf(orderId: string): Promise<number> {
+    const row = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { installmentFeeAmount: true },
+    });
+    return row ? orderInstallmentFeeOf(row).toNumber() : 0;
   }
 
   /**

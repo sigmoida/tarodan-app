@@ -69,3 +69,16 @@ export const INSTALLMENT_OPTIONS_IP_LIMIT_PER_MINUTE = 30;
 
 /** The same endpoint per `paymentId`, per minute (Redis counter). */
 export const INSTALLMENT_OPTIONS_PAYMENT_LIMIT_PER_MINUTE = 20;
+
+/**
+ * The PayTR `user_basket` line of the buyer-paid installment fee, so the
+ * basket sums to the signed amount (plan 5.6 "Basket"). PayTR shows basket
+ * lines in its Turkish merchant panel and receipts, like the goods lines
+ * ("Koleksiyon").
+ */
+export const INSTALLMENT_FEE_BASKET_ITEM = {
+  id: "installment-fee",
+  name: "Taksit vade farkı",
+  category: "Hizmet",
+  quantity: 1,
+} as const;

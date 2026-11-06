@@ -30,6 +30,10 @@ import {
   publicName,
 } from "../../../common/helpers/public-identity";
 import { resolveTimingValue } from "../../../common/timing-rules";
+import {
+  paytrAmountMatches,
+  paytrChargeExpectationsOf,
+} from "../helpers/charged-amount";
 
 export type PaymentAccessContext =
   { internal: true } | { userId: string | null; capabilityAuthorized: boolean };
@@ -475,7 +479,9 @@ export class PaymentLifecycleService {
     const tolerance = parseFloat(
       this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
-    const ourAmount = Number(payment.amount);
+    // PSP scale, per oid: each oid is checked against the amount it was
+    // signed for (its charge attempt), else the legacy `amount`.
+    const expectedFor = await paytrChargeExpectationsOf(this.prisma, payment);
 
     let capturedOid: string | null = null;
     let capturedInquiry: PayTRStatusInquirySuccess | null = null;
@@ -495,9 +501,10 @@ export class PaymentLifecycleService {
       if (!inquiry.ok) continue;
       // Bu oid PayTR'da çekilmiş. Tutar toleransı tutmuyorsa bu oid'i sayma ama
       // diğer oid'leri taramaya devam et (mismatch'i işaretle).
-      if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+      const expected = expectedFor(candidateOid);
+      if (!paytrAmountMatches(inquiry.paymentTotalTl, expected, tolerance)) {
         this.logger.warn(
-          `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${candidateOid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+          `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${candidateOid} paytr=${inquiry.paymentTotalTl} ours=${expected.toFixed(2)}`,
         );
         sawMismatch = true;
         continue;
@@ -536,7 +543,7 @@ export class PaymentLifecycleService {
       paymentType: capturedInquiry.paymentType ?? null,
       installmentCount: capturedInquiry.installmentCount ?? null,
       currency: capturedInquiry.currency ?? null,
-      amount: ourAmount,
+      amount: expectedFor(capturedOid).toNumber(),
       totalAmount: capturedInquiry.paymentTotalTl,
       raw: {
         source: "verify",

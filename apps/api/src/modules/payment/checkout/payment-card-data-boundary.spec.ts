@@ -3,6 +3,7 @@ import { plainToInstance } from "class-transformer";
 import { getMetadataStorage, validate } from "class-validator";
 import { PaymentController } from "../payment.controller";
 import { DirectPaymentDto, InstallmentOptionsDto } from "../dto";
+import { DirectFormInstallmentDto } from "../dto/direct-payment.dto";
 
 describe("PaymentController card data boundary", () => {
   it("exposes form preparation instead of the legacy card proxy", () => {
@@ -65,6 +66,42 @@ describe("PaymentController card data boundary", () => {
       response: { i18nKey: "server.payment.cardDataNotAccepted" },
     });
     expect(paymentService.prepareDirectPayment).not.toHaveBeenCalled();
+  });
+
+  describe("direct-form installment (BIN only)", () => {
+    const errorsOf = async (bin: string) =>
+      (
+        await validate(
+          plainToInstance(DirectFormInstallmentDto, {
+            count: 3,
+            bin,
+            expectedTotal: 1066.38,
+          }),
+        )
+      ).map((error) => error.property);
+
+    it.each(["454671123", "4355084355084358"])(
+      "rejects a BIN longer than 8 digits (%p)",
+      async (bin) => {
+        expect(await errorsOf(bin)).toEqual(["bin"]);
+      },
+    );
+
+    it("declares a count, a BIN and a total, never card fields", () => {
+      const properties = getMetadataStorage()
+        .getTargetValidationMetadatas(
+          DirectFormInstallmentDto,
+          "",
+          false,
+          false,
+        )
+        .map((metadata) => metadata.propertyName);
+      expect([...new Set(properties)].sort()).toEqual([
+        "bin",
+        "count",
+        "expectedTotal",
+      ]);
+    });
   });
 
   describe("installment options (BIN only)", () => {

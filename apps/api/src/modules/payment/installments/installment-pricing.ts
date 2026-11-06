@@ -156,6 +156,16 @@ export function priceInstallment(
 }
 
 /**
+ * The order of a payment's orders wherever its installment fee is split over
+ * them: the keep guard at pricing and the allocation at capture must see the
+ * same order (cart orders by creation, then id).
+ */
+export const INSTALLMENT_FEE_SPLIT_ORDER_BY = [
+  { createdAt: "asc" },
+  { id: "asc" },
+] satisfies Prisma.OrderOrderByWithRelationInput[];
+
+/**
  * Splits `fee` over `weights` (the orders' `totalAmount`) in whole kuruş by
  * largest remainder: each share is floored, the kuruş left over go to the
  * largest remainders, ties to the earlier entry. The shares always sum to

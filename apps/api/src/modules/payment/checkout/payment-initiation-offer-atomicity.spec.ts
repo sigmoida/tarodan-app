@@ -1,5 +1,6 @@
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { Prisma } from "@prisma/client";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * #3 (atomiklik): Teklif siparişinde ilk ödeme başlatmada stok rezervasyonu + Payment
@@ -58,6 +59,7 @@ describe("PaymentInitiationService — teklif reserve+Payment atomikliği (#3)",
       {} as any,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
+      singlePaymentChargeStub() as never,
     );
     return { service, calls, tx };
   };

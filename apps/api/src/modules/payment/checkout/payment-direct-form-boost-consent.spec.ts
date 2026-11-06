@@ -1,5 +1,6 @@
 import { OrderOrigin, OrderStatus } from "@prisma/client";
 import { PaymentInitiationService } from "./payment-initiation.service";
+import { singlePaymentChargeStub } from "../installments/installment-charge.testing";
 
 /**
  * DIRECT-FORM BOOST CONSENT GATE.
@@ -13,6 +14,8 @@ import { PaymentInitiationService } from "./payment-initiation.service";
 describe("PaymentInitiationService — direct-form boost consent gate", () => {
   const makeService = (order: Record<string, unknown>, recorded: boolean) => {
     const prisma = {
+      // The claim transaction writes the form's charge attempt.
+      paymentChargeAttempt: { create: jest.fn().mockResolvedValue({}) },
       order: { findUnique: jest.fn().mockResolvedValue(order) },
       payment: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -54,6 +57,7 @@ describe("PaymentInitiationService — direct-form boost consent gate", () => {
       {} as never,
       { ensureForPayment: distanceGate } as never,
       platformConsent as never,
+      singlePaymentChargeStub() as never,
     );
     return { service, prisma, distanceGate, platformConsent };
   };

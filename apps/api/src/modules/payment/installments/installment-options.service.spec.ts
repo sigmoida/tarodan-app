@@ -383,6 +383,24 @@ describe("InstallmentOptionsService.getOptions", () => {
       expect(provider.lookupBin).not.toHaveBeenCalled();
     });
 
+    it.each`
+      case                                          | payment
+      ${"a test-lane payment of a live order"}      | ${orderPayment({ isTest: true }, { isTest: false })}
+      ${"a live payment of a test account's order"} | ${orderPayment({ isTest: false }, { isTest: false, buyer: { ...buyer(MembershipTierType.free), isTestAccount: true } })}
+    `(
+      "refuses $case (lane mismatch, plan 5.2) without a BIN lookup",
+      async ({ payment }) => {
+        const { service, provider } = setup({ payment });
+        expect(
+          await service.getOptions(
+            { bin: "45467112", paymentId: "pay-1" },
+            member,
+          ),
+        ).toMatchObject({ enabled: false, reason: "not_offered_for_payment" });
+        expect(provider.lookupBin).not.toHaveBeenCalled();
+      },
+    );
+
     it("offers an offer order (D6)", async () => {
       const { service } = setup({
         payment: orderPayment({}, { origin: OrderOrigin.offer }),

@@ -66,6 +66,15 @@ function setup(record: {
   }
 
   const prisma = {
+    // Forms signed before charge attempts: every oid falls back to `amount`.
+
+    paymentChargeAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+
+      findMany: jest.fn().mockResolvedValue([]),
+
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     payment: {
       findFirst: jest.fn().mockResolvedValue(record.payment ?? null),
     },

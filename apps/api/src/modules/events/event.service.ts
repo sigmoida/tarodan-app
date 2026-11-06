@@ -93,6 +93,16 @@ export interface OrderPaidPayload {
    * maili/push GİTMEZ; yalnız satıcı maili/push'u + analytics çalışır.
    */
   skipBuyer?: boolean;
+  /**
+   * The installment terms line (count, monthly, fee, total C) when the
+   * payment was split into installments; absent or null for a single
+   * payment (ADR 0019).
+   */
+  installment?: {
+    label: string;
+    summary: string;
+    chargedAmount: number;
+  } | null;
 }
 
 /**
@@ -137,6 +147,16 @@ export interface GroupBuyerOrderPaidPayload {
   buyerSystemEmail?: string;
   /** Temsilci sipariş no — misafir takip linki için kullanılır */
   representativeOrderNumber?: string;
+  /**
+   * The installment terms line (count, monthly, fee, total C) when the
+   * payment was split into installments; absent or null for a single
+   * payment (ADR 0019).
+   */
+  installment?: {
+    label: string;
+    summary: string;
+    chargedAmount: number;
+  } | null;
   /**
    * Temsilci sipariş id — bildirim hedefi için.
    *
@@ -399,6 +419,7 @@ export class EventService {
             shippingAddress: payload.shippingAddress,
             isGuestOrder: payload.isGuestOrder ?? false,
             buyerSystemEmail: payload.buyerSystemEmail ?? "",
+            installment: payload.installment ?? null,
           },
         },
         {
@@ -542,6 +563,7 @@ export class EventService {
           buyerSystemEmail: payload.buyerSystemEmail ?? "",
           // Misafir takip linki temsilci sipariş no üzerinden çözülür
           orderNumber: payload.representativeOrderNumber ?? "",
+          installment: payload.installment ?? null,
         },
       },
       {

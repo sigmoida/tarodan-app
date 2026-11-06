@@ -127,9 +127,14 @@ export class LedgerService {
   }
 
   /**
-   * Alıcı ödemesi yakalandı: dış giriş (buyer_payment) = escrow (seller_escrow) +
-   * platform komisyonu + stopaj (withholding_tax). gross = sellerNet + commission +
-   * withholdingTax → grup dengeli. sellerNet çağırandan alınır (hold tutarıyla birebir).
+   * A buyer payment was captured, per order: the money in (`buyer_payment`) is
+   * the order's slice of what PayTR charged, `gross + installmentFee`. It
+   * splits into the seller escrow, the platform commission, the stopaj and,
+   * for an installment payment, the buyer-paid installment fee (vade farkı,
+   * `installment_fee`, ADR 0019). `gross = sellerNet + commission +
+   * withholdingTax` stays the goods scale, so the seller net and the escrow
+   * never see the fee; the group balances by construction. `sellerNet` comes
+   * from the caller (equal to the hold amount).
    */
   async recordCapture(
     tx: Prisma.TransactionClient,
@@ -138,19 +143,23 @@ export class LedgerService {
       orderId?: string | null;
       buyerId?: string | null;
       sellerId?: string | null;
+      /** The order's goods total T_o. */
       gross: number;
       sellerNet: number;
       commission: number;
       withholdingTax?: number;
+      /** The order's share F_o of the installment fee; 0 or absent = none. */
+      installmentFee?: number;
       currency?: string;
       memo?: string | null;
     },
   ): Promise<string> {
+    const installmentFee = input.installmentFee ?? 0;
     const entries: LedgerEntryInput[] = [
       {
         account: LedgerAccount.buyer_payment,
         direction: LedgerDirection.credit,
-        amount: input.gross,
+        amount: round2(input.gross + installmentFee),
       },
       {
         account: LedgerAccount.seller_escrow,
@@ -170,6 +179,13 @@ export class LedgerService {
         account: LedgerAccount.withholding_tax,
         direction: LedgerDirection.debit,
         amount: input.withholdingTax,
+      });
+    }
+    if (installmentFee > 0) {
+      entries.push({
+        account: LedgerAccount.installment_fee,
+        direction: LedgerDirection.debit,
+        amount: installmentFee,
       });
     }
     return this.record(tx, {

@@ -42,6 +42,7 @@ import { InstallmentSettingsService } from "./installments/installment-settings.
 import { InstallmentRatesService } from "./installments/installment-rates.service";
 import { InstallmentRulesService } from "./installments/installment-rules.service";
 import { InstallmentOptionsService } from "./installments/installment-options.service";
+import { InstallmentChargeService } from "./installments/installment-charge.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -137,6 +138,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     InstallmentRatesService,
     InstallmentRulesService,
     InstallmentOptionsService,
+    InstallmentChargeService,
   ],
   exports: [
     PaymentService,

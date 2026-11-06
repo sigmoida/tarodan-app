@@ -37,6 +37,7 @@ import type {
   PspLineFilter,
   PspStatementLinesQueryDto,
 } from "./dto/psp-reconciliation.dto";
+import { chargedAmountOf } from "../../payment/helpers/charged-amount";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** `YYYY-MM-DD` gününün kendisi ve ±1 komşusu (oid kayması toleransı). */
@@ -150,6 +151,7 @@ export class AdminPspReconciliationService {
           select: {
             id: true,
             amount: true,
+            chargedAmount: true,
             paidAt: true,
             paytrMerchant: true,
             providerConversationId: true,
@@ -279,7 +281,9 @@ export class AdminPspReconciliationService {
       const day = trCalendarDate(payment.paidAt);
       const card = cardOf(day);
       card.ours.salesCount++;
-      card.ours.salesTotal += Number(payment.amount);
+      // PSP scale: what PayTR charged (an installment fee included), the
+      // figure the statement's sales total is compared with.
+      card.ours.salesTotal += Number(chargedAmountOf(payment));
       const oids = paymentOids(payment);
       if (
         coveredFor(day, payment.paytrMerchant) &&
