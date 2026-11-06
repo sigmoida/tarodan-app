@@ -18,7 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { paymentCapabilities, reinitiatePayment } from "@/lib/api";
 import { usePaymentsConfig } from "@/hooks/usePaymentsConfig";
 import { installmentGateOf, installmentsConfigOf } from "@/lib/installments";
-import { paymentPagePath } from "@/lib/paymentKind";
+import { MY_ORDERS_PATH, paymentPagePath } from "@/lib/paymentKind";
 import { useCart } from "@/hooks/useCart";
 import { useCartStore } from "@/stores/cartStore";
 import { useCheckoutScope } from "@/hooks/useCartSelection";
@@ -332,24 +332,25 @@ function useCheckoutValue() {
    * direct-form answered 409 `paymentAmountOutOfDate` after the cart group
    * was created (the server message is shown): the payment is initiated anew
    * once and the buyer continues on the payment page, which reads the
-   * current amount. A failure sends the buyer to their orders, where the
-   * payment can be completed.
+   * current amount. If that fails, a member completes the payment from
+   * their orders; a guest, who has no order list, goes to the payment page
+   * of the existing payment, which starts it anew itself.
    */
   const handlePaymentOutdated = async (resolved: ResolvedPayment) => {
-    resolvedPaymentRef.current = null;
+    const guest = !isAuthenticated;
     let next: string | null = null;
     try {
-      next = await reinitiatePayment(resolved.target, !isAuthenticated);
+      next = await reinitiatePayment(resolved.target, guest);
     } catch {
       next = null;
     }
-    if (!next) {
+    if (!next && !guest) {
       toast.error(t("checkout.completePaymentFromOrders"));
-      router.push(isAuthenticated ? "/profile/orders" : "/");
+      router.push(MY_ORDERS_PATH);
       return;
     }
-    const path = paymentPagePath(next, "checkout");
-    router.push(isAuthenticated ? path : `${path}?guest=true`);
+    const path = paymentPagePath(next ?? resolved.paymentId, "checkout");
+    router.push(guest ? `${path}?guest=true` : path);
   };
 
   // Kart formu ve ödeme aynı sayfada: kart alanları doğrulandıktan SONRA

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useWatch } from "react-hook-form";
@@ -200,23 +200,37 @@ export function useCardPayment({
           ? { status: "enterCard" }
           : options.state;
   const installmentPending = gate === "on" && options.pending;
+  // The submit closure outlives its render: a refusal acts on the hook as
+  // it is now (on checkout the first submit moves the key from the amount
+  // to the new payment), not as it was when the buyer clicked.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
-  const handleSigningError = (
+  const handleSigningError = async (
     error: InstallmentSigningError,
     serverMessage: string | undefined,
     resolved: ResolvedPayment,
   ) => {
     if (error === "amountOutOfDate") {
       toast.error(serverMessage || t("server.payment.paymentAmountOutOfDate"));
-      void onPaymentOutdated?.(resolved);
+      // The pay button stays busy until the payment is started anew: a
+      // second click meanwhile would race the reload (or, on checkout,
+      // create the order again).
+      try {
+        await onPaymentOutdated?.(resolved);
+      } finally {
+        setProcessing(false);
+      }
       return;
     }
+    setProcessing(false);
     // Total drifted: keep the count, show its new price and let the buyer
     // confirm again. Not offered / unavailable: back to the single payment.
     // All of them read the options again.
-    if (error === "notOffered") options.refuseChosen();
-    else if (error === "unavailable") options.resetToSingle();
-    void options.refetch();
+    const current = optionsRef.current;
+    if (error === "notOffered") current.refuseChosen();
+    else if (error === "unavailable") current.resetToSingle();
+    void current.refetch();
     const fallback = {
       pricingChanged: t("server.payment.installmentPricingChanged"),
       unavailable: t("server.payment.installmentUnavailable"),
@@ -311,14 +325,14 @@ export function useCardPayment({
       document.body.appendChild(paytrForm);
       paytrForm.submit();
     } catch (e: unknown) {
-      setProcessing(false);
       // Installment and amount refusals come before anything is signed:
       // nothing was charged.
       const signingError = installmentSigningErrorOf(e);
       if (signingError && resolved) {
-        handleSigningError(signingError, apiErrorMessage(e), resolved);
+        await handleSigningError(signingError, apiErrorMessage(e), resolved);
         return;
       }
+      setProcessing(false);
       toast.error(apiErrorMessage(e) || t("payment.startFailed"));
     }
   };

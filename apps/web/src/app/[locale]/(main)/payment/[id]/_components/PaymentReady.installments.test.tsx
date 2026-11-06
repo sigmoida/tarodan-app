@@ -456,6 +456,27 @@ describe("PaymentReady installments: refusals at signing", () => {
     expect(h.formSubmit).not.toHaveBeenCalled();
   });
 
+  it("409 paymentAmountOutOfDate: the pay button stays busy until the payment is started anew", async () => {
+    let done: () => void = () => {};
+    onPaymentOutdated.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (done = resolve)),
+    );
+    h.prepareDirectForm.mockRejectedValueOnce(
+      refusal(409, "server.payment.paymentAmountOutOfDate"),
+    );
+    await chooseThreeAndPay();
+
+    // Busy: the button shows the processing label and is disabled.
+    const busy = button("page.payment.paymentready.isleniyor");
+    expect(busy.disabled).toBe(true);
+    click(busy);
+    await flush(10);
+    expect(h.prepareDirectForm).toHaveBeenCalledTimes(1);
+
+    await act(async () => done());
+    expect(payButton().disabled).toBe(false);
+  });
+
   it("an options failure falls back to the single payment, still payable", async () => {
     h.installmentOptions.mockRejectedValueOnce({ response: { status: 429 } });
     render();

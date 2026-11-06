@@ -185,7 +185,8 @@ export function useInstallmentOptions(input: {
             ? [...current.refused, current.count]
             : current.refused,
       }),
-    refetch: () => query.refetch(),
+    /** Reads the options again; joins a request already in flight for the same key. */
+    refetch: () => query.refetch({ cancelRefetch: false }),
   };
 }
 
