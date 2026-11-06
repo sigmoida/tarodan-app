@@ -400,7 +400,16 @@ export class InvoiceReversalService {
       );
 
     if (isPackageFeeInvoiceType(inv.type)) {
-      if (!PACKAGE_FEE_COMPONENT_BY_TYPE[inv.type].refundComponent) return null;
+      const spec = PACKAGE_FEE_COMPONENT_BY_TYPE[inv.type];
+      if (!spec.refundComponent) return null;
+      // The buyer's shipping share follows refund REQUESTS only (their
+      // outbound shipping component); a refund without one (an amount-based
+      // admin refund) reverses it by the general ratio, which the target
+      // cannot see. The ledger-kind fees are prorated in the ledger on that
+      // path too, so they keep their target.
+      if (spec.source.kind === "shipping" && !adjustment?.refundRequestId) {
+        return null;
+      }
       const basis = await this.documents.resolvePackageFeeBasis(inv.sourceId, {
         vatRate,
         refundedRequestIds: adjustment?.refundRequestId
@@ -523,9 +532,13 @@ export class InvoiceReversalService {
       return;
     }
 
+    // A full refund cancels when the document should carry nothing now (or
+    // its type has no target). A target left above zero means the sources
+    // still see something standing: a capped return, never a cancel.
+    const target = inputs.amounts.targetTotal;
     const canCancel =
       inputs.fullyRefunded &&
-      preview.closesDocument &&
+      (target === null || target <= 0.009) &&
       prior.reduce((sum, total) => sum + total, 0) <= 0.009 &&
       inv.documentType === "EARCHIVE" &&
       this.provider.eArchiveReversalStrategy(inv.issuedAt) === "CANCEL";

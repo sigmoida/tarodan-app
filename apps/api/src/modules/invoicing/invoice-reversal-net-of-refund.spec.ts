@@ -701,6 +701,24 @@ describe("package shipping documents", () => {
     expect(ret.map((r) => Number(r.total))).toEqual([30]);
   });
 
+  it("keeps reversing the buyer shipping by the refund ratio on a refund without a refund request", async () => {
+    const seed = shippingSeed(null);
+    seed.shippingRefunds = [];
+    seed.attempts!.ra1.idempotencyKey = "admin-refund-1";
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePackageFeeInvoices("p1");
+    const doc = t.store.invoices.find((i) => i.type === "buyer_shipping");
+    expect(Number(doc?.total)).toBe(30);
+
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.5));
+
+    const ret = t
+      .returns()
+      .filter((r) => r.billingReference === doc?.invoiceNumber);
+    expect(ret.map((r) => Number(r.total))).toEqual([15]);
+  });
+
   it("keeps reversing the seller shipping share by the refund ratio (its amount never follows a refund)", async () => {
     const t = build(shippingSeed(new Date()));
     t.state.strategy = "RETURN_INVOICE";
@@ -771,6 +789,33 @@ describe("cancel claim of a generic document", () => {
     expect(t.returns()).toHaveLength(0);
     // The retried event finds the document cancelled: nothing more.
     await t.reversals.handleOrderRefund("o1", event("ra1", 0.4));
+    expect(t.returns()).toHaveLength(0);
+  });
+
+  it("cancels a fully refunded document even when the refund's component lines fall a kuruş short", async () => {
+    const seed = platformSale();
+    const t = build(seed);
+    await t.issuing.issuePlatformSaleInvoice("o1");
+    refund(seed, 400);
+    seed.attempts!.ra1.idempotencyKey = "refund-request:rr9";
+    seed.refundRequests = {
+      rr9: {
+        refundQuantity: 1,
+        financialComponents: [
+          {
+            componentCode: "product",
+            treatment: "buyer_refund",
+            netAmount: 333.32,
+            taxAmount: 66.67,
+          },
+        ],
+      },
+    };
+
+    await t.reversals.handleOrderRefund("o1", event("ra1", 1, true));
+
+    expect(t.cancels).toHaveLength(1);
+    expect(t.store.invoices[0].status).toBe("cancelled");
     expect(t.returns()).toHaveLength(0);
   });
 
