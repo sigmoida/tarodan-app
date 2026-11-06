@@ -104,7 +104,7 @@ function makePrisma(over: { ledgers?: Record<string, any> } = {}) {
         invoices.filter((i) => matches(i, where)),
       ),
       count: jest.fn(
-        async ({ where }: any) =>
+        async ({ where }: { where: unknown }) =>
           invoices.filter((i) => matches(i, where)).length,
       ),
       create: jest.fn(async ({ data }: any) => {

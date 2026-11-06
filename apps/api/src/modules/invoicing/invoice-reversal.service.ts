@@ -367,7 +367,7 @@ export class InvoiceReversalService {
         ...(now.lines
           ? {
               lineItems: now.lines as unknown as Prisma.InputJsonValue,
-              // İskonto da matrahla birlikte küçülür; kayıt satırlarla tutmalı.
+              // The discount shrinks with the base; the record matches its lines.
               discountTotal: invoiceDiscountFromLines(now.lines),
             }
           : {}),
@@ -412,9 +412,7 @@ export class InvoiceReversalService {
       }
       const basis = await this.documents.resolvePackageFeeBasis(inv.sourceId, {
         vatRate,
-        refundedRequestIds: adjustment?.refundRequestId
-          ? [adjustment.refundRequestId]
-          : [],
+        countFinalizedRefunds: true,
         strict: true,
       });
       if (!basis) throw missing();
@@ -424,7 +422,9 @@ export class InvoiceReversalService {
     }
 
     if (inv.type === "commission" || inv.type === "service_fee") {
-      const totals = await this.documents.resolveFeeLedgerTotals(inv.sourceId);
+      const totals = await this.documents.resolveFeeLedgerTotals(inv.sourceId, {
+        strict: true,
+      });
       if (!totals) return null;
       const net = Math.max(
         0,
@@ -439,7 +439,8 @@ export class InvoiceReversalService {
     }
 
     if (inv.type === "platform_sale") {
-      const cutRates = platformSaleRatesOf(readInvoiceLineItems(inv.lineItems));
+      const cutLines = readInvoiceLineItems(inv.lineItems);
+      const cutRates = platformSaleRatesOf(cutLines);
       const doc = await this.documents.resolvePlatformSaleDocument(
         inv.sourceId,
         {
@@ -448,7 +449,10 @@ export class InvoiceReversalService {
         },
       );
       if (!doc) throw missing();
-      return doc.lines.length
+      // Same shape as the cut: a document cut as one line (no product line
+      // then, or an older cut) is rebuilt as one line at its own rate, never
+      // from lines at rates it did not carry.
+      return cutLines.length && doc.lines.length
         ? { ...invoiceTotalsFromLines(doc.lines), lines: doc.lines }
         : {
             ...this.documents.invoiceAmounts(
@@ -495,7 +499,8 @@ export class InvoiceReversalService {
       issuedAt: found.issuedAt,
     };
 
-    // İADE FATURASI: aynı refund attempt yeniden işlense bile aynı sourceId kullanılır.
+    // One return per refund attempt: a replay of the attempt uses the same
+    // sourceId.
     const reversalSourceId = adjustment
       ? `${inv.id}:${adjustment.refundAttemptId}`
       : inv.id;
@@ -639,9 +644,12 @@ export class InvoiceReversalService {
     inputs: ReturnInputs,
     created: CreatedReturn | null,
   ): void {
-    const target = inputs.amounts.targetTotal;
+    const { targetTotal: target, share, componentLines } = inputs.amounts;
     if (!adjustment || target === null) return;
     if (created && !created.capped) return;
+    // An attempt that refunds nothing of this document (share 0, no lines)
+    // was not capped: nothing to trace.
+    if (!componentLines.length && share !== null && share <= 0.009) return;
     this.logger.warn(
       `INVOICE_RETURN_CAPPED invoice=${inv.invoiceNumber} attempt=${adjustment.refundAttemptId} target=${target} due=${created?.total ?? 0}`,
     );
@@ -663,8 +671,8 @@ export class InvoiceReversalService {
     ) => Promise<ReturnInvoiceAmounts | null>,
   ): Promise<CreatedReturn | null> {
     const now = new Date();
-    // Aynı sayaç satırında başka bir kesimle çakışırsa (P2034) yeniden dene;
-    // kaybeden transaction numara tüketmez. Bkz. invoice-write-conflict.ts.
+    // A write conflict on the shared number counter (P2034) is retried; the
+    // losing transaction consumes no number. See invoice-write-conflict.ts.
     const record = await retryOnWriteConflict(() =>
       this.prisma.$transaction(
         async (tx) => {
@@ -700,14 +708,14 @@ export class InvoiceReversalService {
             data: {
               type: "return_invoice",
               sourceId: reversalSourceId,
-              // İade faturasını gönderecek sağlayıcı — kayıt kimin kestiğini taşır.
+              // The provider that sends the return: the record names its issuer.
               provider: this.provider.name,
               recipientUserId: inv.recipientUserId,
               recipientVknTckn: inv.recipientVknTckn,
               recipientName: inv.recipientName,
-              // İletişim/adres snapshot'ı da TAŞINIR: misafir siparişlerinde tüm
-              // alıcılar tek sistem kullanıcısını paylaşır, kullanıcı kaydına
-              // dönmek iade faturasını sistem e-postasına ve boş adrese yazıyordu.
+              // The contact and address snapshot is CARRIED over: guest orders
+              // share one system user, so reading the user record wrote the
+              // return to the system e-mail and an empty address.
               recipientEmail: inv.recipientEmail,
               recipientCity: inv.recipientCity,
               recipientDistrict: inv.recipientDistrict,
@@ -724,8 +732,8 @@ export class InvoiceReversalService {
               status: "pending",
               billingReference: inv.invoiceNumber,
               billingReferenceIssueDate: inv.issuedAt,
-              // İade faturası da hangi koliden doğduğunu taşır — orijinalin
-              // referansı aynen devralınır.
+              // The return carries the parcel it came from: the original's
+              // reference as is.
               sourceReference: inv.sourceReference,
               lineDescription: `İade: ${
                 inv.lineDescription ||
@@ -839,20 +847,23 @@ export class InvoiceReversalService {
       .cancelEArchive({ ettn: inv.ettn, providerRef: inv.providerRef })
       .catch((e: unknown): EInvoiceCancelResult => {
         outcomeUnknown = true;
-        return { success: false, resultMsg: String((e as Error)?.message) };
+        return { success: false, resultMsg: errorMessage(e) };
       });
     if (res.success) {
-      await this.markCancelled(inv, { resultMsg: res.resultMsg ?? null });
+      await this.markCancelledUnderClaim(inv, claim, {
+        resultMsg: res.resultMsg ?? null,
+      });
       this.logger.log(`eLogo cancel ${inv.invoiceNumber}: OK`);
       return "cancelled";
     }
-    // Timeout/transport hatasında provider iptali uygulamış olabilir. IADE
-    // faturasına düşmeden önce ETTN durumunu sorgula; aksi halde çift ters kayıt olur.
+    // After a timeout or transport error the provider may have applied the
+    // cancel: ask for the ETTN's status before any return, or the document
+    // is reversed twice.
     const status = await this.provider
       .getStatus({ ettn: inv.ettn, providerRef: inv.providerRef }, "EARCHIVE")
       .catch(() => null);
     if (status?.state === "cancelled") {
-      await this.markCancelled(inv, {
+      await this.markCancelledUnderClaim(inv, claim, {
         resultCode: status.resultCode ?? null,
         resultMsg: status.resultMsg ?? res.resultMsg ?? null,
       });
@@ -884,21 +895,50 @@ export class InvoiceReversalService {
     return "fallback";
   }
 
+  /**
+   * Marks the document cancelled by the run holding `claim`. eLogo's answer
+   * is the truth, so the row is marked cancelled even when the claim was
+   * lost (the cancel outlived its lease and another run settled it); that
+   * run may have cut a return meanwhile, so it is an alarm.
+   */
+  private async markCancelledUnderClaim(
+    inv: FiscalInvoice,
+    claim: string,
+    result: { resultCode?: number | null; resultMsg: string | null },
+  ): Promise<void> {
+    const held = await this.prisma.fiscalInvoice.updateMany({
+      where: { id: inv.id, cancelReason: claim },
+      data: this.cancelledData(result),
+    });
+    if (held.count === 1) return;
+    await this.markCancelled(inv, result);
+    this.logger.error(
+      `INVOICE_CANCEL_CLAIM_LOST invoice=${inv.invoiceNumber}: eLogo cancelled it after its claim was lost; check it for a return cut meanwhile`,
+    );
+  }
+
+  private cancelledData(result: {
+    resultCode?: number | null;
+    resultMsg: string | null;
+  }) {
+    return {
+      status: "cancelled" as const,
+      cancelledAt: new Date(),
+      cancelReason: "refund",
+      ...(result.resultCode !== undefined
+        ? { providerResultCode: result.resultCode }
+        : {}),
+      providerResultMsg: result.resultMsg,
+    };
+  }
+
   private async markCancelled(
     inv: FiscalInvoice,
     result: { resultCode?: number | null; resultMsg: string | null },
   ): Promise<void> {
     await this.prisma.fiscalInvoice.update({
       where: { id: inv.id },
-      data: {
-        status: "cancelled",
-        cancelledAt: new Date(),
-        cancelReason: "refund",
-        ...(result.resultCode !== undefined
-          ? { providerResultCode: result.resultCode }
-          : {}),
-        providerResultMsg: result.resultMsg,
-      },
+      data: this.cancelledData(result),
     });
   }
 
@@ -967,7 +1007,9 @@ export class InvoiceReversalService {
       );
     }
 
-    if (inv.type === "platform_sale" || inv.type === "membership") {
+    // platform_sale always has a target (`invoiceDocumentNow`); only a
+    // membership bought as an order is read here.
+    if (inv.type === "membership") {
       const order = await this.prisma.order
         .findUnique({
           where: { id: inv.sourceId },

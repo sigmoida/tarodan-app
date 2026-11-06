@@ -66,7 +66,8 @@ function makePrisma(seed: any = {}) {
         });
       }),
       count: jest.fn(
-        async (args: any) => (await store.fiscalInvoice.findMany(args)).length,
+        async (args: { where: unknown }) =>
+          (await store.fiscalInvoice.findMany(args)).length,
       ),
       create: jest.fn(async ({ data }: any) => {
         const rec = {

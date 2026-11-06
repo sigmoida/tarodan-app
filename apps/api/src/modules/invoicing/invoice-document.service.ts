@@ -24,6 +24,10 @@ import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
 import { formatInvoiceNumber } from "./invoice/document-number";
 import { DEFAULT_ELOGO_INVOICE_PREFIX } from "../../config/elogo";
 import {
+  REFUND_REQUEST_KEY_PREFIX,
+  refundRequestIdOf,
+} from "./helpers/refund-request-key";
+import {
   buildPlatformSaleLines,
   type InvoiceLineItem,
 } from "./invoice/invoice-lines";
@@ -32,8 +36,12 @@ import {
 export interface PackageFeeBasisOptions {
   /** The rate the document was cut with; default: today's service rate. */
   vatRate?: number;
-  /** Refund requests to count as refunded before their `refundedAt` stamp. */
-  refundedRequestIds?: readonly string[];
+  /**
+   * Count every refund request with a FINALIZED refund attempt as refunded,
+   * not only those already stamped `refundedAt` (stamped after the money
+   * commits, in a separate write that can lag or fail).
+   */
+  countFinalizedRefunds?: boolean;
   /** Read errors propagate instead of reading as "nothing refunded". */
   strict?: boolean;
 }
@@ -320,6 +328,23 @@ export class InvoiceDocumentService {
       .catch(() => null);
   }
 
+  /** Refund requests of the orders whose refund attempt is finalized. */
+  private async finalizedRefundRequestIds(
+    orderIds: string[],
+  ): Promise<string[]> {
+    const attempts = await this.prisma.refundAttempt.findMany({
+      where: {
+        orderId: { in: orderIds },
+        status: "finalized",
+        idempotencyKey: { startsWith: REFUND_REQUEST_KEY_PREFIX },
+      },
+      select: { idempotencyKey: true },
+    });
+    return attempts
+      .map((attempt) => refundRequestIdOf(attempt.idempotencyKey))
+      .filter((id): id is string => !!id);
+  }
+
   /**
    * Alıcıya GERİ VERİLMİŞ gidiş kargosu — PAKET toplamı.
    *
@@ -339,11 +364,14 @@ export class InvoiceDocumentService {
     opts: PackageFeeBasisOptions = {},
   ): Promise<number> {
     // A refund request's `refundedAt` is stamped AFTER its money transaction
-    // commits, so the refund's own invoice handler can run before it: the
-    // reversal names that request to count it as refunded already.
-    const refundedRequestIds = opts.refundedRequestIds ?? [];
-    const read = () =>
-      this.prisma.refundFinancialComponent.findMany({
+    // commits, so a refund's invoice handler can run before it (its own, or
+    // a sibling's that lags): the reversal counts every request whose refund
+    // attempt is finalized.
+    const read = async () => {
+      const refundedRequestIds = opts.countFinalizedRefunds
+        ? await this.finalizedRefundRequestIds(orderIds)
+        : [];
+      return this.prisma.refundFinancialComponent.findMany({
         where: {
           componentCode: "outbound_shipping",
           treatment: "buyer_refund",
@@ -353,7 +381,7 @@ export class InvoiceDocumentService {
               ? {
                   OR: [
                     { refundedAt: { not: null } },
-                    { id: { in: [...refundedRequestIds] } },
+                    { id: { in: refundedRequestIds } },
                   ],
                 }
               : { refundedAt: { not: null } }),
@@ -361,6 +389,7 @@ export class InvoiceDocumentService {
         },
         select: { netAmount: true },
       });
+    };
     try {
       const rows = await read();
       return rows.reduce((sum, row) => sum + Number(row.netAmount), 0);
@@ -567,8 +596,8 @@ export class InvoiceDocumentService {
       rates.productVatRate ?? this.resolveVatRate("platform_sale", categoryId),
       rates.serviceVatRate ?? this.resolveVatRate("service_fee"),
     ]);
-    // Kısmi iadede tüm kalemler aynı oranda küçülür; belge her zaman gerçekte
-    // elde kalan tutarı gösterir.
+    // On a partial refund every line shrinks by the same ratio: the document
+    // always shows what the platform actually keeps.
     const lines = buildPlatformSaleLines({
       productName: order.product?.title ?? "",
       quantity: Number(order.quantity ?? 1),
@@ -600,7 +629,10 @@ export class InvoiceDocumentService {
    * kayıtlarda SİPARİŞ id'si olabilir. İki nesil de buradan çözülür, böylece
    * çağıranlar anahtarın hangi nesil olduğunu bilmek zorunda kalmaz.
    */
-  async resolveFeeLedgerTotals(sourceId: string): Promise<{
+  async resolveFeeLedgerTotals(
+    sourceId: string,
+    opts: { strict?: boolean } = {},
+  ): Promise<{
     sellerCommission: number;
     netSellerCommission: number;
     buyerFee: number;
@@ -611,7 +643,12 @@ export class InvoiceDocumentService {
         where: { id: sourceId },
         select: { orders: { select: { id: true } } },
       })
-      .catch(() => null);
+      .catch((error: unknown) => {
+        // The reversal reads strictly: a failed package read must not turn
+        // the package id into an order id and lose the document's target.
+        if (opts.strict) throw error;
+        return null;
+      });
     const orderIds = pkg?.orders.length
       ? pkg.orders.map((o) => o.id)
       : [sourceId];

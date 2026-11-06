@@ -187,6 +187,25 @@ function makeStore(seed: Seed) {
         async ({ where }: { where: { id: string } }) =>
           seed.attempts?.[where.id] ?? null,
       ),
+      findMany: jest.fn(
+        async ({
+          where,
+        }: {
+          where: {
+            orderId: { in: string[] };
+            status: string;
+            idempotencyKey: { startsWith: string };
+          };
+        }) =>
+          Object.values(seed.attempts ?? {}).filter(
+            (a) =>
+              where.orderId.in.includes(String(a.orderId)) &&
+              a.status === where.status &&
+              String(a.idempotencyKey ?? "").startsWith(
+                where.idempotencyKey.startsWith,
+              ),
+          ),
+      ),
     },
     refundRequest: {
       findUnique: jest.fn(
@@ -701,6 +720,58 @@ describe("package shipping documents", () => {
     expect(ret.map((r) => Number(r.total))).toEqual([30]);
   });
 
+  it("counts a sibling refund request as refunded once its attempt is finalized, even before its stamp", async () => {
+    const seed = shippingSeed(null);
+    seed.orders!.o1.buyerShippingAmount = 50;
+    seed.shippingRefunds = [];
+    seed.attempts!.ra2 = {
+      id: "ra2",
+      orderId: "o1",
+      status: "finalized",
+      finalizedAt,
+      idempotencyKey: "refund-request:rr2",
+    };
+    seed.refundRequests!.rr2 = {
+      refundQuantity: 1,
+      financialComponents: [
+        {
+          componentCode: "outbound_shipping",
+          treatment: "buyer_refund",
+          netAmount: 12.5,
+          taxAmount: 2.5,
+        },
+      ],
+    };
+    const t = build(seed);
+    t.state.strategy = "RETURN_INVOICE";
+    await t.issuing.issuePackageFeeInvoices("p1");
+    const doc = t.store.invoices.find((i) => i.type === "buyer_shipping");
+    expect(Number(doc?.total)).toBe(60);
+
+    // Both refunds committed; neither request is stamped `refundedAt` yet.
+    seed.shippingRefunds = [
+      {
+        orderId: "o1",
+        refundRequestId: "rr1",
+        netAmount: 25,
+        refundedAt: null,
+      },
+      {
+        orderId: "o1",
+        refundRequestId: "rr2",
+        netAmount: 12.5,
+        refundedAt: null,
+      },
+    ];
+    await t.reversals.handleOrderRefund("o1", event("ra2", 0.25));
+    await t.reversals.handleOrderRefund("o1", event("ra1", 0.5));
+
+    const ret = t
+      .returns()
+      .filter((r) => r.billingReference === doc?.invoiceNumber);
+    expect(ret.map((r) => Number(r.total)).sort()).toEqual([15, 30]);
+  });
+
   it("keeps reversing the buyer shipping by the refund ratio on a refund without a refund request", async () => {
     const seed = shippingSeed(null);
     seed.shippingRefunds = [];
@@ -817,6 +888,26 @@ describe("cancel claim of a generic document", () => {
     expect(t.cancels).toHaveLength(1);
     expect(t.store.invoices[0].status).toBe("cancelled");
     expect(t.returns()).toHaveLength(0);
+  });
+
+  it("marks a document cancelled by eLogo even after its claim was lost, and raises the alarm", async () => {
+    const { t, doc } = await fullyRefunded();
+    t.state.cancel = async () => {
+      // The cancel outlived its lease and another run took the claim over.
+      doc.cancelReason = formatInvoiceCancelClaim("other", new Date());
+      return { success: true };
+    };
+    const alarm = jest.spyOn(
+      (t.reversals as unknown as { logger: { error: () => void } }).logger,
+      "error",
+    );
+
+    await t.reversals.handleOrderRefund("o1", event("ra1", 1, true));
+
+    expect(doc.status).toBe("cancelled");
+    expect(alarm).toHaveBeenCalledWith(
+      expect.stringContaining("INVOICE_CANCEL_CLAIM_LOST"),
+    );
   });
 
   it("falls back to one closing return when eLogo refuses the cancel, and releases the claim", async () => {
