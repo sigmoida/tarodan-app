@@ -298,6 +298,34 @@ describe("invoice double reversal on a real database (E2E)", () => {
     expect(totals(returns).sort()).toEqual(["100.00", "160.00"]);
   });
 
+  it("reverses both refunds in full when the other's return lands after this handler read its target (400 -> 250)", async () => {
+    const orderId = await platformSale();
+    const doc = await deliver(orderId);
+    const first = await refund(orderId, 100);
+    // The first handler has read its target (300.00) when the second refund
+    // finalizes and its handler cuts 50.00. A target kept from that read
+    // would leave room for 50.00 only and cap the first short for good.
+    const read = documents.resolvePlatformSaleDocument.bind(documents);
+    const between = jest
+      .spyOn(documents, "resolvePlatformSaleDocument")
+      .mockImplementationOnce(async (id, rates) => {
+        const document = await read(id, rates);
+        await handle(await refund(orderId, 50));
+        return document;
+      });
+
+    try {
+      await handle(first);
+    } finally {
+      between.mockRestore();
+    }
+
+    expect(totals(await returnsOf(doc.invoiceNumber))).toEqual([
+      "50.00",
+      "100.00",
+    ]);
+  });
+
   it("takes a document cut net of one refund only down to its target after a second (240 -> 140)", async () => {
     const orderId = await platformSale();
     const early = await refund(orderId, 160);
