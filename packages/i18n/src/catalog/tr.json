@@ -7224,6 +7224,12 @@
             "applied": "Ödemeye işlendi",
             "capturedNotApplied": "Tahsil edildi, ödemeye işlenmedi"
           }
+        },
+        "refundInstallment": {
+          "amountLabel": "İade edilecek ürün tutarı, vade farkı hariç (boş bırakırsanız tam iade)",
+          "noticeTitle": "Vade farkı da iade edilir",
+          "notice": "Girdiğiniz tutar vade farkı hariç ürün tutarıdır. Alıcıya bununla birlikte vade farkının orantılı payı da iade edilir; tam iadede vade farkının tamamı ({fee}) geri verilir.",
+          "started": "İade başlatıldı: alıcıya {cash} iade edilecek ({fee} vade farkı dahil)."
         }
       },
       "psp": {
@@ -7616,6 +7622,17 @@
           "ordersWithoutHold": "Hold'u olmayan ödenmiş sipariş",
           "productTax": "Ürün KDV'si sıfır değil (kod tutarsızlığı)",
           "commissionLedgerDrift": "Sipariş komisyonu ile komisyon defteri farkı"
+        },
+        "installments": {
+          "title": "Taksit",
+          "description": "Taksitli ödemeler taksit sayısı ve kullanıcı grubuna göre: alıcıların ödediği vade farkı, iadelerle geri verilen payı ve kurallar nedeniyle platformun üstlendiği taksit maliyeti.",
+          "columns": {
+            "payments": "Ödeme",
+            "feeCollected": "Tahsil edilen vade farkı (KDV dahil)",
+            "feeRefunded": "İade edilen vade farkı",
+            "platformCostBooked": "Kayda geçen platform maliyeti"
+          },
+          "empty": "Henüz taksitli ödeme yok."
         }
       },
       "installments": {

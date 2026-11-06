@@ -7224,6 +7224,12 @@
             "applied": "Applied to the payment",
             "capturedNotApplied": "Captured, not applied"
           }
+        },
+        "refundInstallment": {
+          "amountLabel": "Goods amount to refund, before the installment fee (leave empty for a full refund)",
+          "noticeTitle": "The installment fee is refunded too",
+          "notice": "The amount you enter is the goods amount before the installment fee. The buyer also gets the proportional share of the installment fee back; a full refund returns all of it ({fee}).",
+          "started": "Refund initiated: the buyer gets {cash} back ({fee} installment fee included)."
         }
       },
       "psp": {
@@ -7616,6 +7622,17 @@
           "ordersWithoutHold": "Paid orders without a hold",
           "productTax": "Product VAT is not zero (code inconsistency)",
           "commissionLedgerDrift": "Order commission vs commission ledger drift"
+        },
+        "installments": {
+          "title": "Installments",
+          "description": "Installment payments by installment count and buyer segment: the installment fee the buyers paid, the share given back with refunds and the installment cost the platform absorbs under the rules.",
+          "columns": {
+            "payments": "Payments",
+            "feeCollected": "Installment fee collected (incl. VAT)",
+            "feeRefunded": "Installment fee refunded",
+            "platformCostBooked": "Booked platform cost"
+          },
+          "empty": "No installment payments yet."
         }
       },
       "installments": {
