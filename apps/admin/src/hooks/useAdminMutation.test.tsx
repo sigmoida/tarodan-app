@@ -104,4 +104,31 @@ describe("useAdminMutation toasts", () => {
     expect(h.toast.success.mock.calls[0][0]).toBe("done 1");
     view.unmount();
   });
+
+  it("keeps a write successful when the toast builder throws", async () => {
+    const onSuccess = vi.fn();
+    function Thrower() {
+      const m = useAdminMutation(() => Promise.resolve({}), {
+        successMessage: () => {
+          throw new TypeError("unexpected shape");
+        },
+        onSuccess,
+      });
+      return (
+        <Button type="button" onClick={() => m.mutate()}>
+          go
+        </Button>
+      );
+    }
+    const view = mount(<Thrower />);
+    await act(async () => {
+      button("go").click();
+    });
+    await flush();
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(h.toast.success).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
+    view.unmount();
+  });
 });

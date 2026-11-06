@@ -62,6 +62,24 @@ const toastId = (kind: "success" | "error", message: string) =>
   `admin-mutation:${kind}:${message}`;
 
 /**
+ * The success toast text. A builder that throws (an unexpected response
+ * shape) shows no toast: the write already succeeded, and an error thrown
+ * here would make the mutation look failed (a done refund retried).
+ */
+function successToastOf<TData, TVars>(
+  successMessage: UseAdminMutationOptions<TData, TVars>["successMessage"],
+  data: TData,
+  vars: TVars,
+): string | undefined {
+  if (typeof successMessage !== "function") return successMessage;
+  try {
+    return successMessage(data, vars);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Refreshes every query of each resource (all lists + details) and its count
  * queries (`<resource>-count`: tab badges, header summaries).
  */
@@ -158,10 +176,7 @@ export function useAdminMutation<TData, TVars = void>(
     },
     onSuccess: (data, vars) => {
       invalidateAdminResources(queryClient, invalidates);
-      const message =
-        typeof successMessage === "function"
-          ? successMessage(data, vars)
-          : successMessage;
+      const message = successToastOf(successMessage, data, vars);
       if (message) {
         toast.success(message, { id: toastId("success", message) });
       }
