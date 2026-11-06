@@ -379,15 +379,43 @@ describe("installment capture on a real database (E2E)", () => {
       sellerEscrow: "360.00",
       net: "0.00",
     });
+    // The seller's holds stay on the goods scale: the same as paid in one.
+    const holds = await prisma.paymentHold.findMany({
+      where: { paymentId: target.paymentId },
+      select: { amount: true },
+    });
+    expect(holds.map((h) => h.amount.toFixed(2)).sort()).toEqual([
+      "360.00",
+      "540.00",
+    ]);
 
-    // A duplicate callback changes nothing.
+    // A duplicate callback and a second finalize (the outbox backstop)
+    // change nothing: same attempt, fee shares, stamp and ledger.
     await callbacks.handlePayTRCallback(
       signedCallback(fields.merchant_oid, "106638", "3"),
     );
+    await finalize(target.paymentId);
     const again = await prisma.payment.findUniqueOrThrow({
       where: { id: target.paymentId },
     });
     expect(again.chargeAttemptId).toBe(attempt.id);
+    expect(again.chargedAmount?.toFixed(2)).toBe("1066.38");
+    const feesAgain = await prisma.order.findMany({
+      where: { id: { in: target.orderIds } },
+      select: { installmentFeeAmount: true },
+    });
+    expect(
+      feesAgain.map((o) => o.installmentFeeAmount.toFixed(2)).sort(),
+    ).toEqual(["26.55", "39.83"]);
+    const stampedAgain = await prisma.paymentChargeAttempt.findUniqueOrThrow({
+      where: { id: attempt.id },
+    });
+    expect(stampedAgain.capturedAt).toEqual(captured.capturedAt);
+    await expect(
+      captureLines(
+        orders.find((o) => o.totalAmount.toFixed(2) === "600.00")?.id as string,
+      ),
+    ).resolves.toEqual(big);
 
     // Why the initiate retry paths refuse a captured row: the DB refuses to
     // move `amount` under the captured charged amount.
@@ -429,6 +457,23 @@ describe("installment capture on a real database (E2E)", () => {
     expect(paid.chargeAttempt?.merchantOid).toBe(first.merchant_oid);
     expect(paid.chargedAmount?.toFixed(2)).toBe("1066.38");
     expect(paid.providerConversationId).toBe(first.merchant_oid);
+
+    // The second form paid as well (a double charge): the captured payment
+    // keeps the first attempt; the second stays uncaptured for review.
+    await callbacks.handlePayTRCallback(
+      signedCallback(second.merchant_oid, "100000", "0"),
+    );
+    const still = await prisma.payment.findUniqueOrThrow({
+      where: { id: target.paymentId },
+      include: { chargeAttempt: true },
+    });
+    expect(still.chargeAttempt?.merchantOid).toBe(first.merchant_oid);
+    expect(still.chargedAmount?.toFixed(2)).toBe("1066.38");
+    expect(still.providerConversationId).toBe(first.merchant_oid);
+    const secondAttempt = await prisma.paymentChargeAttempt.findUniqueOrThrow({
+      where: { merchantOid: second.merchant_oid },
+    });
+    expect(secondAttempt.capturedAt).toBeNull();
   });
 
   it("does not complete an installment oid that PayTR reports at T", async () => {
