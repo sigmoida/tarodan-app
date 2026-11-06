@@ -99,6 +99,42 @@ describe("payment installment fields", () => {
       }
       expect(status).toMatchObject({ amount: 1000 });
     });
+
+    it("shows a trade cash payment's charge to its payer only, never the recipient", async () => {
+      // Trade cash is always a single payment (D6); the payer still gets
+      // the charge fields, the other party of the trade none of them.
+      const tradeCash = {
+        ...captured,
+        orderId: null,
+        order: null,
+        chargedAmount: D("1000.00"),
+        installmentCount: 1,
+        chargeAttempt: null,
+        tradeCashPayment: {
+          tradeId: "trade-1",
+          payerId: BUYER,
+          recipientId: SELLER,
+          tradeFeeAmount: D("0"),
+          shippingAmount: D("0"),
+          amount: D("1000.00"),
+          totalAmount: D("1000.00"),
+        },
+      };
+      const { svc } = service(tradeCash);
+
+      const asPayer = await svc.getPaymentStatusUnified("pay-1", BUYER);
+      expect(asPayer).toMatchObject({
+        installmentCount: 1,
+        installmentFeeAmount: 0,
+        chargedAmount: 1000,
+      });
+
+      const asRecipient = await svc.getPaymentStatusUnified("pay-1", SELLER);
+      expect(asRecipient).toMatchObject({ tradeId: "trade-1", amount: 1000 });
+      for (const field of Object.keys(FIELDS)) {
+        expect(asRecipient).not.toHaveProperty(field);
+      }
+    });
   });
 
   describe("GET /payments/my-payments", () => {
