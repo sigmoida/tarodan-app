@@ -3,15 +3,16 @@ import { Prisma } from "@prisma/client";
 import type { Locale } from "@tarodan/i18n";
 import {
   CONSENT_ACTION_I18N_KEYS,
-  CONSENT_DOCUMENTS,
   CONSENT_DOCUMENT_I18N_KEYS,
   CONSENT_SOURCE_I18N_KEYS,
   CONSENT_SUBJECT_TYPE_I18N_KEYS,
   EXPORT_CATALOGS,
   consentSubjectType,
+  currentConsentVersion,
   isConsentDocumentKey,
   type AdminConsentRecordRow,
   type ConsentDocumentStatus,
+  type ConsentVersionContext,
   type ConsentSubjectType,
   type ExportCatalogKey,
 } from "@tarodan/types";
@@ -100,16 +101,22 @@ export class AdminConsentService {
   ) {}
 
   async list(query: ConsentRecordQueryDto) {
-    const result = await paginate(
-      this.prisma.consentRecord,
-      {
-        where: buildConsentWhere(query),
-        orderBy: this.orderBy(query),
-        select: ROW_SELECT,
-      },
-      query,
-    );
-    return { ...result, data: result.data.map(toAdminRow) };
+    const [result, versionContext] = await Promise.all([
+      paginate(
+        this.prisma.consentRecord,
+        {
+          where: buildConsentWhere(query),
+          orderBy: this.orderBy(query),
+          select: ROW_SELECT,
+        },
+        query,
+      ),
+      this.consents.versionContext(),
+    ]);
+    return {
+      ...result,
+      data: result.data.map((row) => toAdminRow(row, versionContext)),
+    };
   }
 
   /**
@@ -123,6 +130,9 @@ export class AdminConsentService {
     locale: Locale,
   ): Promise<ExportFile> {
     const where = buildConsentWhere(query);
+    // One reading of the switch for the whole file: every row compares with
+    // the same version in force.
+    const versionContext = await this.consents.versionContext();
     const orderBy: Prisma.ConsentRecordOrderByWithRelationInput[] = [
       this.orderBy(query),
       { id: "asc" },
@@ -173,7 +183,7 @@ export class AdminConsentService {
             skip,
             take,
           })
-        ).map(toAdminRow),
+        ).map((row) => toAdminRow(row, versionContext)),
       map: consentExportRecord,
       audit: {
         actorId,
@@ -218,11 +228,14 @@ export function buildConsentWhere(
   };
 }
 
-function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
+function toAdminRow(
+  row: ConsentRecordWithRelations,
+  versionContext: ConsentVersionContext,
+): AdminConsentRecordRow {
   // The document key is validated on write; a value outside the catalogue
   // (manual SQL) is still shown but never counts as the current version.
   const currentVersion = isConsentDocumentKey(row.document)
-    ? CONSENT_DOCUMENTS[row.document].version
+    ? currentConsentVersion(row.document, versionContext)
     : null;
   const details =
     row.details &&

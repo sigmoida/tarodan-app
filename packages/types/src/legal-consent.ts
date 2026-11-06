@@ -27,8 +27,18 @@ export const CONSENT_DOCUMENT_KEYS = [
 export type ConsentDocumentKey = (typeof CONSENT_DOCUMENT_KEYS)[number];
 
 export interface ConsentDocumentDefinition {
-  /** The version of the current text (`YYYY-MM-DD`, or with `-draft`). */
+  /**
+   * The version of the current text (`YYYY-MM-DD`, or with `-draft`). For a
+   * document with an `installmentVersion`, the text while installments are
+   * off; read the version in force through `currentConsentVersion`.
+   */
   version: string;
+  /**
+   * The version of the text with its installment clauses, in force only while
+   * installment payments are on (`installments_enabled`). Absent for a
+   * document whose text does not depend on installments.
+   */
+  installmentVersion?: string;
   /**
    * Whether opening (and keeping) an account needs it. A member without a
    * record of a required document, or with an old version, is asked again.
@@ -69,12 +79,14 @@ export const CONSENT_DOCUMENTS: Record<
   // points").
   kvkk: { version: "2026-08-04", requiredForAccount: true, path: "/privacy" },
   // Distance sales consent is per ORDER, not per account; taken at checkout
-  // or at the payment step. DRAFT: the installment clause (tarodan-ops plan
-  // 2026-11-03-installment-payments, AS-L1) waits for legal sign-off; the
-  // release that turns installments on waits for the signed text and its
-  // dated version.
+  // or at the payment step. The installment clause (tarodan-ops plan
+  // 2026-11-03-installment-payments, AS-L1) is in the text, and in the
+  // recorded version, only while installments are on. DRAFT: the clause
+  // waits for legal sign-off; installments are not turned on before the
+  // signed text and its dated `installmentVersion`.
   distance_sales: {
-    version: "2026-11-06-draft",
+    version: "2026-08-03",
+    installmentVersion: "2026-11-06-draft",
     requiredForAccount: false,
     path: "/distance-sales",
   },
@@ -106,6 +118,43 @@ export const CONSENT_DOCUMENTS: Record<
     path: null,
   },
 };
+
+/** What the version in force of a document depends on. */
+export interface ConsentVersionContext {
+  /** Installment payments on (`installments_enabled`). */
+  installmentsEnabled: boolean;
+}
+
+/**
+ * The context of the base texts: installments off. The fail-closed reading
+ * when the switch cannot be read, and the context of a document whose text
+ * does not depend on it.
+ */
+export const BASE_CONSENT_VERSION_CONTEXT: ConsentVersionContext = {
+  installmentsEnabled: false,
+};
+
+/**
+ * The ONE resolver of the version in force of a document: the version a
+ * consent is recorded against and the one an older record is compared with.
+ * The installment version applies only while installments are on.
+ */
+export function currentConsentVersion(
+  document: ConsentDocumentKey,
+  context: ConsentVersionContext,
+): string {
+  const { version, installmentVersion } = CONSENT_DOCUMENTS[document];
+  return context.installmentsEnabled && installmentVersion
+    ? installmentVersion
+    : version;
+}
+
+/** Whether the version in force of a document depends on the installment switch. */
+export function consentVersionFollowsInstallments(
+  document: ConsentDocumentKey,
+): boolean {
+  return CONSENT_DOCUMENTS[document].installmentVersion !== undefined;
+}
 
 /** Hesap için zorunlu belgeler — kayıt formu ve yeniden-onay kapısı bunları ister. */
 export const ACCOUNT_REQUIRED_CONSENTS: readonly ConsentDocumentKey[] =

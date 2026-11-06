@@ -3,10 +3,13 @@ import { join } from "path";
 import { ConsentAction, ConsentSource } from "@prisma/client";
 import {
   ACCOUNT_REQUIRED_CONSENTS,
+  BASE_CONSENT_VERSION_CONTEXT,
   CONSENT_ACTIONS,
   CONSENT_DOCUMENT_KEYS,
   CONSENT_DOCUMENTS,
   CONSENT_SOURCES,
+  consentVersionFollowsInstallments,
+  currentConsentVersion,
   isDraftConsentVersion,
 } from "@tarodan/types";
 import { apiAppRoot } from "../../common/helpers/app-root";
@@ -36,9 +39,12 @@ describe("consent catalog contract", () => {
 
   it("every document has a YYYY-MM-DD version, optionally marked -draft", () => {
     for (const key of CONSENT_DOCUMENT_KEYS) {
-      expect(CONSENT_DOCUMENTS[key].version).toMatch(
-        /^\d{4}-\d{2}-\d{2}(-draft)?$/,
-      );
+      const { version, installmentVersion } = CONSENT_DOCUMENTS[key];
+      expect(version).toMatch(/^\d{4}-\d{2}-\d{2}(-draft)?$/);
+      if (installmentVersion !== undefined) {
+        expect(installmentVersion).toMatch(/^\d{4}-\d{2}-\d{2}(-draft)?$/);
+        expect(installmentVersion > version).toBe(true);
+      }
     }
   });
 
@@ -47,7 +53,56 @@ describe("consent catalog contract", () => {
     // text legal has not signed off.
     for (const key of ACCOUNT_REQUIRED_CONSENTS) {
       expect(isDraftConsentVersion(CONSENT_DOCUMENTS[key].version)).toBe(false);
+      // Nor does its version follow a switch: flipping it would send every
+      // member to the gate.
+      expect(consentVersionFollowsInstallments(key)).toBe(false);
     }
+  });
+
+  describe("the distance sales version follows the installment switch", () => {
+    it("keeps the pre-installment version while installments are off", () => {
+      // User decision 2026-11-06: with the switch off the text and the
+      // recorded version stay exactly as before the installment clause.
+      expect(
+        currentConsentVersion("distance_sales", { installmentsEnabled: false }),
+      ).toBe("2026-08-03");
+      expect(
+        currentConsentVersion("distance_sales", BASE_CONSENT_VERSION_CONTEXT),
+      ).toBe("2026-08-03");
+    });
+
+    it("records the installment version only while installments are on", () => {
+      expect(
+        currentConsentVersion("distance_sales", { installmentsEnabled: true }),
+      ).toBe(CONSENT_DOCUMENTS.distance_sales.installmentVersion);
+      // The clause is still a draft: the switch must not go on in production
+      // before legal signs it off (docs/CONSENTS.md).
+      expect(
+        isDraftConsentVersion(
+          currentConsentVersion("distance_sales", {
+            installmentsEnabled: true,
+          }),
+        ),
+      ).toBe(true);
+    });
+
+    it("only distance sales follows the switch", () => {
+      expect(
+        CONSENT_DOCUMENT_KEYS.filter(consentVersionFollowsInstallments),
+      ).toEqual(["distance_sales"]);
+      for (const key of CONSENT_DOCUMENT_KEYS) {
+        if (key === "distance_sales") continue;
+        expect(currentConsentVersion(key, { installmentsEnabled: true })).toBe(
+          CONSENT_DOCUMENTS[key].version,
+        );
+      }
+    });
+
+    it("the fail-closed context is installments off", () => {
+      expect(BASE_CONSENT_VERSION_CONTEXT).toEqual({
+        installmentsEnabled: false,
+      });
+    });
   });
 
   it("the platform service documents are per order, not an account gate", () => {

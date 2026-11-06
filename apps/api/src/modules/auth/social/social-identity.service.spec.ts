@@ -34,6 +34,7 @@ import { StorageService } from "../../storage/storage.service";
 import { SecurityService } from "../../security/security.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
 import { ConsentService } from "../../consent/consent.service";
+import { InstallmentSettingsService } from "../../payment/installments/installment-settings.service";
 import { LegalIdentityService } from "../../legal-identity/legal-identity.service";
 import { SentryService } from "../../sentry/sentry.service";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -439,6 +440,7 @@ describe.each<SocialProvider>(["google", "apple"])(
           SecurityService,
           PushTokenRevocationService,
           ConsentService,
+          InstallmentSettingsService,
           { provide: PrismaService, useValue: fake.db },
           {
             provide: JwtService,

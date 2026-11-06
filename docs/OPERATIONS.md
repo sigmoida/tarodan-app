@@ -601,6 +601,13 @@ cleared, mobile with the selector live).
   `PATCH /admin/installments/settings` (super_admin, audited); the generic
   settings endpoint refuses them. Turning the switch off is the rollback: it
   acts on the next options or signing call (no cache).
+- **The switch also selects the distance sales text.** On, the contract page
+  (web and the mobile WebView) shows the installment clauses and every new
+  distance sales consent is recorded against `installmentVersion`; off, the
+  text and the version are the ones before the clauses (`docs/CONSENTS.md`,
+  "Versions that follow the installment switch"). Do not turn it on in
+  production while that version still ends in `-draft`. The web page follows
+  within about 5 minutes (config cache), the API at once.
 - **Rates cron `paytr-installment-rates`** (03:30 Europe/Istanbul) stores a
   snapshot of the marketplace store's PayTR rate table in
   `installment_rate_snapshots`; pricing refuses a snapshot older than 36 h and

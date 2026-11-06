@@ -39,7 +39,10 @@ interface FindManyArgs {
   take?: number;
 }
 
-function makeService(rows: Record<string, unknown>[] = [row()]) {
+function makeService(
+  rows: Record<string, unknown>[] = [row()],
+  installmentsEnabled = false,
+) {
   const prisma = {
     consentRecord: {
       // Liste de döküm de skip/take ile sayfalar; mock gerçek bir tablo gibi
@@ -52,7 +55,10 @@ function makeService(rows: Record<string, unknown>[] = [row()]) {
       count: jest.fn().mockResolvedValue(rows.length),
     },
   };
-  const consents = { getStatus: jest.fn().mockResolvedValue([]) };
+  const consents = {
+    getStatus: jest.fn().mockResolvedValue([]),
+    versionContext: jest.fn().mockResolvedValue({ installmentsEnabled }),
+  };
   const audit = {
     createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
   };
@@ -189,6 +195,29 @@ describe("AdminConsentService.list", () => {
     });
     expect(result.meta.total).toBe(2);
   });
+
+  const base = CONSENT_DOCUMENTS.distance_sales.version;
+  const installment = CONSENT_DOCUMENTS.distance_sales
+    .installmentVersion as string;
+  it.each([
+    [false, base, true],
+    [false, installment, false],
+    [true, installment, true],
+    [true, base, false],
+  ])(
+    "with installments %p, a distance sales row at %p is current: %p",
+    async (installmentsEnabled, version, current) => {
+      const { service, consents } = makeService(
+        [row({ document: "distance_sales", version, source: "checkout" })],
+        installmentsEnabled,
+      );
+
+      const result = await service.list({});
+
+      expect(result.data[0].isCurrentVersion).toBe(current);
+      expect(consents.versionContext).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("maps a trade cash payment consent to its trade (from details)", async () => {
     const tradeDetails = {

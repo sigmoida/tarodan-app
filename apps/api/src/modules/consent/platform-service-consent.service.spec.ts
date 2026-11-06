@@ -34,7 +34,8 @@ function make(rows: Array<{ document: string }> = []) {
   };
   const service = new PlatformServiceConsentService(
     prisma as never,
-    new ConsentService(prisma as never),
+    // The platform service documents do not follow the installment switch.
+    new ConsentService(prisma as never, { read: jest.fn() } as never),
   );
   return { service, prisma };
 }

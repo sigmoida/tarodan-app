@@ -1,8 +1,9 @@
 import { ConsentAction, ConsentSource, Prisma } from "@prisma/client";
 import {
-  CONSENT_DOCUMENTS,
+  currentConsentVersion,
   isConsentDocumentKey,
   type ConsentDocumentKey,
+  type ConsentVersionContext,
 } from "@tarodan/types";
 
 /** Onayın kime ait olduğu — üç kimlikten en az biri dolu olmalı. */
@@ -26,15 +27,16 @@ export interface ConsentEntry {
 }
 
 /**
- * Kayıt girdisini tablo satırına çevirir: sürüm `CONSENT_DOCUMENTS`'ten, kanıt
- * (IP, kullanıcı ajanı) çağıranın verdiğinden damgalanır. Saf ve DI'sızdır:
- * hem `ConsentService` hem seed'ler (istek bağlamı olmayan koşular) aynı satırı
- * üretir.
+ * Turns an entry into a table row: the version is the one in force in
+ * `versionContext` (`currentConsentVersion`), the evidence (IP, user agent)
+ * is what the caller passes. Pure and DI-free: `ConsentService` and the seeds
+ * (runs without a request context) build the same row.
  */
 export function toConsentRow(
   entry: ConsentEntry,
   ipAddress: string | null,
   userAgent: string | null,
+  versionContext: ConsentVersionContext,
 ): Prisma.ConsentRecordCreateManyInput {
   if (!isConsentDocumentKey(entry.document)) {
     throw new Error(`Unknown consent document: ${String(entry.document)}`);
@@ -45,7 +47,7 @@ export function toConsentRow(
   }
   return {
     document: entry.document,
-    version: CONSENT_DOCUMENTS[entry.document].version,
+    version: currentConsentVersion(entry.document, versionContext),
     action: entry.action ?? ConsentAction.granted,
     source: entry.source,
     userId: userId ?? null,
