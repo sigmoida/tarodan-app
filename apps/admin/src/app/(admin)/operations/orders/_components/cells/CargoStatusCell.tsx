@@ -7,12 +7,24 @@ import {
   shipmentProviderConfig,
   shipmentStatusConfig,
 } from "@tarodan/ui";
-import type { AdminOrderListRow, AdminOrderPackage } from "@tarodan/types";
+import {
+  ADMIN_ORDER_BUCKET_I18N_KEYS,
+  type AdminOrderListRow,
+  type AdminOrderPackage,
+} from "@tarodan/types";
+import { STATUS_TONE } from "@/lib/status-tone";
 import { statusConfig, statusLabel } from "@/lib/statusLabels";
 import { packageOrderStatuses } from "../../_lib/rowView";
 import { PackageStack } from "./PackageStack";
 
-function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
+function PackageCargo({
+  pkg,
+  unpaid,
+}: {
+  pkg: AdminOrderPackage;
+  /** The cart's payment never completed: marked once, on its first package. */
+  unpaid: boolean;
+}) {
   const t = useTranslations();
   const shipment = pkg.shipment;
   const hasRefund = pkg.lines.some((line) => line.hasActiveRefund);
@@ -42,6 +54,11 @@ function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
         </span>
       )}
       <div className="flex flex-wrap gap-1">
+        {unpaid && (
+          <Badge variant={STATUS_TONE.ended}>
+            {t(ADMIN_ORDER_BUCKET_I18N_KEYS.unpaid)}
+          </Badge>
+        )}
         {packageOrderStatuses(pkg).map((status) => (
           <Badge
             key={status}
@@ -60,8 +77,11 @@ function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
 }
 
 /**
- * Son kolon: paket başına taşıyıcı, takip no ve kargo durumu ile kalemlerin
- * sipariş durumu. Siparişe dönmemiş teklifte teklifin (görünen) durumu.
+ * Last column: per package the carrier, tracking number and shipment status,
+ * and the order status of its lines. A cart whose payment never completed
+ * (`unpaid` bucket: abandoned checkout, unpaid offer, their expiry cancels)
+ * is marked so it is not read as a real order. An offer that never became an
+ * order shows the offer's (visible) status.
  */
 export function CargoStatusCell({ row }: { row: AdminOrderListRow }) {
   const t = useTranslations();
@@ -73,10 +93,14 @@ export function CargoStatusCell({ row }: { row: AdminOrderListRow }) {
       />
     ) : null;
   }
+  const unpaid = row.bucket === "unpaid";
+  const firstKey = row.packages[0].key;
   return (
     <PackageStack
       packages={row.packages}
-      body={(pkg) => <PackageCargo pkg={pkg} />}
+      body={(pkg) => (
+        <PackageCargo pkg={pkg} unpaid={unpaid && pkg.key === firstKey} />
+      )}
     />
   );
 }
