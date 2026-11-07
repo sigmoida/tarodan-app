@@ -3,7 +3,8 @@ import { PaymentStatus, type Prisma } from "@prisma/client";
 /**
  * "Was the money taken?" for the admin order screens — the ONE definition.
  * The orders buckets (unpaid vs real), the cancellations tab (which offer
- * orders it lists, the refund state) and their row mappers read it here.
+ * orders it lists, the refund state), the refunds tab (which trade cash
+ * payments were charged) and their row mappers read it here.
  */
 
 /**

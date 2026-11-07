@@ -265,6 +265,26 @@ describe("refund state", () => {
     ).toBe("pending");
   });
 
+  // Same "charged" as the orders buckets (charged-payment.ts): the money was
+  // taken when EITHER payment completed, so an uncharged own payment row
+  // does not hide a charged group payment (it used to: own payment first).
+  it("a charged group payment counts even when the line's own payment failed", () => {
+    expect(
+      orderRefundState({
+        ...base,
+        payment: { status: "failed" },
+        checkoutGroup: { payment: { status: "completed" } },
+      }),
+    ).toBe("pending");
+    expect(
+      orderRefundState({
+        ...base,
+        payment: { status: "completed" },
+        checkoutGroup: { payment: { status: "pending" } },
+      }),
+    ).toBe("pending");
+  });
+
   it("a successful attempt is refunded, an open request in review, only failures failed", () => {
     const paid = { ...base, payment: { status: "refunded" as const } };
     expect(

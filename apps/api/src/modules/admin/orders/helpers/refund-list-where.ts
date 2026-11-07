@@ -1,9 +1,4 @@
-import {
-  OrderOrigin,
-  PaymentStatus,
-  TradeStatus,
-  type Prisma,
-} from "@prisma/client";
+import { OrderOrigin, TradeStatus, type Prisma } from "@prisma/client";
 import {
   ADMIN_REFUND_TAB_SOURCES,
   REFUND_ATTEMPT_IN_FLIGHT_STATUSES,
@@ -26,6 +21,7 @@ import {
 } from "@tarodan/types";
 import { buildSearchWhere } from "../../../../common/list";
 import { istanbulRangeEdge } from "../../../../common/helpers/tr-calendar";
+import { CHARGED_PAYMENT_STATUSES } from "./charged-payment";
 import { refundRequestKindWhere } from "./refund-request-kind-where";
 
 /**
@@ -69,12 +65,6 @@ export interface RefundSourceWheres {
 export interface RefundBucketContext {
   inFlightRequestIds: readonly string[];
 }
-
-/** Takasın tahsil edilmiş sayılan ödeme durumları. */
-export const TRADE_REFUND_CHARGED_PAYMENT_STATUSES: PaymentStatus[] = [
-  PaymentStatus.completed,
-  PaymentStatus.refunded,
-];
 
 /** İade yoluna girmiş takas: depodan dönüşte, iptal edilmiş ya da itirazda. */
 export const TRADE_REFUND_SCOPE_STATUSES: TradeStatus[] = [
@@ -264,7 +254,7 @@ function requestTabWhere(
 /** İadesi olan takas — liste, sayaç ve Excel'in takas kapsamı. */
 export const TRADE_REFUND_SCOPE: Prisma.TradeWhereInput = {
   cashPayments: {
-    some: { status: { in: TRADE_REFUND_CHARGED_PAYMENT_STATUSES } },
+    some: { status: { in: CHARGED_PAYMENT_STATUSES } },
   },
   OR: [
     { status: { in: TRADE_REFUND_SCOPE_STATUSES } },
@@ -403,4 +393,3 @@ export function refundListScopeOf(query: RefundListQuery): {
     },
   };
 }
-
