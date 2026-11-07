@@ -38,14 +38,16 @@ vi.mock("./_components/EmptyCart", () => ({ default: () => null }));
 vi.mock("./_components/CartSimilarProducts", () => ({ default: () => null }));
 
 import CartClient from "./CartClient";
+import { useCartStore } from "@/stores/cartStore";
 
-const offlineLine = (
+const line = (
+  source: "authenticated" | "offline",
   productId: string,
   quantity: number,
   isAvailable = true,
 ) => ({
-  id: `offline-${productId}`,
-  source: "offline" as const,
+  id: `${source}-${productId}`,
+  source,
   productId,
   title: productId,
   imageUrl: null,
@@ -56,6 +58,34 @@ const offlineLine = (
   lineTotal: 100 * quantity,
   isAvailable,
 });
+const offlineLine = (productId: string, quantity: number, isAvailable = true) =>
+  line("offline", productId, quantity, isAvailable);
+const serverLine = (productId: string, quantity: number, isAvailable = true) =>
+  line("authenticated", productId, quantity, isAvailable);
+
+/** Fill the mocked `useCart` result; every test starts from a fresh object. */
+function setCart(
+  overrides: { lines: ReturnType<typeof line>[] } & Record<string, unknown>,
+) {
+  h.cart = {
+    isAuthenticated: false,
+    lineCount: overrides.lines.length,
+    items: [],
+    isLoading: false,
+    refetch: vi.fn().mockResolvedValue(undefined),
+    appliedDiscounts: [],
+    appliedCouponCode: null,
+    canCheckout: true,
+    ...overrides,
+  };
+}
+
+async function quoteInput() {
+  await act(async () => {
+    await vi.waitFor(() => expect(h.getQuote).toHaveBeenCalled());
+  });
+  return h.getQuote.mock.calls.at(-1)?.[0];
+}
 
 let container: HTMLDivElement;
 let root: Root;
@@ -75,6 +105,7 @@ beforeEach(() => {
   container = document.createElement("div");
   root = createRoot(container);
   h.getQuote.mockReset();
+  useCartStore.setState({ excludedProductIds: [] });
   h.getQuote.mockResolvedValue({ data: { pricing: { summary: {} } } });
 });
 
@@ -84,34 +115,60 @@ afterEach(async () => {
 
 describe("CartClient quote input", () => {
   it("prices a guest cart (offline lines, no server items)", async () => {
-    const lines = [
-      offlineLine("p1", 2),
-      offlineLine("p2", 1),
-      offlineLine("p3", 1, false),
-    ];
-    Object.assign(h.cart, {
+    setCart({
       isAuthenticated: false,
-      lines,
-      lineCount: lines.length,
-      items: [],
-      isLoading: false,
-      refetch: vi.fn().mockResolvedValue(undefined),
-      appliedDiscounts: [],
+      lines: [
+        offlineLine("p1", 2),
+        offlineLine("p2", 1),
+        offlineLine("p3", 1, false),
+      ],
       appliedCouponCode: "GUEST10",
-      canCheckout: true,
     });
 
     await render();
-    await act(async () => {
-      await vi.waitFor(() => expect(h.getQuote).toHaveBeenCalled());
-    });
 
-    expect(h.getQuote).toHaveBeenCalledWith({
+    expect(await quoteInput()).toEqual({
       items: [
         { productId: "p1", quantity: 2 },
         { productId: "p2", quantity: 1 },
       ],
       couponCode: "GUEST10",
+    });
+  });
+
+  it("prices only the selected, available server lines when logged in", async () => {
+    // `items` is what the summary used to be priced from; it must no longer
+    // matter, the normalized `lines` + selection decide.
+    setCart({
+      isAuthenticated: true,
+      lines: [
+        serverLine("p1", 3),
+        serverLine("p2", 1),
+        serverLine("p3", 2, false),
+      ],
+      appliedCouponCode: "SERVER5",
+    });
+    useCartStore.setState({ excludedProductIds: ["p2"] });
+
+    await render();
+
+    expect(await quoteInput()).toEqual({
+      items: [{ productId: "p1", quantity: 3 }],
+      couponCode: "SERVER5",
+    });
+  });
+
+  it("leaves a deselected guest line out of the quote", async () => {
+    setCart({
+      isAuthenticated: false,
+      lines: [offlineLine("p1", 1), offlineLine("p2", 4)],
+    });
+    useCartStore.setState({ excludedProductIds: ["p1"] });
+
+    await render();
+
+    expect(await quoteInput()).toEqual({
+      items: [{ productId: "p2", quantity: 4 }],
     });
   });
 });
