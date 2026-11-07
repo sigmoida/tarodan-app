@@ -41,7 +41,22 @@ import {
 } from "./helpers/order-list-row.mapper";
 import { resolveProductImageUrl } from "./helpers/product-image-url";
 
-/** Sepet sekmelerinde birleşik sıralamanın okuduğu alanlar. */
+/** Rows grouped by `keyOf`, in input order within each group. */
+function groupByKey<T>(
+  rows: readonly T[],
+  keyOf: (row: T) => string,
+): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+/** The fields the cart tabs' merged sort reads. */
 interface CartHeadRow {
   kind: "group" | "order";
   id: string;
@@ -156,12 +171,12 @@ export class AdminOrderService {
     return counts;
   }
 
-  // ── Sepet sekmeleri: CheckoutGroup + grupsuz sipariş ──────────────────────
+  // ── Cart tabs: CheckoutGroup + groupless order ─────────────────────────────
 
   /**
-   * Sekmenin kaynakları birleşik sıralamayla sayfalanır. Grup kaynağı yalnız
-   * doğrudan satış taşıyan sekmelerde vardır ("Siparişe Dönen Teklifler"de
-   * satırların hepsi grupsuz tekil siparişlerdir).
+   * The tab's sources are paged with one merged sort. The group source exists
+   * only in tabs that carry direct sales (in "Offers turned into orders" every
+   * row is a groupless single order).
    */
   private async listCarts(
     sources: {
@@ -265,11 +280,10 @@ export class AdminOrderService {
       this.groupBucketLines(groupIds, lineScope),
     ]);
 
-    const byCart = new Map<string, ListLine[]>();
-    for (const line of lines) {
-      const key = line.checkoutGroupId ?? line.id;
-      byCart.set(key, [...(byCart.get(key) ?? []), line]);
-    }
+    const byCart = groupByKey<ListLine>(
+      lines,
+      (line) => line.checkoutGroupId ?? line.id,
+    );
     const ctx = await this.rowContext(lines, now);
     return {
       ...page,
@@ -299,15 +313,11 @@ export class AdminOrderService {
       where: { checkoutGroupId: { in: [...groupIds] } },
       select: BUCKET_LINE_SELECT,
     });
-    const byGroup = new Map<string, BucketLine[]>();
-    for (const line of lines) {
-      if (!line.checkoutGroupId) continue;
-      byGroup.set(line.checkoutGroupId, [
-        ...(byGroup.get(line.checkoutGroupId) ?? []),
-        line,
-      ]);
-    }
-    return byGroup;
+    // The where guarantees a group id; `id` only satisfies the key type.
+    return groupByKey<BucketLine>(
+      lines,
+      (line) => line.checkoutGroupId ?? line.id,
+    );
   }
 
   // ── Ortak ──────────────────────────────────────────────────────────────────
