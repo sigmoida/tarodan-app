@@ -25,20 +25,17 @@ const fmtTL = (n: number) =>
   });
 
 /**
- * Sepet özeti — tutarların HİÇBİRİ burada hesaplanmaz. `quote` doğrudan
- * `POST /orders/quote`'tan gelir; ürünün tabi olduğu komisyon kuralı, hizmet
- * KDV'si ve kargo hep o tek hesaptan çıkar. `subtotal` yalnız quote henüz
- * dönmediğinde gösterilecek yedek değerdir.
+ * Cart summary: none of the amounts is computed here. `quote` comes straight
+ * from `POST /orders/quote`; the commission rule, service VAT and shipping all
+ * come from that single calculation. While it is loading the lines show "—".
  */
 export default function CartSummary({
-  subtotal,
   appliedDiscounts,
   quote,
   isAuthenticated,
   canCheckout,
   selectedCount,
 }: {
-  subtotal: number;
   appliedDiscounts?: AppliedDiscount[];
   quote: OrderSummaryAmounts | null;
   isAuthenticated: boolean;

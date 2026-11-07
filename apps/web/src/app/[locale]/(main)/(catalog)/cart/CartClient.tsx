@@ -25,8 +25,6 @@ export default function CartClient() {
     isAuthenticated,
     lines: cartLines,
     lineCount,
-    items,
-    subtotal,
     isLoading,
     refetch: fetchCart,
     removeFromCart,
@@ -49,13 +47,16 @@ export default function CartClient() {
     toggleAll,
   } = useCartSelection(cartLines);
 
-  // Özet ve ödeme YALNIZ seçili satırları kapsar; seçimden çıkarılan ürün
-  // sepette durur ama tutarlara girmez.
-  const selectedProductIds = new Set(selectedLines.map((l) => l.productId));
+  // The summary and checkout cover ONLY the selected lines; a deselected
+  // product stays in the cart but is not priced. `selectedLines` spans both
+  // sources (server items and guest offline lines), so guests are priced too.
   const quote = useCartQuote(
-    items.filter(
-      (item) => item.isAvailable && selectedProductIds.has(item.productId),
-    ),
+    selectedLines
+      .filter((line) => line.isAvailable)
+      .map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+      })),
     appliedCouponCode,
   );
 
@@ -141,14 +142,6 @@ export default function CartClient() {
     onSelectedChange: () => toggleLine(line.productId),
   }));
 
-  const selectedSubtotal = selectedLines.reduce(
-    (sum, line) => sum + line.price * line.quantity,
-    0,
-  );
-
-  // Toplam quote'tan gelir — sepet kendi aritmetiğini YAPMAZ. Quote henüz
-  // dönmediyse (ya da sepet boşsa) ürün toplamı gösterilir.
-
   return (
     <PageShell>
       <PageHeader
@@ -183,7 +176,6 @@ export default function CartClient() {
 
         <div className="lg:col-span-1">
           <CartSummary
-            subtotal={selectedSubtotal}
             appliedDiscounts={appliedDiscounts}
             quote={quote}
             isAuthenticated={isAuthenticated}
