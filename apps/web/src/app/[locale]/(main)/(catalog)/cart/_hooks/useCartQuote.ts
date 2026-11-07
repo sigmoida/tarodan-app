@@ -19,7 +19,7 @@ type QuoteItem = { productId?: string; id?: string; quantity?: number };
  * olduğu API testinde sabittir.
  *
  * Satır kümesi değiştiğinde yeniden sorgulanır; boş sepet hiç sorgulanmaz.
- * Misafir (offline) satırlar giriş sonrası fiyatlanır.
+ * Guest (offline) lines are priced too: `POST /orders/quote` is public.
  */
 export function useCartQuote(
   items: QuoteItem[] | undefined,
