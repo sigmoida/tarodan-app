@@ -2,7 +2,6 @@ import {
   CancellationActor,
   OrderOrigin,
   OrderStatus,
-  PaymentStatus,
   ProductKind,
   TradeStatus,
   type Prisma,
@@ -18,6 +17,7 @@ import {
   type AdminCancellationTab,
 } from "@tarodan/types";
 import { buildSearchWhere, dateRangeWhere } from "../../../../common/list";
+import { CHARGED_PAYMENT_STATUSES } from "./charged-payment";
 
 /**
  * İptaller sekmesinin `where` builder'ı — TEK kaynak. Liste, sayaçlar ve Excel
@@ -53,12 +53,6 @@ export interface CancellationSourceWheres {
   order?: Prisma.OrderWhereInput;
   trade?: Prisma.TradeWhereInput;
 }
-
-/** Teklif sekmesi yalnız ÖDENMİŞ teklif siparişlerini listeler. */
-export const PAID_PAYMENT_STATUSES: PaymentStatus[] = [
-  PaymentStatus.completed,
-  PaymentStatus.refunded,
-];
 
 export const CANCELLED_TRADE_STATUSES: TradeStatus[] = [
   TradeStatus.cancelled,
@@ -189,14 +183,15 @@ function orderTabWhere(
   const directSale: Prisma.OrderWhereInput = {
     origin: OrderOrigin.direct_sale,
   };
-  // Ödenmemiş (vazgeçilmiş) teklif listelenmez: teklif siparişinin ödemesi
-  // doğrudan siparişe bağlıdır (teklif siparişi sepete girmez). İstisna
-  // yöneticinin iptal ettiği ödenmemiş teklif siparişidir: bir yönetici
-  // kararıdır ve "Yönetici iptali" süzgecinde görünmelidir.
+  // An unpaid (abandoned) offer order is not listed: an offer order's payment
+  // hangs off the order itself (offer orders never join a cart), so only its
+  // own payment is read. The exception is an unpaid offer order an admin
+  // cancelled: that is an admin decision and must show under the
+  // "Admin cancellation" filter.
   const listedOffer: Prisma.OrderWhereInput = {
     origin: OrderOrigin.offer,
     OR: [
-      { payment: { is: { status: { in: PAID_PAYMENT_STATUSES } } } },
+      { payment: { is: { status: { in: CHARGED_PAYMENT_STATUSES } } } },
       ADMIN_CANCELLED,
     ],
   };
