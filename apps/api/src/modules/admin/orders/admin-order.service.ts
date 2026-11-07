@@ -27,9 +27,11 @@ import {
   type OrderListFilters,
 } from "./helpers/order-list-where";
 import {
+  BUCKET_LINE_SELECT,
   LIST_INVOICE_SELECT,
   LIST_LINE_SELECT,
   ORDER_INVOICE_TYPES,
+  type BucketLine,
   type ListInvoice,
   type ListLine,
 } from "./helpers/order-list-select";
@@ -39,7 +41,22 @@ import {
 } from "./helpers/order-list-row.mapper";
 import { resolveProductImageUrl } from "./helpers/product-image-url";
 
-/** Sepet sekmelerinde birleşik sıralamanın okuduğu alanlar. */
+/** Rows grouped by `keyOf`, in input order within each group. */
+function groupByKey<T>(
+  rows: readonly T[],
+  keyOf: (row: T) => string,
+): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+/** The fields the cart tabs' merged sort reads. */
 interface CartHeadRow {
   kind: "group" | "order";
   id: string;
@@ -154,12 +171,12 @@ export class AdminOrderService {
     return counts;
   }
 
-  // ── Sepet sekmeleri: CheckoutGroup + grupsuz sipariş ──────────────────────
+  // ── Cart tabs: CheckoutGroup + groupless order ─────────────────────────────
 
   /**
-   * Sekmenin kaynakları birleşik sıralamayla sayfalanır. Grup kaynağı yalnız
-   * doğrudan satış taşıyan sekmelerde vardır ("Siparişe Dönen Teklifler"de
-   * satırların hepsi grupsuz tekil siparişlerdir).
+   * The tab's sources are paged with one merged sort. The group source exists
+   * only in tabs that carry direct sales (in "Offers turned into orders" every
+   * row is a groupless single order).
    */
   private async listCarts(
     sources: {
@@ -240,19 +257,17 @@ export class AdminOrderService {
     const orderIds = page.data
       .filter((h) => h.kind === "order")
       .map((h) => h.id);
-    const lines =
+    const lineScope = orderLineScopeWhere(filters);
+    const [lines, scopedBuckets] = await Promise.all([
       page.data.length === 0
         ? []
-        : await this.prisma.order.findMany({
+        : this.prisma.order.findMany({
             where: {
               OR: [
                 ...(groupIds.length
                   ? [
                       {
-                        AND: [
-                          { checkoutGroupId: { in: groupIds } },
-                          orderLineScopeWhere(filters),
-                        ],
+                        AND: [{ checkoutGroupId: { in: groupIds } }, lineScope],
                       },
                     ]
                   : []),
@@ -261,21 +276,48 @@ export class AdminOrderService {
             },
             select: LIST_LINE_SELECT,
             orderBy: [{ createdAt: "asc" }, { orderNumber: "asc" }],
-          });
+          }),
+      this.groupBucketLines(groupIds, lineScope),
+    ]);
 
-    const byCart = new Map<string, ListLine[]>();
-    for (const line of lines) {
-      const key = line.checkoutGroupId ?? line.id;
-      byCart.set(key, [...(byCart.get(key) ?? []), line]);
-    }
+    const byCart = groupByKey<ListLine>(
+      lines,
+      (line) => line.checkoutGroupId ?? line.id,
+    );
     const ctx = await this.rowContext(lines, now);
     return {
       ...page,
       data: page.data.flatMap((head) => {
         const members = byCart.get(head.id);
-        return members?.length ? [mapCartRow(head, members, ctx)] : [];
+        return members?.length
+          ? [mapCartRow(head, members, ctx, scopedBuckets?.get(head.id))]
+          : [];
       }),
     };
+  }
+
+  /**
+   * Every line of the page's groups, narrowed to what the bucket reads — only
+   * when a deep-link scope (user / product) hides some lines of a group, so
+   * the row's bucket still describes the whole cart, like the bucket filter.
+   * Without a scope the shown lines are all the lines (`undefined`).
+   */
+  private async groupBucketLines(
+    groupIds: readonly string[],
+    lineScope: Prisma.OrderWhereInput,
+  ): Promise<Map<string, BucketLine[]> | undefined> {
+    if (groupIds.length === 0 || Object.keys(lineScope).length === 0) {
+      return undefined;
+    }
+    const lines = await this.prisma.order.findMany({
+      where: { checkoutGroupId: { in: [...groupIds] } },
+      select: BUCKET_LINE_SELECT,
+    });
+    // The where guarantees a group id; `id` only satisfies the key type.
+    return groupByKey<BucketLine>(
+      lines,
+      (line) => line.checkoutGroupId ?? line.id,
+    );
   }
 
   // ── Ortak ──────────────────────────────────────────────────────────────────

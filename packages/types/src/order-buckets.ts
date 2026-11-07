@@ -5,21 +5,22 @@ import type {
 } from "./commerce-status";
 
 /**
- * Admin sipariş ekranının sekme + alt sekme (kova) sözlüğü — TEK kaynak.
+ * The tab + sub-tab (bucket) vocabulary of the admin orders screen — the ONE
+ * source.
  *
- * API bu tablolardan Prisma `where` üretir (liste ve sayaçlar aynı builder'ı
- * kullanır), panel sekmeleri ve etiket anahtarlarını buradan okur. Bir kovanın
- * tanımı değişirse yalnız burası değişir.
+ * The API builds its Prisma `where`s from these tables (the list and the
+ * counters share one builder); the panel reads its tabs and label keys from
+ * here. A bucket's definition changes here and nowhere else.
  *
- * Satır birimi SEPETTİR: doğrudan satışta CheckoutGroup (GRP), teklifte tekil
- * sipariş (ORD). Burada yalnız SİPARİŞ satırı taşıyan sekmeler vardır; aynı
- * ekrandaki Teklifler (siparişe dönmemişler dahil bütün teklifler) ve Takaslar
- * sekmeleri kendi listelerini okur (bkz. `admin-orders-screen.ts`).
+ * A row is a CART: a CheckoutGroup (GRP) for direct sales, a single order
+ * (ORD) for offers. Only the tabs that carry ORDER rows live here; the Offers
+ * (every offer, including those that never became an order) and Trades tabs
+ * of the same screen read their own lists (see `admin-orders-screen.ts`).
  */
 
 /**
- * Sipariş satırı taşıyan sekmeler: tüm siparişler, doğrudan satış ve siparişe
- * dönen teklifler (`offer_order` — teklif kaynaklı ORD'ler).
+ * Tabs that carry order rows: every order, direct sales, and offers that
+ * became an order (`offer_order` — offer-origin ORDs).
  */
 export const ADMIN_ORDER_TABS = ["all", "direct_sale", "offer_order"] as const;
 
@@ -33,30 +34,31 @@ export const ADMIN_ORDER_BUCKETS = [
   "delivered",
   "cancelled",
   "refunds",
+  "unpaid",
   "other",
 ] as const;
 
 export type AdminOrderBucket = (typeof ADMIN_ORDER_BUCKETS)[number];
 
 /**
- * "Tümü": kova filtresi UYGULAMAYAN alt sekme — sekmenin bütün satırları.
- * Kova hiç verilmemiş istekle aynı anlamdadır; sayacı sekmenin toplamıdır.
+ * "All": the sub-tab that applies NO bucket filter — every row of the tab.
+ * Same meaning as a request without a bucket; its counter is the tab total.
  */
 export const ADMIN_ORDER_ALL_BUCKET = "all" satisfies AdminOrderBucket;
 
-/** Satırları gerçekten süzen kovalar ("Tümü" dışındakiler). */
+/** Buckets that actually filter rows (everything but "All"). */
 export type AdminOrderFilterBucket = Exclude<
   AdminOrderBucket,
   typeof ADMIN_ORDER_ALL_BUCKET
 >;
 
 /**
- * Kapsamsız açılışın alt sekmesi: operasyonun iş kuyruğu "Yeni". Kullanıcı /
- * ürün deep-link'i ise "Tümü"nde açılır (bkz. panel `useOrderBucket`).
+ * The sub-tab of an unscoped visit: the operations work queue, "New". A user
+ * or product deep link opens in "All" instead (see the panel `useOrderBucket`).
  */
 export const ADMIN_ORDER_DEFAULT_BUCKET = "new" satisfies AdminOrderBucket;
 
-/** Kovanın süzgeci: "Tümü" (ya da kova yok) süzgeç yok demektir. */
+/** The bucket's filter: "All" (or no bucket) means no filter. */
 export function adminOrderBucketFilter(
   bucket: AdminOrderBucket | undefined,
 ): AdminOrderFilterBucket | undefined {
@@ -64,11 +66,11 @@ export function adminOrderBucketFilter(
 }
 
 /**
- * Bir sipariş satırının (Order) ilerleme aşamaları, İLERLEME SIRASIYLA.
- * Sıra anlamlıdır: çok satıcılı sepet en GERİDEKİ paketinin aşamasına düşer.
- * Hiçbir aşamaya uymayan satır KAPANMIŞ satırdır (iptal, iade, ödeme bekleyen,
- * kargo hatası…); hiçbir satırı aşamada olmayan sepet `ORDER_CLOSED_BUCKETS`
- * kurallarıyla İptaller / İadeler / Diğer'den TAM OLARAK birine düşer.
+ * The progress stages of an order line (Order), IN PROGRESS ORDER. The order
+ * matters: a multi-seller cart sits in the stage of its LEAST advanced
+ * package. A line in no stage is a CLOSED line (cancelled, refunded, awaiting
+ * payment, failed shipment, ...); a cart with no line in a stage lands in
+ * EXACTLY one of `ORDER_CLOSED_BUCKETS` (see `orderCartBucketOf`).
  */
 export const ORDER_LINE_STAGES = [
   "new",
@@ -82,8 +84,8 @@ export type OrderLineStage = (typeof ORDER_LINE_STAGES)[number];
 export interface OrderLineStageRule {
   orderStatuses: readonly OrderStatusValue[];
   /**
-   * Aşama kargo durumuna da bakıyorsa: izin verilen kargo durumları ve kargo
-   * kaydı hiç yokken satırın bu aşamada sayılıp sayılmayacağı.
+   * When the stage also reads the shipment: the allowed shipment statuses and
+   * whether a line with no shipment row at all counts in this stage.
    */
   shipment?: {
     statuses: readonly ShipmentStatusValue[];
@@ -92,15 +94,17 @@ export interface OrderLineStageRule {
 }
 
 /**
- * - new: ödenmiş ama kargoya verilmemiş. Kargo durumuna bakılmaz — siparişi
- *   `shipped`'e çeviren yazıcılar kargo satırıyla AYNI transaction'da çevirir,
- *   dolayısıyla ödenmiş sipariş hareket görmüş kargoyla kalmaz; iptal edilip
- *   yeniden açılmış bir etiket de "yeni iş"tir.
- * - shipped (Kargoya Verilen): gönderi oluştu/teslim alındı, henüz yolda değil.
- * - in_transit (Taşıma Durumunda): yolda / dağıtımda. Kargo `delivered` ama
- *   sipariş henüz geçmemişse de burada durur (teslim handler'ı birazdan çevirir).
- * - delivered (Teslim Edilen): teslim + onay penceresi + tamamlanmış.
- * Kargosu hata/iade/iptal olmuş `shipped` sipariş hiçbir aşamada değildir.
+ * - new: paid but not handed to the carrier. The shipment is not read: the
+ *   writers that move an order to `shipped` do it in the SAME transaction as
+ *   the shipment row, so a paid order never sits with a moving parcel; a
+ *   label that was voided and reopened is "new work" as well.
+ * - shipped (Handed to Carrier): shipment created / picked up, not moving yet.
+ * - in_transit: on the way / out for delivery. A shipment that is `delivered`
+ *   while the order has not moved yet also stays here (the delivery handler
+ *   moves it shortly).
+ * - delivered: delivered + confirmation window + completed.
+ * A `shipped` order whose shipment failed, came back or was cancelled is in
+ * no stage.
  */
 export const ORDER_LINE_STAGE_RULES: Record<
   OrderLineStage,
@@ -132,29 +136,38 @@ export const ORDER_LINE_STAGE_RULES: Record<
 };
 
 /**
- * KAPANMIŞ sepetlerin kovaları — hiçbir satırı bir ilerleme aşamasında olmayan
- * sepetler, ekrandaki sırayla. Öncelik sırası bu sıra DEĞİLDİR; karar
- * `orderCartBucketOf`'ta: önce iade, sonra iptal, kalan "Diğer".
+ * The buckets of CLOSED carts — carts with no line in a progress stage — in
+ * screen order. That is NOT the precedence; the decision is in
+ * `orderCartBucketOf`: refunds, then unpaid, then cancelled, the rest "Other".
  *
- * - refunds (İadeler): en az bir satırda iade izi var — iade talebi açılmış /
- *   iade edilmiş sipariş ya da geri dönen (dönmekte olan) koli.
- * - cancelled (İptaller): iade izi yok ve satırların TAMAMI iptal. İptal
- *   satırının yanında ödenmemiş ya da kargosu hata vermiş bir satır varsa o
- *   satır hâlâ bakılacak iştir; sepet "Diğer"de kalır.
- * - other (Diğer): kalan her şey — ödeme bekleyen/terk edilmiş sepet, kargosu
- *   hata vermiş ya da iptal edilmiş `shipped` sipariş…
+ * - refunds: at least one line carries a refund mark — a refund requested /
+ *   refunded order, or a parcel coming (or come) back.
+ * - unpaid (Payment Not Completed): no refund mark and EVERY line is an unpaid
+ *   line (`isUnpaidOrderLine`): the buyer went to payment and never paid
+ *   (abandoned checkout, an accepted offer left unpaid), whether the order
+ *   still awaits payment or was cancelled at `paymentExpiresAt` or by an
+ *   admin. These are not real orders, so they get their own bucket.
+ * - cancelled: no refund mark, not every line unpaid, and EVERY line
+ *   cancelled — so at least one cancelled line was charged.
+ * - other: everything else — a `shipped` order whose shipment failed or was
+ *   cancelled, a cart that mixes a charged line with an unpaid one, ...
  *
- * Üç kova birbirini dışlar ve kapanmış sepetlerin tamamını kapsar: sayaçların
- * toplamı yine sepet sayısına eşittir.
+ * The four buckets are disjoint and cover every closed cart: the counters
+ * still add up to the number of carts.
  */
-export const ORDER_CLOSED_BUCKETS = ["cancelled", "refunds", "other"] as const;
+export const ORDER_CLOSED_BUCKETS = [
+  "cancelled",
+  "refunds",
+  "unpaid",
+  "other",
+] as const;
 
 export type OrderClosedBucket = (typeof ORDER_CLOSED_BUCKETS)[number];
 
-/** Bir sepetin kovası: ilerleme aşaması ya da kapanmış kovalardan biri. */
+/** A cart's bucket: a progress stage or one of the closed buckets. */
 export type OrderCartBucket = OrderLineStage | OrderClosedBucket;
 
-/** İade izi taşıyan satır: sipariş durumu ya da kolinin durumu yeter. */
+/** A line with a refund mark: the order status or the parcel status. */
 export const ORDER_REFUND_LINE_RULE = {
   orderStatuses: ["refund_requested", "refunded"],
   shipmentStatuses: ["return_in_progress", "returned"],
@@ -163,15 +176,26 @@ export const ORDER_REFUND_LINE_RULE = {
   shipmentStatuses: readonly ShipmentStatusValue[];
 };
 
-/** İptal satırı. */
+/** A cancelled line. */
 export const ORDER_CANCELLED_LINE_STATUSES = [
   "cancelled",
 ] as const satisfies readonly OrderStatusValue[];
 
 /**
- * Sekmenin kapsadığı sipariş kökenleri — listenin ve sayaçların kaynağı.
- * Teklif siparişi grupsuz tekil siparişidir; CheckoutGroup kaynağı yalnız
- * doğrudan satışı taşır (bkz. API `orderListSourceWheres`).
+ * The statuses an UNPAID line can have: still awaiting payment, or cancelled
+ * (payment expiry, buyer or admin). Only together with "not charged"
+ * (`OrderLineState.charged`) does such a line count as unpaid: a cancelled
+ * line that was charged is a real cancellation.
+ */
+export const ORDER_UNPAID_LINE_STATUSES = [
+  "pending_payment",
+  "cancelled",
+] as const satisfies readonly OrderStatusValue[];
+
+/**
+ * The order origins a tab covers — the source of the list and the counters.
+ * An offer order is a single order without a group; the CheckoutGroup source
+ * carries direct sales only (see the API `orderListSourceWheres`).
  */
 export const ADMIN_ORDER_TAB_ORIGINS: Record<
   AdminOrderTab,
@@ -183,9 +207,11 @@ export const ADMIN_ORDER_TAB_ORIGINS: Record<
 };
 
 /**
- * Sekme → alt sekmeler, ekrandaki sırayla. Her sekme "Tümü" ile başlar.
- * Siparişe dönmemiş tekliflerin "Bekleyen" / "Süresi Dolan" ayrımı artık
- * Teklifler sekmesinin durum filtresindedir (teklif satırı sipariş değildir).
+ * Tab -> sub-tabs, in screen order. Every tab starts with "All" and carries
+ * every bucket ("unpaid" included: an accepted offer left unpaid is an offer
+ * order too). The "Pending" / "Expired" split of offers that never became an
+ * order lives in the Offers tab's status filter (an offer row is not an
+ * order).
  */
 export const ADMIN_ORDER_TAB_BUCKETS: Record<
   AdminOrderTab,
@@ -204,6 +230,7 @@ export const ADMIN_ORDER_BUCKET_I18N_KEYS = {
   delivered: "admin.operations.orders.buckets.delivered",
   cancelled: "admin.operations.orders.buckets.cancelled",
   refunds: "admin.operations.orders.buckets.refunds",
+  unpaid: "admin.operations.orders.buckets.unpaid",
   other: "admin.operations.orders.buckets.other",
 } as const satisfies Record<AdminOrderBucket, string>;
 
@@ -218,14 +245,14 @@ export function isAdminOrderBucketOfTab(
   return (ADMIN_ORDER_TAB_BUCKETS[tab] as readonly unknown[]).includes(bucket);
 }
 
-/** Tanınmayan sekme (eski yer imi, elle yazılmış URL) "Tüm Siparişler"e düşer. */
+/** An unknown tab (old bookmark, hand-typed URL) falls back to "All Orders". */
 export function resolveAdminOrderTab(value: unknown): AdminOrderTab {
   return isAdminOrderTab(value) ? value : "all";
 }
 
 /**
- * Sekmede olmayan (ya da hiç verilmemiş) kova `fallback`'e düşer — varsayılan
- * "Tümü", yani süzgeçsiz liste.
+ * A bucket that is not in the tab (or not given) falls back to `fallback` —
+ * by default "All", the unfiltered list.
  */
 export function resolveAdminOrderBucket(
   tab: AdminOrderTab,
@@ -236,9 +263,9 @@ export function resolveAdminOrderBucket(
 }
 
 /**
- * Tek bir sipariş satırının aşaması — `ORDER_LINE_STAGE_RULES`'un düz okuması.
- * Kurallar birbirini dışladığı için ilk eşleşme tek eşleşmedir; hiçbiri
- * eşleşmezse "other".
+ * The stage of one order line — a plain reading of `ORDER_LINE_STAGE_RULES`.
+ * The rules are disjoint, so the first match is the only match; no match
+ * means "other".
  */
 export function orderLineStageOf(
   orderStatus: OrderStatusValue,
@@ -257,13 +284,20 @@ export function orderLineStageOf(
   return "other";
 }
 
-/** Kovayı belirleyen satır bilgisi: siparişin ve (varsa) kolinin durumu. */
+/** The line facts that decide the bucket. */
 export interface OrderLineState {
   status: OrderStatusValue;
+  /** The parcel's status; null without a shipment row. */
   shipmentStatus: ShipmentStatusValue | null;
+  /**
+   * The money was taken: the order's payment OR its checkout group's payment
+   * is `completed` or `refunded`. No payment row, `pending`, `processing` or
+   * `failed` is not charged (API `helpers/charged-payment.ts`).
+   */
+  charged: boolean;
 }
 
-/** Satırda iade izi var mı (`ORDER_REFUND_LINE_RULE`). */
+/** Whether the line carries a refund mark (`ORDER_REFUND_LINE_RULE`). */
 export function isRefundOrderLine(line: OrderLineState): boolean {
   const rule = ORDER_REFUND_LINE_RULE;
   return (
@@ -276,13 +310,26 @@ export function isRefundOrderLine(line: OrderLineState): boolean {
 }
 
 /**
- * Bir sepetin kovası — API'nin Prisma `where`'lerinin düz okuması (contract
- * spec ikisini her durum kombinasyonunda karşılaştırır). Satırsız sepet hiçbir
- * kovada değildir (`null`).
+ * Whether the line is an unpaid line: awaiting payment or cancelled
+ * (`ORDER_UNPAID_LINE_STATUSES`) and never charged.
+ */
+export function isUnpaidOrderLine(line: OrderLineState): boolean {
+  return (
+    (ORDER_UNPAID_LINE_STATUSES as readonly OrderStatusValue[]).includes(
+      line.status,
+    ) && !line.charged
+  );
+}
+
+/**
+ * A cart's bucket — a plain reading of the API's Prisma `where`s (the
+ * contract spec compares the two on every status combination). A cart with
+ * no line is in no bucket (`null`).
  *
- * 1. En geride kalan satırın aşaması (en geride paket kuralı).
- * 2. Hiçbir satır aşamada değilse: iade izi → İadeler; tamamı iptal →
- *    İptaller; kalan → Diğer.
+ * 1. The stage of the least advanced line (least-advanced-package rule).
+ * 2. With no line in a stage: a refund mark -> refunds; every line unpaid ->
+ *    unpaid; every line cancelled (so at least one was charged) ->
+ *    cancelled; the rest -> other.
  */
 export function orderCartBucketOf(
   lines: readonly OrderLineState[],
@@ -295,7 +342,9 @@ export function orderCartBucketOf(
     if (stages.includes(stage)) return stage;
   }
   if (lines.some(isRefundOrderLine)) return "refunds";
-  const cancelled = ORDER_CANCELLED_LINE_STATUSES as readonly OrderStatusValue[];
+  if (lines.every(isUnpaidOrderLine)) return "unpaid";
+  const cancelled =
+    ORDER_CANCELLED_LINE_STATUSES as readonly OrderStatusValue[];
   if (lines.every((line) => cancelled.includes(line.status))) {
     return "cancelled";
   }

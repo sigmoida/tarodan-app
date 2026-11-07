@@ -8101,7 +8101,8 @@
           "delivered": "Delivered",
           "other": "Other",
           "cancelled": "Cancelled",
-          "refunds": "Refunds"
+          "refunds": "Refunds",
+          "unpaid": "Payment Not Completed"
         },
         "filters": {
           "party": "Buyer / Seller",

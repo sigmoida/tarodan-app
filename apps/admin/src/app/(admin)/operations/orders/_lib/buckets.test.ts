@@ -26,9 +26,10 @@ describe("order bucket bar", () => {
     }
   });
 
-  it("opens the cancelled and refunds buckets from a deep link", () => {
+  it("opens the cancelled, refunds and unpaid buckets from a deep link", () => {
     expect(resolveAdminOrderBucket("all", "cancelled")).toBe("cancelled");
     expect(resolveAdminOrderBucket("all", "refunds")).toBe("refunds");
+    expect(resolveAdminOrderBucket("offer_order", "unpaid")).toBe("unpaid");
   });
 
   it("falls back for an unknown bucket", () => {

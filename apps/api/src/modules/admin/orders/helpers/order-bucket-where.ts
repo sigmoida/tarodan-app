@@ -4,31 +4,34 @@ import {
   ORDER_LINE_STAGES,
   ORDER_LINE_STAGE_RULES,
   ORDER_REFUND_LINE_RULE,
+  ORDER_UNPAID_LINE_STATUSES,
   type OrderCartBucket,
   type OrderLineStage,
 } from "@tarodan/types";
+import { chargedOrderLineWhere } from "./charged-payment";
 
 /**
- * Admin sipariş kovalarının Prisma karşılığı. Liste ve sayaç uçları AYNI
- * fonksiyonları çağırır — bir kovanın iki tanımı olamaz. Kovaların anlamı
- * `@tarodan/types` `order-buckets.ts` tablolarındadır; burası yalnız çeviridir.
+ * The Prisma form of the admin order buckets. The list and the counter
+ * endpoints call the SAME functions, so a bucket cannot have two definitions.
+ * What the buckets mean lives in the `@tarodan/types` `order-buckets.ts`
+ * tables; this file only translates them.
  */
 
-/** Sepetin kovası: bir ilerleme aşaması ya da kapanmış kovalardan biri. */
+/** A cart's bucket: a progress stage or one of the closed buckets. */
 export type CartBucket = OrderCartBucket;
 
-/** Satır (Order) koşulunu sepet modelinin koşuluna taşıyan adaptör: "en az bir satır". */
+/** Lifts a line (Order) condition to the cart model: "at least one line". */
 export type LineAdapter<TWhere> = (line: Prisma.OrderWhereInput) => TWhere;
 
-/** CheckoutGroup: sepetin satırları `orders` ilişkisidir. */
+/** CheckoutGroup: the cart's lines are its `orders` relation. */
 export const groupLines: LineAdapter<Prisma.CheckoutGroupWhereInput> = (
   line,
 ) => ({ orders: { some: line } });
 
-/** Grupsuz tekil sipariş: sepet tek satırın kendisidir. */
+/** A single order without a group: the cart is that one line. */
 export const singleLine: LineAdapter<Prisma.OrderWhereInput> = (line) => line;
 
-/** Bir sipariş satırının `stage` aşamasında olma koşulu. */
+/** An order line in stage `stage`. */
 export function orderLineStageWhere(
   stage: OrderLineStage,
 ): Prisma.OrderWhereInput {
@@ -51,7 +54,7 @@ export function orderLineStageWhere(
   };
 }
 
-/** İade izi taşıyan satır (`ORDER_REFUND_LINE_RULE`). */
+/** A line with a refund mark (`ORDER_REFUND_LINE_RULE`). */
 export function refundOrderLineWhere(): Prisma.OrderWhereInput {
   return {
     OR: [
@@ -65,28 +68,61 @@ export function refundOrderLineWhere(): Prisma.OrderWhereInput {
   };
 }
 
-/** İptal OLMAYAN satır — "tamamı iptal" bunun yokluğudur. */
+/** A line that is NOT cancelled — "every line cancelled" is its absence. */
 export function notCancelledOrderLineWhere(): Prisma.OrderWhereInput {
   return { status: { notIn: [...ORDER_CANCELLED_LINE_STATUSES] } };
 }
 
 /**
- * EN GERİDEKİ PAKET kuralı — tek yazıldığı yer.
+ * An unpaid line (`isUnpaidOrderLine`): awaiting payment or cancelled, and
+ * never charged — a missing payment row included (`chargedOrderLineWhere`
+ * explains why its negation is NULL-safe).
+ */
+export function unpaidOrderLineWhere(): Prisma.OrderWhereInput {
+  return {
+    AND: [
+      { status: { in: [...ORDER_UNPAID_LINE_STATUSES] } },
+      { NOT: chargedOrderLineWhere() },
+    ],
+  };
+}
+
+/**
+ * A line that is NOT unpaid — "every line unpaid" is its absence. Written
+ * positively (the complement of `unpaidOrderLineWhere`): another status, or
+ * charged.
+ */
+export function notUnpaidOrderLineWhere(): Prisma.OrderWhereInput {
+  return {
+    OR: [
+      { status: { notIn: [...ORDER_UNPAID_LINE_STATUSES] } },
+      chargedOrderLineWhere(),
+    ],
+  };
+}
+
+/**
+ * The LEAST-ADVANCED-PACKAGE rule — the one place it is written.
  *
- * Çok satıcılı sepet, en geride kalan paketinin (satırının) aşamasındadır:
- * "Yeni" bir paketi olan sepet "Yeni"de görünür, öbür paketi teslim edilmiş
- * olsa bile. Aşama k'daki sepet = k'da en az bir satırı olan ve k'dan önceki
- * hiçbir aşamada satırı olmayan sepettir.
+ * A multi-seller cart sits in the stage of its least advanced package (line):
+ * a cart with a "New" package shows in "New" even when its other package was
+ * delivered. The cart in stage k = has a line in k and no line in a stage
+ * before k.
  *
- * Hiçbir aşamada satırı olmayan sepet KAPANMIŞTIR ve `orderCartBucketOf`'un
- * sırasıyla tam olarak bir kapanmış kovaya düşer: iade izi olan → refunds;
- * iade izi yok, iptal olmayan satır da yok → cancelled; iade izi yok ama iptal
- * olmayan satır var → other. Böylece her sepet tam olarak bir kovadadır ve
- * sayaçların toplamı sepet sayısına eşittir.
+ * A cart with no line in any stage is CLOSED and lands in exactly one closed
+ * bucket, in `orderCartBucketOf`'s order:
+ * - a refund mark -> refunds;
+ * - no refund mark and no line that is not unpaid -> unpaid;
+ * - no refund mark, a line that is not unpaid, no line that is not
+ *   cancelled -> cancelled;
+ * - no refund mark, a line that is not unpaid, a line that is not
+ *   cancelled -> other.
+ * So every cart is in exactly one bucket and the counters add up to the
+ * number of carts.
  *
- * Paket aşaması = paketin en gerideki satırı olduğundan sepet için "en gerideki
- * paket" ile "en gerideki satır" aynı sonucu verir; kural satır üzerinden
- * yazılır ki tek satırlık sepet (teklif siparişi) de aynı fonksiyondan geçsin.
+ * A package's stage is its least advanced line, so for a cart "least advanced
+ * package" and "least advanced line" agree; the rule is written per line so a
+ * one-line cart (offer order) goes through the same function.
  */
 export function cartBucketWhere<TWhere>(
   bucket: CartBucket,
@@ -97,18 +133,27 @@ export function cartBucketWhere<TWhere>(
     ({
       AND: [lines({}), { NOT: lines({ OR: stages }) } as TWhere, ...parts],
     }) as TWhere;
+  const none = (line: Prisma.OrderWhereInput) =>
+    ({ NOT: lines(line) }) as TWhere;
 
   switch (bucket) {
     case "refunds":
       return closed(lines(refundOrderLineWhere()));
+    case "unpaid":
+      return closed(
+        none(refundOrderLineWhere()),
+        none(notUnpaidOrderLineWhere()),
+      );
     case "cancelled":
       return closed(
-        { NOT: lines(refundOrderLineWhere()) } as TWhere,
-        { NOT: lines(notCancelledOrderLineWhere()) } as TWhere,
+        none(refundOrderLineWhere()),
+        lines(notUnpaidOrderLineWhere()),
+        none(notCancelledOrderLineWhere()),
       );
     case "other":
       return closed(
-        { NOT: lines(refundOrderLineWhere()) } as TWhere,
+        none(refundOrderLineWhere()),
+        lines(notUnpaidOrderLineWhere()),
         lines(notCancelledOrderLineWhere()),
       );
     default: {
@@ -116,7 +161,7 @@ export function cartBucketWhere<TWhere>(
       const earlier = stages.slice(0, index);
       const parts: TWhere[] = [lines(stages[index])];
       if (earlier.length > 0) {
-        parts.push({ NOT: lines({ OR: earlier }) } as TWhere);
+        parts.push(none({ OR: earlier }));
       }
       return { AND: parts } as TWhere;
     }

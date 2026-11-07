@@ -12,11 +12,11 @@ import {
 } from "@tarodan/types";
 import {
   CANCELLED_TRADE_STATUSES,
-  PAID_PAYMENT_STATUSES,
   cancellationBucketWhere,
   cancellationScopeOf,
   cancellationSourceWheres,
 } from "./cancellation-where";
+import { CHARGED_PAYMENT_STATUSES } from "./charged-payment";
 
 const NOW = new Date("2026-09-22T12:00:00.000Z");
 const json = (value: unknown) => JSON.stringify(value);
@@ -41,7 +41,7 @@ describe("cancellation where-builder", () => {
                     OR: [
                       {
                         payment: {
-                          is: { status: { in: PAID_PAYMENT_STATUSES } },
+                          is: { status: { in: CHARGED_PAYMENT_STATUSES } },
                         },
                       },
                       {

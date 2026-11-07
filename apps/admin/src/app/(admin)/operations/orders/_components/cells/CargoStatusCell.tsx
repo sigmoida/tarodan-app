@@ -1,18 +1,30 @@
 import { useTranslations } from "next-intl";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import {
-  Badge,
   offerStatusConfig,
   orderStatusConfig,
   shipmentProviderConfig,
   shipmentStatusConfig,
 } from "@tarodan/ui";
-import type { AdminOrderListRow, AdminOrderPackage } from "@tarodan/types";
+import {
+  ADMIN_ORDER_BUCKET_I18N_KEYS,
+  type AdminOrderListRow,
+  type AdminOrderPackage,
+} from "@tarodan/types";
+import { TableBadge } from "@/components/table/TableBadge";
+import { STATUS_TONE } from "@/lib/status-tone";
 import { statusConfig, statusLabel } from "@/lib/statusLabels";
 import { packageOrderStatuses } from "../../_lib/rowView";
 import { PackageStack } from "./PackageStack";
 
-function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
+function PackageCargo({
+  pkg,
+  unpaid,
+}: {
+  pkg: AdminOrderPackage;
+  /** The cart's payment never completed: marked once, on its first package. */
+  unpaid: boolean;
+}) {
   const t = useTranslations();
   const shipment = pkg.shipment;
   const hasRefund = pkg.lines.some((line) => line.hasActiveRefund);
@@ -31,7 +43,7 @@ function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
               </span>
             )}
           </span>
-          <Badge
+          <TableBadge
             status={shipment.status}
             config={statusConfig(shipmentStatusConfig, t)}
           />
@@ -42,17 +54,22 @@ function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
         </span>
       )}
       <div className="flex flex-wrap gap-1">
+        {unpaid && (
+          <TableBadge variant={STATUS_TONE.ended}>
+            {t(ADMIN_ORDER_BUCKET_I18N_KEYS.unpaid)}
+          </TableBadge>
+        )}
         {packageOrderStatuses(pkg).map((status) => (
-          <Badge
+          <TableBadge
             key={status}
             status={status}
             config={statusConfig(orderStatusConfig, t)}
           />
         ))}
         {hasRefund && (
-          <Badge variant="danger">
+          <TableBadge variant="danger">
             {t("admin.operations.orders.status.refundInProgress")}
-          </Badge>
+          </TableBadge>
         )}
       </div>
     </div>
@@ -60,23 +77,30 @@ function PackageCargo({ pkg }: { pkg: AdminOrderPackage }) {
 }
 
 /**
- * Son kolon: paket başına taşıyıcı, takip no ve kargo durumu ile kalemlerin
- * sipariş durumu. Siparişe dönmemiş teklifte teklifin (görünen) durumu.
+ * Last column: per package the carrier, tracking number and shipment status,
+ * and the order status of its lines. A cart whose payment never completed
+ * (`unpaid` bucket: abandoned checkout, unpaid offer, their expiry cancels)
+ * is marked so it is not read as a real order. An offer that never became an
+ * order shows the offer's (visible) status.
  */
 export function CargoStatusCell({ row }: { row: AdminOrderListRow }) {
   const t = useTranslations();
   if (row.packages.length === 0) {
     return row.offer ? (
-      <Badge
+      <TableBadge
         status={row.offer.status}
         config={statusConfig(offerStatusConfig, t)}
       />
     ) : null;
   }
+  const unpaid = row.bucket === "unpaid";
+  const firstKey = row.packages[0].key;
   return (
     <PackageStack
       packages={row.packages}
-      body={(pkg) => <PackageCargo pkg={pkg} />}
+      body={(pkg) => (
+        <PackageCargo pkg={pkg} unpaid={unpaid && pkg.key === firstKey} />
+      )}
     />
   );
 }

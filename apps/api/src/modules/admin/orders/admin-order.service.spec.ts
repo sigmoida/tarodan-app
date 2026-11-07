@@ -54,6 +54,8 @@ function lineRow(overrides: Record<string, unknown> = {}) {
     shipment: null,
     offer: null,
     refundRequests: [],
+    payment: null,
+    checkoutGroup: { payment: { status: "completed" } },
     ...overrides,
   };
 }
@@ -236,7 +238,8 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
 
     await service.getOrders({ userId: "s1", userRole: "seller" });
 
-    expect(prisma.order.findMany).toHaveBeenLastCalledWith(
+    expect(prisma.order.findMany).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({
         where: {
           OR: [
@@ -250,6 +253,78 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
         },
       }),
     );
+  });
+
+  it("reads a scoped group's bucket from ALL its lines, not only the shown ones", async () => {
+    const prisma = makePrisma();
+    prisma.checkoutGroup.findMany.mockResolvedValue([
+      {
+        id: "g1",
+        groupNumber: "GRP-1",
+        totalAmount: D(100),
+        createdAt: T0,
+        buyer: { displayName: "B" },
+      },
+    ]);
+    const bucketLine = (status: string, groupPayment: string | null) => ({
+      checkoutGroupId: "g1",
+      status,
+      shipment: null,
+      payment: null,
+      checkoutGroup: {
+        payment: groupPayment ? { status: groupPayment } : null,
+      },
+    });
+    prisma.order.findMany
+      // groupless heads
+      .mockResolvedValueOnce([])
+      // the seller's own (shown) line: delivered
+      .mockResolvedValueOnce([lineRow({ status: "delivered" })])
+      // every line of the cart: another seller's package is still "new"
+      .mockResolvedValueOnce([
+        bucketLine("delivered", "completed"),
+        bucketLine("paid", "completed"),
+      ]);
+    const { service } = makeService(prisma);
+
+    const result = await service.getOrders({
+      userId: "s1",
+      userRole: "seller",
+    });
+
+    expect(prisma.order.findMany).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ where: { checkoutGroupId: { in: ["g1"] } } }),
+    );
+    // the shown line alone would say "delivered"; the cart is in "new",
+    // exactly where the bucket filter puts it
+    expect(result.data.map((row) => row.bucket)).toEqual(["new"]);
+  });
+
+  it("reads the bucket from the shown lines when no scope narrows them", async () => {
+    const prisma = makePrisma();
+    prisma.checkoutGroup.findMany.mockResolvedValue([
+      {
+        id: "g1",
+        groupNumber: "GRP-1",
+        totalAmount: D(100),
+        createdAt: T0,
+        buyer: { displayName: "B" },
+      },
+    ]);
+    prisma.order.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      lineRow({
+        status: "pending_payment",
+        checkoutGroup: { payment: { status: "pending" } },
+      }),
+    ]);
+    const { service } = makeService(prisma);
+
+    const result = await service.getOrders({ tab: "all", bucket: "unpaid" });
+
+    // heads + lines only: no extra bucket read
+    expect(prisma.order.findMany).toHaveBeenCalledTimes(2);
+    expect(result.data.map((row) => row.bucket)).toEqual(["unpaid"]);
   });
 
   it("reads every invoice of the page in ONE query, by package and legacy order id", async () => {
@@ -370,17 +445,17 @@ describe("AdminOrderService.getOrderCounts", () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     // group source is identical for "all" and "direct_sale" → counted once;
     // the offer-order tab has no group source
-    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(8);
-    // the groupless source differs per tab (its origins) → 3 tabs × 8 buckets
-    expect(prisma.order.count).toHaveBeenCalledTimes(24);
+    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(9);
+    // the groupless source differs per tab (its origins) → 3 tabs × 9 buckets
+    expect(prisma.order.count).toHaveBeenCalledTimes(27);
     expect(prisma.offer.count).not.toHaveBeenCalled();
     // the same where-builder as the list, filters included
     expect(prisma.order.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("offer_order", "new", { party: "ali" })
         .loose,
     });
-    // the closed carts are split three ways — each its own count
-    for (const bucket of ["cancelled", "refunds", "other"] as const) {
+    // the closed carts are split four ways — each its own count
+    for (const bucket of ["cancelled", "refunds", "unpaid", "other"] as const) {
       expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
         where: orderListSourceWheres("all", bucket, { party: "ali" }).group,
       });
@@ -401,6 +476,7 @@ describe("AdminOrderService.getOrderCounts", () => {
         delivered: n,
         cancelled: n,
         refunds: n,
+        unpaid: n,
         other: n,
       },
     });

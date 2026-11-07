@@ -24,11 +24,9 @@ import {
   type RefundablePayment,
 } from "../../../trade/helpers/trade-refund-policy";
 import { isTradeHandedToCargo } from "../../../trade/helpers/trade-handed-to-cargo";
+import { isChargedPaymentStatus } from "./charged-payment";
 import { buyerOf, partyOf, salesCommissionOf } from "./order-list-row.mapper";
-import {
-  TRADE_REFUND_CHARGED_PAYMENT_STATUSES,
-  tradeRefundKindOf,
-} from "./refund-list-where";
+import { tradeRefundKindOf } from "./refund-list-where";
 import type {
   RefundRowAttempt,
   RefundRowInvoice,
@@ -366,9 +364,7 @@ export function mapTradeRefundRows(
     const counterpartPayment =
       trade.cashPayments.find((row) => row.payerId === side.counterpartId) ??
       null;
-    const charged =
-      payment != null &&
-      TRADE_REFUND_CHARGED_PAYMENT_STATUSES.includes(payment.status);
+    const charged = isChargedPaymentStatus(payment?.status);
     const policyPayment = payment ? policyPaymentOf(payment) : null;
 
     const providerPayment = payment?.payment ?? null;

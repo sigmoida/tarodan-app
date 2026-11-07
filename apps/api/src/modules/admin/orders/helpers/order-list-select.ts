@@ -3,10 +3,11 @@ import {
   type FiscalInvoiceType,
   type Prisma,
 } from "@prisma/client";
+import { LINE_CHARGE_SELECT } from "./charged-payment";
 
 /**
- * Admin sipariş listesinin `select`'leri. Satır hücrelerinin okuduğu her alan
- * burada seçilir, fazlası seçilmez (§5): sayfa 500 satıra kadar çıkabilir.
+ * The admin order list `select`s. Every field a row cell reads is selected
+ * here and nothing more (§5): a page can hold up to 500 rows.
  */
 
 export const PARTY_SELECT = {
@@ -30,7 +31,7 @@ export const LIST_PRODUCT_SELECT = {
   },
 } as const satisfies Prisma.ProductSelect;
 
-/** Kapanmamış iade talebi — satırda "iade sürecinde" işareti. */
+/** A refund request still open — the row's "refund in progress" mark. */
 const CLOSED_REFUND_STATUSES: RefundRequestStatus[] = [
   RefundRequestStatus.refunded,
   RefundRequestStatus.rejected,
@@ -45,7 +46,7 @@ export const LIST_OFFER_CORE_SELECT = {
   createdAt: true,
 } as const satisfies Prisma.OfferSelect;
 
-/** Bir sipariş satırı (ürün kalemi) — paket ve kargo bilgisiyle. */
+/** An order line (product item) — with its package and shipment. */
 const LIST_LINE_BASE_SELECT = {
   id: true,
   orderNumber: true,
@@ -63,7 +64,7 @@ const LIST_LINE_BASE_SELECT = {
   createdAt: true,
   checkoutGroupId: true,
   packageId: true,
-  // Test şeridi damgası — satır "TEST" rozeti taşır (liste test kaydını gizlemez).
+  // Test-lane stamp — the row shows a "TEST" badge (the list does not hide it).
   isTest: true,
   shippingAddress: true,
   financialSnapshot: true,
@@ -81,7 +82,7 @@ const LIST_LINE_BASE_SELECT = {
       status: true,
       trackingNumber: true,
       providerTrackingId: true,
-      // Kargoya devir mührü — panelin iptal uygunluğu (preShipmentCancelBlocker).
+      // Carrier hand-over stamp — the panel's cancel eligibility (preShipmentCancelBlocker).
       shippedAt: true,
     },
   },
@@ -90,9 +91,29 @@ const LIST_LINE_BASE_SELECT = {
     take: 1,
     select: { id: true },
   },
+  // Charge state: the row's bucket (unpaid vs real) and the cancellations
+  // tab's refund state.
+  ...LINE_CHARGE_SELECT,
 } as const satisfies Prisma.OrderSelect;
 
-/** Sepet sekmelerinin satırı: teklif siparişinde teklifin kendisiyle. */
+/**
+ * What a line contributes to its cart's bucket (`orderCartBucketOf`). A
+ * deep-link scope shows only some lines of a group; the row's bucket still
+ * reads every line through this narrow selection.
+ */
+export const BUCKET_LINE_SELECT = {
+  id: true,
+  checkoutGroupId: true,
+  status: true,
+  shipment: { select: { status: true } },
+  ...LINE_CHARGE_SELECT,
+} as const satisfies Prisma.OrderSelect;
+
+export type BucketLine = Prisma.OrderGetPayload<{
+  select: typeof BUCKET_LINE_SELECT;
+}>;
+
+/** A cart tab line: an offer order comes with its offer. */
 export const LIST_LINE_SELECT = {
   ...LIST_LINE_BASE_SELECT,
   offer: { select: LIST_OFFER_CORE_SELECT },
@@ -102,7 +123,7 @@ export type ListLine = Prisma.OrderGetPayload<{
   select: typeof LIST_LINE_SELECT;
 }>;
 
-/** Sipariş satırının teklif ilişkisi hariç yükü — eşleyicinin kalem/paket adımları. */
+/** An order line without the offer relation — the mapper's line/package steps. */
 export type ListOfferOrder = Prisma.OrderGetPayload<{
   select: typeof LIST_LINE_BASE_SELECT;
 }>;
@@ -122,9 +143,9 @@ export type ListInvoice = Prisma.FiscalInvoiceGetPayload<{
 }>;
 
 /**
- * Siparişin kendi e-belgeleri. İade ve ceza belgelerinin `sourceId`'si başka
- * tabloyu gösterir (fatura / iade talebi), takas ve platform hizmeti belgeleri
- * sipariş ekranına ait değildir.
+ * The order's own e-documents. Return and penalty documents point their
+ * `sourceId` at another table (invoice / refund request); trade and platform
+ * service documents do not belong to the orders screen.
  */
 export const ORDER_INVOICE_TYPES: FiscalInvoiceType[] = [
   "commission",

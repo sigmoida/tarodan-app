@@ -6,9 +6,10 @@ import {
 } from "./order-list-select";
 
 /**
- * İptaller sekmesinin `select`'leri. Sipariş kalemi, siparişler ekranının
- * kalem seçimini AYNEN taşır (satır eşlemesi `mapCartRow`'u yeniden kullanır)
- * ve üstüne iptalin neden / para alanlarını ekler.
+ * The cancellations tab `select`s. An order line carries the orders screen's
+ * line selection AS IS (the row mapping reuses `mapCartRow`; the charge state
+ * the refund state reads comes with it) and adds the cancellation's reason
+ * and money fields.
  */
 
 export const CANCELLATION_LINE_SELECT = {
@@ -17,10 +18,6 @@ export const CANCELLATION_LINE_SELECT = {
   cancelReason: true,
   cancellationReasonCode: true,
   adminCancelReasonCode: true,
-  payment: { select: { status: true } },
-  checkoutGroup: {
-    select: { payment: { select: { status: true } } },
-  },
   refundAttempts: { select: { status: true } },
 } as const satisfies Prisma.OrderSelect;
 

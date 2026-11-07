@@ -25,7 +25,11 @@ import {
   type CartHead,
   type RowMapContext,
 } from "./order-list-row.mapper";
-import { PAID_PAYMENT_STATUSES } from "./cancellation-where";
+import {
+  isChargedOrderLine,
+  isChargedPaymentStatus,
+  type LineCharge,
+} from "./charged-payment";
 
 /**
  * İptaller sekmesinin satır eşlemesi — saf. Sipariş satırları siparişler
@@ -89,21 +93,18 @@ const REFUND_BROKEN: RefundAttemptStatus[] = [
 ];
 
 /**
- * Sipariş kaleminin iade durumu. Tahsilat siparişin ya da (sepette) grubunun
- * ödemesidir. Başarılı bir iade denemesi "iade edildi"dir; açık bir iade talebi
- * "incelemede"; yalnız başarısız denemeler "başarısız"; tahsil edilmiş ama hiç
- * denenmemiş "bekliyor".
+ * The refund state of an order line. The charge is the order's payment or,
+ * in a cart, its group's payment (`isChargedOrderLine`). A successful refund
+ * attempt is "refunded"; an open refund request "in review"; only failed
+ * attempts "failed"; charged but never attempted "pending".
  */
-export function orderRefundState(line: {
-  payment: { status: PaymentStatus } | null;
-  checkoutGroup: { payment: { status: PaymentStatus } | null } | null;
-  refundAttempts: readonly { status: RefundAttemptStatus }[];
-  refundRequests: readonly unknown[];
-}): AdminCancellationRefundState {
-  const paymentStatus =
-    line.payment?.status ?? line.checkoutGroup?.payment?.status ?? null;
-  if (!paymentStatus || !PAID_PAYMENT_STATUSES.includes(paymentStatus))
-    return "not_charged";
+export function orderRefundState(
+  line: LineCharge & {
+    refundAttempts: readonly { status: RefundAttemptStatus }[];
+    refundRequests: readonly unknown[];
+  },
+): AdminCancellationRefundState {
+  if (!isChargedOrderLine(line)) return "not_charged";
   const attempts = line.refundAttempts.map((attempt) => attempt.status);
   if (attempts.some((status) => REFUND_DONE.includes(status)))
     return "refunded";
@@ -122,7 +123,7 @@ export function tradeRefundState(trade: {
   }[];
 }): AdminCancellationRefundState {
   const paid = trade.cashPayments.filter((payment) =>
-    PAID_PAYMENT_STATUSES.includes(payment.status),
+    isChargedPaymentStatus(payment.status),
   );
   if (paid.length === 0) return "not_charged";
   const refunded = paid.filter(
@@ -283,7 +284,7 @@ export function mapCancelledTradeRow(
   });
 
   const paid = trade.cashPayments.filter((payment) =>
-    PAID_PAYMENT_STATUSES.includes(payment.status),
+    isChargedPaymentStatus(payment.status),
   );
   const sum = (pick: (payment: (typeof paid)[number]) => Prisma.Decimal) =>
     paid.reduce((acc, payment) => acc.plus(pick(payment)), money(0));

@@ -1,4 +1,9 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type OrderStatus, type ShipmentStatus } from "@prisma/client";
+import {
+  orderCartBucketOf,
+  type OrderCartBucket,
+  type OrderLineState,
+} from "@tarodan/types";
 import type {
   AdminOrderInvoice,
   AdminOrderLine,
@@ -10,6 +15,7 @@ import type {
 } from "@tarodan/types";
 import { compareOfferToListing } from "../../../order/helpers/order-offer-snapshot";
 import { isInvoiceDownloadable } from "../../finance/invoice-downloadable";
+import { isChargedOrderLine, type LineCharge } from "./charged-payment";
 import { offerEffectiveStatus } from "./offer-effective-status";
 import type {
   ListInvoice,
@@ -246,10 +252,32 @@ function offerInfoOf(params: {
   };
 }
 
+/** The line facts a cart's bucket reads (`BUCKET_LINE_SELECT`). */
+export type BucketLineFacts = LineCharge & {
+  status: OrderStatus;
+  shipment: { status: ShipmentStatus } | null;
+};
+
+export function orderLineStateOf(line: BucketLineFacts): OrderLineState {
+  return {
+    status: line.status,
+    shipmentStatus: line.shipment?.status ?? null,
+    charged: isChargedOrderLine(line),
+  };
+}
+
+/** The cart's bucket over the given lines — the same rule as the filter. */
+export function cartBucketOf(
+  lines: readonly BucketLineFacts[],
+): OrderCartBucket | null {
+  return orderCartBucketOf(lines.map(orderLineStateOf));
+}
+
 function cartRowOf(
   head: CartHead,
   orders: readonly ListOfferOrder[],
   offer: OfferCore | null,
+  bucket: OrderCartBucket | null,
   ctx: RowMapContext,
 ): AdminOrderListRow {
   const first = orders[0];
@@ -264,6 +292,7 @@ function cartRowOf(
     createdAt: head.createdAt.toISOString(),
     detailOrderId: first.id,
     isTest: isTestRow(orders),
+    bucket,
     buyer: buyerOf(first.buyer, first.shippingAddress),
     totalAmount: sum((o) => money(o.totalAmount)).toNumber(),
     subtotal: lines
@@ -289,11 +318,22 @@ function cartRowOf(
   };
 }
 
-/** Sepet sekmelerinin satırı: grup ya da grupsuz tekil sipariş. */
+/**
+ * A cart tab row: a group or a single order without a group. `cartLines` are
+ * ALL the cart's lines for its bucket; leave it out when `lines` already are
+ * (no deep-link scope narrowed them).
+ */
 export function mapCartRow(
   head: CartHead,
   lines: readonly ListLine[],
   ctx: RowMapContext,
+  cartLines: readonly BucketLineFacts[] = lines,
 ): AdminOrderListRow {
-  return cartRowOf(head, lines, lines[0]?.offer ?? null, ctx);
+  return cartRowOf(
+    head,
+    lines,
+    lines[0]?.offer ?? null,
+    cartBucketOf(cartLines),
+    ctx,
+  );
 }
