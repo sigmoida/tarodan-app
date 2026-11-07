@@ -8101,7 +8101,8 @@
           "delivered": "Teslim Edilen",
           "other": "Diğer",
           "cancelled": "İptaller",
-          "refunds": "İadeler"
+          "refunds": "İadeler",
+          "unpaid": "Ödeme Tamamlanmadı"
         },
         "filters": {
           "party": "Alıcı / Satıcı",

@@ -57,6 +57,7 @@ describe("the orders screen tab set", () => {
       "delivered",
       "cancelled",
       "refunds",
+      "unpaid",
       "other",
     ]);
     for (const tab of ADMIN_ORDER_TABS) {

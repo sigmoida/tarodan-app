@@ -3,6 +3,7 @@ import {
   type FiscalInvoiceType,
   type Prisma,
 } from "@prisma/client";
+import { LINE_CHARGE_SELECT } from "./charged-payment";
 
 /**
  * Admin sipariş listesinin `select`'leri. Satır hücrelerinin okuduğu her alan
@@ -90,7 +91,26 @@ const LIST_LINE_BASE_SELECT = {
     take: 1,
     select: { id: true },
   },
+  // Charge state: the row's bucket (unpaid vs real) and the cancellations
+  // tab's refund state.
+  ...LINE_CHARGE_SELECT,
 } as const satisfies Prisma.OrderSelect;
+
+/**
+ * What a line contributes to its cart's bucket (`orderCartBucketOf`). A
+ * deep-link scope shows only some lines of a group; the row's bucket still
+ * reads every line through this narrow selection.
+ */
+export const BUCKET_LINE_SELECT = {
+  checkoutGroupId: true,
+  status: true,
+  shipment: { select: { status: true } },
+  ...LINE_CHARGE_SELECT,
+} as const satisfies Prisma.OrderSelect;
+
+export type BucketLine = Prisma.OrderGetPayload<{
+  select: typeof BUCKET_LINE_SELECT;
+}>;
 
 /** Sepet sekmelerinin satırı: teklif siparişinde teklifin kendisiyle. */
 export const LIST_LINE_SELECT = {

@@ -5,7 +5,11 @@ import type {
   OrderStatusValue,
   ShipmentStatusValue,
 } from "./commerce-status";
-import type { AdminOrderBucket, AdminOrderTab } from "./order-buckets";
+import type {
+  AdminOrderBucket,
+  AdminOrderTab,
+  OrderCartBucket,
+} from "./order-buckets";
 
 /**
  * `GET /admin/orders` satır sözleşmesi — API üretir, panel okur.
@@ -121,13 +125,20 @@ export interface AdminOrderListRow {
   number: string;
   origin: OrderOriginValue;
   createdAt: string;
-  /** Sipariş dosyasını açan sipariş id'si (grup dosyası buradan çözülür). */
+  /** The order id that opens the order file (the group file resolves from it). */
   detailOrderId: string;
   /**
-   * Test şeridi kaydı (App Review / QA hesapları, PayTR test modu). Liste onu
-   * GİZLEMEZ — panel "TEST" rozeti basar; raporlar hiç saymaz.
+   * Test-lane record (App Review / QA accounts, PayTR test mode). The list
+   * does NOT hide it — the panel shows a "TEST" badge; reports never count it.
    */
   isTest: boolean;
+  /**
+   * The cart's bucket over ALL its lines (`orderCartBucketOf`), whatever the
+   * deep-link scope shows: the panel marks `unpaid` carts (payment never
+   * completed) so they are not read as real orders. Null for a cart with no
+   * line.
+   */
+  bucket: OrderCartBucket | null;
   buyer: AdminOrderParty;
   totalAmount: number;
   subtotal: number;

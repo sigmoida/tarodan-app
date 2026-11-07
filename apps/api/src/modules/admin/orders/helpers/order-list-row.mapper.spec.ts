@@ -57,6 +57,8 @@ function line(overrides: Partial<ListLine> = {}): ListLine {
     shipment: null,
     offer: null,
     refundRequests: [],
+    payment: null,
+    checkoutGroup: { payment: { status: "completed" } },
     ...overrides,
   } as ListLine;
 }
@@ -255,6 +257,94 @@ describe("mapCartRow", () => {
       mapCartRow(head, [line(), line({ id: "o2", isTest: true })], ctx())
         .isTest,
     ).toBe(true);
+  });
+
+  describe("bucket", () => {
+    const head = {
+      kind: "group" as const,
+      id: "g1",
+      number: "GRP-1",
+      createdAt: NOW,
+    };
+    const groupPaid = (status: "pending" | "failed" | "completed" | null) => ({
+      checkoutGroup: { payment: status ? { status } : null },
+    });
+
+    it("an abandoned checkout (awaiting payment, no charge) is unpaid", () => {
+      const row = mapCartRow(
+        head,
+        [line({ status: "pending_payment", ...groupPaid("pending") })],
+        ctx(),
+      );
+      expect(row.bucket).toBe("unpaid");
+    });
+
+    it("a payment-expiry cancel with NO payment row is unpaid", () => {
+      const row = mapCartRow(
+        head,
+        [line({ status: "cancelled", ...groupPaid(null) })],
+        ctx(),
+      );
+      expect(row.bucket).toBe("unpaid");
+    });
+
+    it("an unpaid offer order (own payment failed, no group) is unpaid", () => {
+      const row = mapCartRow(
+        { ...head, kind: "order", id: "o1", number: "ORD-1" },
+        [
+          line({
+            origin: "offer",
+            status: "pending_payment",
+            checkoutGroupId: null,
+            checkoutGroup: null,
+            payment: { status: "failed" },
+          }),
+        ],
+        ctx(),
+      );
+      expect(row.bucket).toBe("unpaid");
+    });
+
+    it("a cancel after a charge is a real cancellation, by order or group payment", () => {
+      expect(
+        mapCartRow(
+          head,
+          [line({ status: "cancelled", ...groupPaid("completed") })],
+          ctx(),
+        ).bucket,
+      ).toBe("cancelled");
+      expect(
+        mapCartRow(
+          head,
+          [
+            line({
+              status: "cancelled",
+              checkoutGroup: null,
+              payment: { status: "refunded" },
+            }),
+          ],
+          ctx(),
+        ).bucket,
+      ).toBe("cancelled");
+    });
+
+    it("a live cart is in its stage", () => {
+      expect(mapCartRow(head, [line()], ctx()).bucket).toBe("new");
+    });
+
+    it("reads the whole cart when the shown lines are a deep-link subset", () => {
+      const shown = [line({ status: "delivered" })];
+      const whole = [
+        {
+          status: "delivered" as const,
+          shipment: null,
+          ...groupPaid("completed"),
+        },
+        { status: "paid" as const, shipment: null, ...groupPaid("completed") },
+      ].map((facts) => ({ ...facts, payment: null }));
+      expect(mapCartRow(head, shown, ctx()).bucket).toBe("delivered");
+      expect(mapCartRow(head, shown, ctx(), whole).bucket).toBe("new");
+    });
   });
 
   it("carries who cancelled the line, and null while nobody did", () => {
