@@ -1,7 +1,6 @@
 import { useTranslations } from "next-intl";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import {
-  Badge,
   offerStatusConfig,
   orderStatusConfig,
   shipmentProviderConfig,
@@ -12,6 +11,7 @@ import {
   type AdminOrderListRow,
   type AdminOrderPackage,
 } from "@tarodan/types";
+import { TableBadge } from "@/components/table/TableBadge";
 import { STATUS_TONE } from "@/lib/status-tone";
 import { statusConfig, statusLabel } from "@/lib/statusLabels";
 import { packageOrderStatuses } from "../../_lib/rowView";
@@ -43,7 +43,7 @@ function PackageCargo({
               </span>
             )}
           </span>
-          <Badge
+          <TableBadge
             status={shipment.status}
             config={statusConfig(shipmentStatusConfig, t)}
           />
@@ -55,21 +55,21 @@ function PackageCargo({
       )}
       <div className="flex flex-wrap gap-1">
         {unpaid && (
-          <Badge variant={STATUS_TONE.ended}>
+          <TableBadge variant={STATUS_TONE.ended}>
             {t(ADMIN_ORDER_BUCKET_I18N_KEYS.unpaid)}
-          </Badge>
+          </TableBadge>
         )}
         {packageOrderStatuses(pkg).map((status) => (
-          <Badge
+          <TableBadge
             key={status}
             status={status}
             config={statusConfig(orderStatusConfig, t)}
           />
         ))}
         {hasRefund && (
-          <Badge variant="danger">
+          <TableBadge variant="danger">
             {t("admin.operations.orders.status.refundInProgress")}
-          </Badge>
+          </TableBadge>
         )}
       </div>
     </div>
@@ -87,7 +87,7 @@ export function CargoStatusCell({ row }: { row: AdminOrderListRow }) {
   const t = useTranslations();
   if (row.packages.length === 0) {
     return row.offer ? (
-      <Badge
+      <TableBadge
         status={row.offer.status}
         config={statusConfig(offerStatusConfig, t)}
       />
